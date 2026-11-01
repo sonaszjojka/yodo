@@ -1,11 +1,13 @@
 # OS / editor
 .DS_Store
 .idea/
-.vscode/*
-!.vscode/extensions.json
+*.sw?
+**/.vscode/*
+!**/.vscode/extensions.json
 
 # Secrets and local env
 .env
+*.local
 .env.*
 !.env.example
 
