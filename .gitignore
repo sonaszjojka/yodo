@@ -1,0 +1,33 @@
+# OS / editor
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Secrets and local env
+.env
+.env.*
+!.env.example
+
+# Claude Code personal settings (shared settings.json stays tracked)
+.claude/settings.local.json
+
+# Node / web
+node_modules/
+dist/
+coverage/
+*.log
+
+# Go / server
+/server/bin/
+*.test
+*.out
+
+# SQLite data from local runs
+*.db
+*.db-shm
+*.db-wal
+
+# Playwright
+/e2e/test-results/
+/e2e/playwright-report/
