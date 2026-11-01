@@ -7,7 +7,6 @@
 
 # Secrets and local env
 .env
-/web/*.local
 .env.*
 !.env.example
 
@@ -17,6 +16,7 @@
 # Node / web
 node_modules/
 dist/
+*.local
 coverage/
 *.log
 
