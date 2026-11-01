@@ -20,7 +20,8 @@ Rule: every stage ends with a **file of decisions**, not just a conversation. Co
 - Done (2026-10-30): Stage 5. `docs/roadmap.md` approved: walking skeleton first, so M0 = Part B (scaffold, CI, Pages deploy, Docker image, Host/Origin checks), then M1 (draw + save in both modes + Home), M2 (styles, dark mode, images, export/import incl. Excalidraw, password, perf benchmark), M3 (folders, trash, search, attached arrows, v1.0.0).
 - Done (2026-10-30): Stage 6. `docs/conventions.md` approved: Conventional Commits without AI attribution trailers, GitHub flow (branch per task, PR, CI, `/code-review`, squash-merge to protected `main`), definition of done, MIT license. Workflow skills written in `.claude/skills/` (`feature`, `fix`, `commit`, `ship`, `adr`).
 - Done (2026-11-01): Part B step 1 (= roadmap 0.1). Repo `sonaszjojka/yodo` created (public, MIT); `web/` (Vite + React + TS strict, placeholder page with the logo) and `server/` (Go module stub) merged in PR #1. Also decided: TypeScript lint with oxlint (ADR 0016). `main` is protected on GitHub (squash merge only, ruleset "Protect main"), and `/code-review --comment` findings are triaged into fixes, `review` issues or replies (`docs/conventions.md`).
-- **Next step:** turn the roadmap tasks into GitHub Issues, then Part B step 2 (= roadmap 0.2, tooling).
+- Done (2026-11-01): roadmap tasks for M0 and M1 are GitHub Issues #6–#25, grouped in milestones M0–M3 and linked from `docs/roadmap.md`. M2 and M3 issues are created when M1 ends.
+- **Next step:** Part B step 2 (= roadmap 0.2, tooling, issue #6).
 
 ## Working mode: an educational project
 The goal is both the app and learning how to program with Claude as effectively as possible, so that the knowledge stays with you.

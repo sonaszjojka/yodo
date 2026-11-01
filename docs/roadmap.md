@@ -1,6 +1,6 @@
 # Yodo — Roadmap
 
-> Status: **approved 2026-10-30** (Stage 5 of `docs/plan.md`). Splits the MVP in `docs/product.md` into milestones and tasks of about one session each. Each task has a "done when…" criterion on top of the definition of done in `docs/conventions.md`. M0 and M1 tasks are GitHub Issues (number after each task name) grouped in milestones M0–M3; M2 and M3 issues are created when M1 ends. This file keeps the order and the milestone split.
+> Status: **approved 2026-10-30** (Stage 5 of `docs/plan.md`). Splits the MVP in `docs/product.md` into milestones and tasks of about one session each. Each task has a "done when…" criterion on top of the definition of done in `docs/conventions.md`. M0 and M1 tasks are GitHub Issues (linked after each task name; done tasks link the PR that shipped them) grouped in milestones M0–M3; M2 and M3 issues are created when M1 ends. This file keeps the order and the milestone split.
 
 ## Ordering principle: walking skeleton first
 M0 builds a thin end-to-end path through every part of the system (web app, Go server, SQLite, Docker image, Pages deploy, CI) before any feature work. Integration risks (Vite `base`, hash routing, `go:embed`, CI path filters) show up on day one, and from then on every task ships to a live URL. Features are added as vertical slices on top.
@@ -8,33 +8,33 @@ M0 builds a thin end-to-end path through every part of the system (web app, Go s
 ## M0 — Walking skeleton (= Part B of `docs/plan.md`)
 | # | Task | Done when… |
 |---|---|---|
-| 0.1 | Repo + scaffold ✓ (#1) | `sonaszjojka/yodo` exists with `web/` (Vite + React + TS strict) and `server/` (Go module) laid out per ADR 0012; `npm run dev` shows a placeholder page with the logo. |
-| 0.2 | Tooling (#6) | Format for TS and Go, lint for Go (TS lint: oxlint, ADR 0016), `npm test` and `go test ./...` each run one passing test, `sqlc generate` runs on an empty schema. Project CLAUDE.md via `/init`, extended with ADR rule + conventions. |
-| 0.3 | CI + Pages deploy (#7) | GitHub Actions runs web and server jobs with path filters; merging to `main` deploys the placeholder to `sonaszjojka.github.io/yodo/` (ADR 0007). |
-| 0.4 | Go server + Docker image (#8) | `server` embeds `dist/` and serves it with hash routing; `/api/health` returns 200; multi-stage `Dockerfile` builds an image pushed to GHCR; the documented `docker run` command shows the placeholder. |
-| 0.5 | Server security baseline (#9) | Host/Origin middleware per ADR 0008 (`YODO_ALLOWED_ORIGINS`), table-driven tests for allowed/blocked/missing-Origin cases. |
+| 0.1 | Repo + scaffold ✓ (PR [#1](https://github.com/sonaszjojka/yodo/pull/1)) | `sonaszjojka/yodo` exists with `web/` (Vite + React + TS strict) and `server/` (Go module) laid out per ADR 0012; `npm run dev` shows a placeholder page with the logo. |
+| 0.2 | Tooling ([#6](https://github.com/sonaszjojka/yodo/issues/6)) | Format for TS and Go, lint for Go (TS lint: oxlint, ADR 0016), `npm test` and `go test ./...` each run one passing test, `sqlc generate` runs on an empty schema. Project CLAUDE.md via `/init`, extended with ADR rule + conventions. |
+| 0.3 | CI + Pages deploy ([#7](https://github.com/sonaszjojka/yodo/issues/7)) | GitHub Actions runs web and server jobs with path filters; merging to `main` deploys the placeholder to `sonaszjojka.github.io/yodo/` (ADR 0007). |
+| 0.4 | Go server + Docker image ([#8](https://github.com/sonaszjojka/yodo/issues/8)) | `server` embeds `dist/` and serves it with hash routing; `/api/health` returns 200; multi-stage `Dockerfile` builds an image pushed to GHCR; the documented `docker run` command shows the placeholder. |
+| 0.5 | Server security baseline ([#9](https://github.com/sonaszjojka/yodo/issues/9)) | Host/Origin middleware per ADR 0008 (`YODO_ALLOWED_ORIGINS`), table-driven tests for allowed/blocked/missing-Origin cases. |
 
 ## M1 — Draw and keep it (both usage modes)
 Goal: open Yodo, draw basic shapes, close the browser, come back to the same drawing listed on Home, in hosted and self-hosted mode.
 
 | # | Task | Done when… |
 |---|---|---|
-| 1.1 | Document model + migrations skeleton (#10) | `web/src/core` defines the v1 document (ADR 0013) and element types; `migrate()` runs on load and is tested with a fixture. |
-| 1.2 | Canvas + rectangle (#11) | Full-window canvas, HiDPI-sharp; click-drag draws a rough.js rectangle with a fixed per-element seed; Shift keeps it square. **ADR:** frontend state management (open item from Stage 3). |
-| 1.3 | Pan + zoom (#12) | Hand tool / Space-drag pans; wheel/pinch zooms around the cursor; zoom % shown and resettable. Screen↔world transforms unit-tested. |
-| 1.4 | Diamond, ellipse, line, arrow (#13) | Each tool draws at the dragged size; Shift constrains; arrowhead on arrow. Hit-testing for every shape unit-tested. |
-| 1.5 | Selection (#14) | Click, Shift+click, box select; selection outline + handles per `docs/ui.md`; move and Delete. |
-| 1.6 | Resize (#15) | Corner/edge handles resize one or many elements; Shift keeps proportions; size badge shown. |
-| 1.7 | Undo / redo (#16) | Every change from 1.2–1.6 undoes/redoes with Cmd/Ctrl+Z and Shift+Cmd/Ctrl+Z. **ADR:** undo/redo design (open item from Stage 3). |
-| 1.8 | Pencil (#17) | Freehand strokes are smooth, selectable and movable as one element. |
-| 1.9 | Text (#18) | Click places a text box; double-click edits; text inside shapes. |
-| 1.10 | Eraser + tool shortcuts (#19) | Dragging erases (undoable); every tool so far has a single-key shortcut; editor toolbar per `docs/ui.md`. |
-| 1.11 | Repository interface + IndexedDB (#20) | `DrawingRepository` + `InMemory` and `IndexedDb` implementations pass one shared contract suite (ADR 0005, 0011). |
-| 1.12 | SQLite + HTTP API (#21) | goose migration for `drawings`, sqlc queries, CRUD handlers with `httptest` tests on a temp SQLite file (ADR 0006, 0009, 0010). |
-| 1.13 | HTTP repository + mode detection (#22) | `HttpDrawingRepository` passes the same contract suite against a running server; app picks HTTP if `/api/health` answers, otherwise IndexedDB. |
-| 1.14 | Auto-save (#23) | Changes save debounced, with save status in the bottom bar; reload restores the drawing in both modes. |
-| 1.15 | Home screen (#24) | Card grid with thumbnail, name, last edited; "+ New drawing" tile; open, rename; sort by recent/name/created. Hash routes `#/` and `#/d/:id`. |
-| 1.16 | M1 e2e (#25) | Playwright: draw → reload → open from Home, in hosted and self-hosted mode (ADR 0011). |
+| 1.1 | Document model + migrations skeleton ([#10](https://github.com/sonaszjojka/yodo/issues/10)) | `web/src/core` defines the v1 document (ADR 0013) and element types; `migrate()` runs on load and is tested with a fixture. |
+| 1.2 | Canvas + rectangle ([#11](https://github.com/sonaszjojka/yodo/issues/11)) | Full-window canvas, HiDPI-sharp; click-drag draws a rough.js rectangle with a fixed per-element seed; Shift keeps it square. **ADR:** frontend state management (open item from Stage 3). |
+| 1.3 | Pan + zoom ([#12](https://github.com/sonaszjojka/yodo/issues/12)) | Hand tool / Space-drag pans; wheel/pinch zooms around the cursor; zoom % shown and resettable. Screen↔world transforms unit-tested. |
+| 1.4 | Diamond, ellipse, line, arrow ([#13](https://github.com/sonaszjojka/yodo/issues/13)) | Each tool draws at the dragged size; Shift constrains; arrowhead on arrow. Hit-testing for every shape unit-tested. |
+| 1.5 | Selection ([#14](https://github.com/sonaszjojka/yodo/issues/14)) | Click, Shift+click, box select; selection outline + handles per `docs/ui.md`; move and Delete. |
+| 1.6 | Resize ([#15](https://github.com/sonaszjojka/yodo/issues/15)) | Corner/edge handles resize one or many elements; Shift keeps proportions; size badge shown. |
+| 1.7 | Undo / redo ([#16](https://github.com/sonaszjojka/yodo/issues/16)) | Every change from 1.2–1.6 undoes/redoes with Cmd/Ctrl+Z and Shift+Cmd/Ctrl+Z. **ADR:** undo/redo design (open item from Stage 3). |
+| 1.8 | Pencil ([#17](https://github.com/sonaszjojka/yodo/issues/17)) | Freehand strokes are smooth, selectable and movable as one element. |
+| 1.9 | Text ([#18](https://github.com/sonaszjojka/yodo/issues/18)) | Click places a text box; double-click edits; text inside shapes. |
+| 1.10 | Eraser + tool shortcuts ([#19](https://github.com/sonaszjojka/yodo/issues/19)) | Dragging erases (undoable); every tool so far has a single-key shortcut; editor toolbar per `docs/ui.md`. |
+| 1.11 | Repository interface + IndexedDB ([#20](https://github.com/sonaszjojka/yodo/issues/20)) | `DrawingRepository` + `InMemory` and `IndexedDb` implementations pass one shared contract suite (ADR 0005, 0011). |
+| 1.12 | SQLite + HTTP API ([#21](https://github.com/sonaszjojka/yodo/issues/21)) | goose migration for `drawings`, sqlc queries, CRUD handlers with `httptest` tests on a temp SQLite file (ADR 0006, 0009, 0010). |
+| 1.13 | HTTP repository + mode detection ([#22](https://github.com/sonaszjojka/yodo/issues/22)) | `HttpDrawingRepository` passes the same contract suite against a running server; app picks HTTP if `/api/health` answers, otherwise IndexedDB. |
+| 1.14 | Auto-save ([#23](https://github.com/sonaszjojka/yodo/issues/23)) | Changes save debounced, with save status in the bottom bar; reload restores the drawing in both modes. |
+| 1.15 | Home screen ([#24](https://github.com/sonaszjojka/yodo/issues/24)) | Card grid with thumbnail, name, last edited; "+ New drawing" tile; open, rename; sort by recent/name/created. Hash routes `#/` and `#/d/:id`. |
+| 1.16 | M1 e2e ([#25](https://github.com/sonaszjojka/yodo/issues/25)) | Playwright: draw → reload → open from Home, in hosted and self-hosted mode (ADR 0011). |
 
 ## M2 — Style, share, move between tools
 | # | Task | Done when… |
