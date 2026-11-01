@@ -5,6 +5,8 @@
 //
 //	YODO_ADDR  listen address, default 127.0.0.1:8080 (the Docker image sets
 //	           0.0.0.0:8080, ADR 0019)
+//	YODO_ALLOWED_ORIGINS  comma-separated origins the server accepts requests
+//	           for, default http://localhost:8080,http://127.0.0.1:8080 (ADR 0008)
 package main
 
 import (
@@ -41,16 +43,22 @@ func run(ctx context.Context, getenv func(string) string) error {
 		addr = defaultAddr
 	}
 
+	// Fail fast on a typo instead of blocking every request later.
+	origins, err := server.ParseAllowedOrigins(getenv("YODO_ALLOWED_ORIGINS"))
+	if err != nil {
+		return err
+	}
+
 	srv := &http.Server{
 		Addr:    addr,
-		Handler: server.New(webui.FS()),
+		Handler: server.New(webui.FS(), origins),
 		// Bounds slow clients that never finish their headers (Slowloris).
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	errc := make(chan error, 1)
 	go func() {
-		slog.Info("yodo server listening", "addr", addr)
+		slog.Info("yodo server listening", "addr", addr, "allowed_origins", origins)
 		errc <- srv.ListenAndServe()
 	}()
 
