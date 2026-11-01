@@ -19,10 +19,13 @@ Node 24 (`web/.nvmrc`, `nvm use`), Go 1.27. golangci-lint 2.15 is a separate bin
 **server/** (run from `server/`)
 | Task | Command |
 |---|---|
-| Tests | `go test ./...` · one test: `go test ./cmd/yodo -run TestName` |
+| Tests | `go test ./...` · one test: `go test ./internal/server -run TestName` |
 | Lint | `golangci-lint run` |
 | Format | `golangci-lint fmt` · check: `golangci-lint fmt --diff` (gofmt + goimports) |
 | Generate SQL code | `go tool sqlc generate` (commit the output in `internal/db/`) |
+| Run | `go run ./cmd/yodo` (listens on `YODO_ADDR`, default `127.0.0.1:8080`) |
+
+**Docker image** (run from the repo root): `docker build -t yodo .`, then `docker run -p 127.0.0.1:8080:8080 -v yodo-data:/data yodo`. The build copies `web/dist` into `server/internal/webui/dist/` for `go:embed` (ADR 0019).
 
 Before calling a task done, run the test, lint, format-check and type-check commands for every part that changed (definition of done, `docs/conventions.md`).
 
