@@ -19,7 +19,7 @@ Format ([conventionalcommits.org](https://www.conventionalcommits.org/)):
 
 ## Branches and flow: GitHub flow with squash merge
 - `main` is always deployable (it deploys to GitHub Pages) and is protected: changes land only through PRs with green CI.
-- Enforced on GitHub: repo settings allow squash merge only (commit title = PR title) and delete merged branches; the ruleset "Protect main" requires a PR (0 approvals, since a solo owner cannot approve their own PR) with all review threads resolved, and blocks force-push and deletion, with no bypass. The CI status check is added to the ruleset in roadmap task 0.3.
+- Enforced on GitHub: repo settings allow squash merge only (commit title = PR title) and delete merged branches; the ruleset "Protect main" requires a PR (0 approvals, since a solo owner cannot approve their own PR) with all review threads resolved, and blocks force-push and deletion, with no bypass, and requires the `ci` status check to pass ([ADR 0018](adr/0018-ci-github-actions-gate-job.md)).
 - One short-lived branch per roadmap task or bug: `<type>/<id>-<slug>`, e.g. `feat/1.2-rectangle-tool`, `fix/42-undo-after-delete`, `docs/roadmap-m2`.
 - The loop for every change:
   1. `/clear`, then state one goal (a roadmap task or an issue).

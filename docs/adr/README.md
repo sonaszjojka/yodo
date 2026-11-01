@@ -28,3 +28,4 @@ Why Yodo is built the way it is. See [0001](0001-record-architecture-decisions.m
 | [0015](0015-store-light-colours-adapt-in-dark-mode.md) | Store light colours, adapt them when rendering dark | Accepted |
 | [0016](0016-typescript-lint-oxlint.md) | Lint TypeScript with oxlint | Accepted |
 | [0017](0017-formatting-go-lint-and-go-tools.md) | Prettier + gofmt, golangci-lint, Go tools via `go tool` | Accepted |
+| [0018](0018-ci-github-actions-gate-job.md) | CI: one workflow, path filters, `ci` gate job | Accepted |
