@@ -41,8 +41,8 @@ Commit without a separate approval step: approving the plan covers it. Otherwise
 ## 7. Hand off
 Give the recap: what was done, why that way, what's worth learning. End with the reviewer command, made to stand out: its own bold header line, then a fenced block holding only the command, with the real branch name:
 
-**👉 Reviewer command: run in a clean session (`/clear` or a new terminal), fix findings there, then come back**
+**👉 Reviewer command: run in a clean session (`/clear` or a new terminal), fix bugs only, one round, then come back**
 ```
-/code-review medium <branch>
+/code-review low <branch>
 ```
-`medium` is the default level; suggest a higher one only for risky changes (storage, auth, document format). When the user comes back after the review, suggest `/ship` — do not push on your own.
+Review rules to repeat in one line under the block: one round per branch, with no re-review after the fixes; fix correctness bugs; a cleanup becomes a `review` issue only if the user wants it, otherwise drop it. Suggest `medium` only for risky changes (storage, auth, document format). When the user comes back after the review, suggest `/ship` — do not push on your own.
