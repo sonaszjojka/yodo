@@ -33,3 +33,9 @@ coverage/
 # Playwright
 /e2e/test-results/
 /e2e/playwright-report/
+
+# Frontend copied in for go:embed by the image build (ADR 0019). Re-include
+# the directory (the dist/ rule above ignores it) so its .gitkeep is tracked.
+!/server/internal/webui/dist/
+/server/internal/webui/dist/*
+!/server/internal/webui/dist/.gitkeep

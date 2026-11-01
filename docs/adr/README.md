@@ -29,3 +29,4 @@ Why Yodo is built the way it is. See [0001](0001-record-architecture-decisions.m
 | [0016](0016-typescript-lint-oxlint.md) | Lint TypeScript with oxlint | Accepted |
 | [0017](0017-formatting-go-lint-and-go-tools.md) | Prettier + gofmt, golangci-lint, Go tools via `go tool` | Accepted |
 | [0018](0018-ci-github-actions-gate-job.md) | CI: one workflow, path filters, `ci` gate job | Accepted |
+| [0019](0019-docker-image-build-and-publishing.md) | Docker image: dist copied into the Go package, distroless, multi-arch from `main` | Accepted |

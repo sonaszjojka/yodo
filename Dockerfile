@@ -1,0 +1,40 @@
+# syntax=docker/dockerfile:1
+# Self-hosted Yodo image (ADR 0007, 0019): Node builds web/dist, Go builds a
+# static binary that embeds it, distroless runs it as a non-root user.
+# Base images are pinned by digest; bump tag and digest together.
+
+# Builder stages run on the build machine's platform and cross-compile, so a
+# multi-arch build needs no emulation.
+FROM --platform=$BUILDPLATFORM node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85 AS web
+WORKDIR /src/web
+# Dependencies first, so source edits reuse the cached npm ci layer.
+COPY web/package.json web/package-lock.json ./
+RUN npm ci
+COPY web/ ./
+RUN npm run build
+
+FROM --platform=$BUILDPLATFORM golang:1.27@sha256:2920bb124f1a2e12a1d39f0cab756ae0068441ee1da7655dec7f5e374944095b AS server
+ARG TARGETOS TARGETARCH
+WORKDIR /src/server
+COPY server/go.mod server/go.sum ./
+RUN go mod download
+COPY server/ ./
+COPY --from=web /src/web/dist ./internal/webui/dist
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    go build -trimpath -ldflags="-s -w" -o /out/yodo ./cmd/yodo
+# Owned by the distroless nonroot user, so a new named volume is writable.
+RUN mkdir -p /out/data
+
+FROM gcr.io/distroless/static-debian13:nonroot@sha256:25ac8f0c3b2334a9eb05452266bd4697864a8c8ef0ef71e5e6480d7f92868329
+LABEL org.opencontainers.image.source="https://github.com/sonaszjojka/yodo" \
+      org.opencontainers.image.description="Yodo: local-first drawing app, self-hosted" \
+      org.opencontainers.image.licenses="MIT"
+COPY --from=server /out/yodo /usr/local/bin/yodo
+COPY --from=server --chown=65532:65532 /out/data /data
+# 0.0.0.0 is required for Docker port publishing; limit access with
+# -p 127.0.0.1:8080:8080 instead (ADR 0007).
+ENV YODO_ADDR=0.0.0.0:8080
+EXPOSE 8080
+VOLUME /data
+USER nonroot:nonroot
+ENTRYPOINT ["/usr/local/bin/yodo"]
