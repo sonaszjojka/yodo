@@ -26,7 +26,8 @@ Ask before each of: push, opening the PR, merging. Never merge without an explic
 - Watch with `gh pr checks --watch`. If a check fails, read the log (`gh run view --log-failed`), fix on the branch via the commit workflow, push again.
 
 ## 4. Review
-- Suggest the user run `/code-review --comment` on the PR (a fresh context catches what the authoring session misses); findings land as inline PR comments.
+- The branch is normally reviewed before `/ship`: `/feature` and `/fix` end with the reviewer command, and the user fixes findings in that clean session. If the user says the branch was not reviewed, give that command now (same format as the `/feature` hand-off) and wait until they come back.
+- Comments that show up on the PR itself (the user's own review, or anything else) are triaged as below.
 - Triage every finding with the user, one of:
   - **Fix now:** a new commit on the branch; resolve the comment thread (the ruleset blocks merging with unresolved threads).
   - **Later:** propose a follow-up issue and create it only after the user agrees: `gh issue create --label review` with the finding, the file/line and a link to the PR. Reply on the comment thread with the issue link, then resolve it.
