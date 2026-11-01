@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest'
+import { afterEach, expect, test, vi } from 'vitest'
 import { createDocument } from './create.ts'
 import { loadDocument } from './migrate.ts'
 import { CURRENT_SCHEMA_VERSION } from './types.ts'
@@ -31,4 +31,22 @@ test('uses the given name and a new id each time', () => {
 test('survives a save and load round trip', () => {
   const doc = createDocument('Round trip')
   expect(loadDocument(JSON.stringify(doc))).toEqual(doc)
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
+test('creates an id where crypto.randomUUID is missing (plain HTTP)', () => {
+  // Browsers expose randomUUID only in secure contexts, e.g. not on
+  // http://192.168.1.10:8080; getRandomValues is available everywhere.
+  vi.stubGlobal('crypto', {
+    getRandomValues: crypto.getRandomValues.bind(crypto),
+  })
+
+  const a = createDocument()
+  const b = createDocument()
+
+  expect(a.id).toMatch(UUID)
+  expect(a.id).not.toBe(b.id)
 })
