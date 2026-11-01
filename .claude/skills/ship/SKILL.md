@@ -15,6 +15,15 @@ Ask before each of: push, opening the PR, merging. Never merge without an explic
 - Not on `main`; working tree clean; definition of done (`docs/conventions.md`) met — re-run tests/lint if anything changed since the last run.
 - Rebase onto the latest `main` if it moved (`git fetch` then `git rebase origin/main`); re-run tests after a rebase.
 
+## 1b. Sync docs (before pushing, so they land in the same PR)
+- Sweep for data, requirements or decisions this branch made stale:
+  - `docs/roadmap.md`: tick the task row (`✓`, as 0.1 shows).
+  - `docs/plan.md`: add a dated "Done" line to Status and move "Next step" to the next task and its issue.
+  - Also `docs/adr/README.md`, `docs/product.md`, `docs/ui.md`, `docs/conventions.md`, README, CLAUDE.md and project memory.
+- List each stale item (file, what's outdated, proposed fix) and wait for the user's OK; if nothing is stale, say so. Leave superseded ADRs as history.
+- Commit the approved edits on the branch as `docs: sync docs for <task id>` (commit workflow, no separate approval needed after the OK).
+- Note issues the branch also resolves (beyond the task's own), to list as `Closes #n` in the PR body.
+
 ## 2. Push and open the PR
 - Push with `git push -u origin <branch>`.
 - Open the PR with `gh pr create`:
@@ -26,7 +35,8 @@ Ask before each of: push, opening the PR, merging. Never merge without an explic
 - Watch with `gh pr checks --watch`. If a check fails, read the log (`gh run view --log-failed`), fix on the branch via the commit workflow, push again.
 
 ## 4. Review
-- Suggest the user run `/code-review --comment` on the PR (a fresh context catches what the authoring session misses); findings land as inline PR comments.
+- The branch is normally reviewed before `/ship`: `/feature` and `/fix` end with the reviewer command, and the user fixes findings in that clean session. If the user says the branch was not reviewed, give that command now (same format as the `/feature` hand-off) and wait until they come back.
+- Comments that show up on the PR itself (the user's own review, or anything else) are triaged as below.
 - Triage every finding with the user, one of:
   - **Fix now:** a new commit on the branch; resolve the comment thread (the ruleset blocks merging with unresolved threads).
   - **Later:** propose a follow-up issue and create it only after the user agrees: `gh issue create --label review` with the finding, the file/line and a link to the PR. Reply on the comment thread with the issue link, then resolve it.
@@ -41,5 +51,4 @@ Ask before each of: push, opening the PR, merging. Never merge without an explic
 - Claude Code's auto mode blocks Claude from merging, and the owner merges anyway: give the user `! gh pr merge <n> --squash` to run. The PR title becomes the commit subject, and GitHub deletes the remote branch.
 - Then `git fetch --prune && git switch main && git pull --ff-only`.
 - Delete the local branch only after checking nothing is lost: a squash merge makes `git branch -d` always refuse, so confirm `git diff <branch> main` is empty first, then `git branch -D <branch>`. If the diff is not empty, stop and show it to the user.
-- If the task came from `docs/roadmap.md`, mark it done there in the next docs commit (or include it in the PR).
 - Recap and suggest `/clear` before the next task.

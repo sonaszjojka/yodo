@@ -26,9 +26,9 @@ Format ([conventionalcommits.org](https://www.conventionalcommits.org/)):
   2. Plan mode for anything bigger than a small fix; the owner approves the plan.
   3. Implement in small steps, tests first where practical (ADR 0011).
   4. Verify against the definition of done below.
-  5. Claude proposes the commit (message + diff summary); the owner approves before it is made.
-  6. Push and open a PR (title = the future squash commit, in Conventional Commit format) on the owner's command.
-  7. `/code-review --comment` in a fresh context (findings become inline PR comments), then the owner reviews the PR. Each finding is fixed in the PR, deferred to a follow-up issue labelled `review` (created with the owner's OK), or answered with a reason; every thread is resolved before merge.
+  5. Claude commits on the branch (the plan approval covers it; `/feature` and `/fix` do this) and ends with the reviewer command for the branch.
+  6. The owner runs `/code-review low <branch>` in a fresh context (`medium` only for risky changes: storage, auth, document format). One round per branch, with no re-review after the fixes: fix correctness bugs there; a cleanup becomes a follow-up issue labelled `review` only if the owner wants it (created with the owner's OK), otherwise it is dropped. Severity-based triage keeps the review loop finite.
+  7. Back in the authoring session, `/ship`: sync the docs the branch made stale (roadmap tick, plan status, others with the owner's OK) as a commit in the same PR, then push and open a PR (title = the future squash commit, in Conventional Commit format) on the owner's command; the owner reviews the PR, and every PR comment thread is fixed or answered and resolved before merge.
   8. Squash-merge on the owner's command; delete the branch; `/clear`.
 - Worktrees only for genuinely parallel sessions (e.g. web and server at once), each on its own branch.
 
@@ -45,10 +45,10 @@ A task is done only when all of these hold:
 | Step | Claude | Owner |
 |---|---|---|
 | Plan, code, tests, verification | does | approves the plan |
-| Commit | prepares message + diff | approves |
+| Commit | commits on the branch after the approved plan | can amend or reject before `/ship` |
 | Branch, push, PR | prepares the command | approves each one |
 | Merge | prepares the command | runs it (`! gh pr merge <n> --squash`; Claude Code blocks Claude from merging) |
-| Review | runs `/code-review --comment`, triages findings, proposes follow-up issues | approves issues, final review + merge |
+| Review | gives the reviewer command; triages PR comments, proposes follow-up issues | runs the review in a fresh session and fixes findings; approves issues, final review + merge |
 
 ## License
 **MIT.** Short, permissive and common for self-hostable tools (Excalidraw also uses MIT); fits the goal of letting anyone run their own copy. `LICENSE` is in the repo root.

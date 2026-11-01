@@ -33,10 +33,16 @@ Goal: $ARGUMENTS
 - Run the test, lint, format and type-check commands for every part that changed (see the project CLAUDE.md for exact commands). All must pass; report failures with output rather than hiding them.
 - For UI changes, run the app and check the behaviour in the browser with a screenshot (light theme, and dark once it exists).
 - Check the "done when…" criterion item by item and say which evidence proves each.
-- Update docs the change made stale; tick nothing in the roadmap until merged.
+- Update docs the change itself made stale (ADR, `docs/ui.md`, CLAUDE.md commands). The roadmap tick and plan status are done by `/ship`'s docs sync.
 
 ## 6. Commit
-Follow `.claude/skills/commit/SKILL.md` (type `feat`, scope by area, `Refs #<issue>` if one exists).
+Commit without a separate approval step: approving the plan covers it. Otherwise follow `.claude/skills/commit/SKILL.md` (type `feat`, scope by area, `Refs #<issue>` if one exists): guard secrets, split unrelated changes into separate commits, stage files by name, and show `git log --stat` for the new commits. Leave out docs edits the user has not approved yet, and say so.
 
 ## 7. Hand off
-Give the recap: what was done, why that way, what's worth learning. Suggest `/ship` as the next step — do not push on your own.
+Give the recap: what was done, why that way, what's worth learning. End with the reviewer command, made to stand out: its own bold header line, then a fenced block holding only the command, with the real branch name:
+
+**👉 Reviewer command: run in a clean session (`/clear` or a new terminal), fix bugs only, one round, then come back**
+```
+/code-review low <branch>
+```
+Review rules to repeat in one line under the block: one round per branch, with no re-review after the fixes; fix correctness bugs; a cleanup becomes a `review` issue only if the user wants it, otherwise drop it. Suggest `medium` only for risky changes (storage, auth, document format). When the user comes back after the review, suggest `/ship` — do not push on your own.

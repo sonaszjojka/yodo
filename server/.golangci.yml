@@ -1,0 +1,11 @@
+# golangci-lint v2 config (ADR 0017).
+version: "2"
+
+linters:
+  # The standard set: errcheck, govet, ineffassign, staticcheck, unused.
+  default: standard
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
