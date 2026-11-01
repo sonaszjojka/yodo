@@ -1,5 +1,6 @@
 // The "scribble tile" logo from docs/ui.md: a teal rounded square with one pen stroke,
-// followed by the wordmark. The tile alone is also the favicon (public/favicon.svg).
+// followed by the wordmark. The tile alone is also the favicon (public/favicon.svg):
+// keep the geometry and stroke width in sync with it.
 export function Logo() {
   return (
     <span className="logo">

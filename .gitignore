@@ -7,7 +7,7 @@
 
 # Secrets and local env
 .env
-*.local
+/web/*.local
 .env.*
 !.env.example
 

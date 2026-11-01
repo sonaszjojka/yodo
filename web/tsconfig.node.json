@@ -6,7 +6,7 @@
     "types": ["node"],
     "skipLibCheck": true,
 
-    /* Bundler mode */
+    /* Module resolution: Node ESM (nodenext), since vite.config.ts runs in Node */
     "module": "nodenext",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
