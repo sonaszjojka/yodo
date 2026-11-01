@@ -1,0 +1,10 @@
+# sqlc config (ADR 0010): typed Go code from the goose migrations + queries.
+version: "2"
+sql:
+  - engine: sqlite
+    schema: migrations
+    queries: queries
+    gen:
+      go:
+        package: db
+        out: internal/db
