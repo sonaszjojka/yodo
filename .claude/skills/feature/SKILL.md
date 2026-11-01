@@ -33,7 +33,7 @@ Goal: $ARGUMENTS
 - Run the test, lint, format and type-check commands for every part that changed (see the project CLAUDE.md for exact commands). All must pass; report failures with output rather than hiding them.
 - For UI changes, run the app and check the behaviour in the browser with a screenshot (light theme, and dark once it exists).
 - Check the "done when…" criterion item by item and say which evidence proves each.
-- Update docs the change made stale; tick nothing in the roadmap until merged.
+- Update docs the change itself made stale (ADR, `docs/ui.md`, CLAUDE.md commands). The roadmap tick and plan status are done by `/ship`'s docs sync.
 
 ## 6. Commit
 Commit without a separate approval step: approving the plan covers it. Otherwise follow `.claude/skills/commit/SKILL.md` (type `feat`, scope by area, `Refs #<issue>` if one exists): guard secrets, split unrelated changes into separate commits, stage files by name, and show `git log --stat` for the new commits. Leave out docs edits the user has not approved yet, and say so.
