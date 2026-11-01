@@ -96,11 +96,19 @@ export function Canvas({ editor }: { editor: Editor }) {
     if (event.button !== 0) return
     // Keep receiving moves when the pointer leaves the canvas mid-drag.
     event.currentTarget.setPointerCapture(event.pointerId)
-    editor.rectangleTool.pointerDown(toPoint(event), event.shiftKey)
+    editor.rectangleTool.pointerDown(
+      event.pointerId,
+      toPoint(event),
+      event.shiftKey,
+    )
   }
 
   function onPointerMove(event: PointerEvent<HTMLCanvasElement>) {
-    editor.rectangleTool.pointerMove(toPoint(event), event.shiftKey)
+    editor.rectangleTool.pointerMove(
+      event.pointerId,
+      toPoint(event),
+      event.shiftKey,
+    )
   }
 
   return (
@@ -109,8 +117,10 @@ export function Canvas({ editor }: { editor: Editor }) {
       className="canvas"
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
-      onPointerUp={() => editor.rectangleTool.pointerUp()}
-      onPointerCancel={() => editor.rectangleTool.cancel()}
+      onPointerUp={(event) => editor.rectangleTool.pointerUp(event.pointerId)}
+      onPointerCancel={(event) =>
+        editor.rectangleTool.pointerCancel(event.pointerId)
+      }
     />
   )
 }
