@@ -42,3 +42,8 @@ body {
   font-weight: 800;
   letter-spacing: -0.02em;
 }
+
+/* Block-level flex box, so the inlined SVG gets no extra space below its baseline. */
+.logo-tile {
+  display: flex;
+}

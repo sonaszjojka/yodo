@@ -1,2 +1,0 @@
-<!-- Same tile as web/src/ui/Logo.tsx; keep the geometry and stroke width in sync. -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" rx="11" fill="#0F766E"/><path d="M10 26 C12 15 20 11 24.5 15.5 C29 20 22.5 27.5 18 24.5 C13.5 21.5 21 11.5 31 13.5" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/></svg>
