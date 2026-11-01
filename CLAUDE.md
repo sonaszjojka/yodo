@@ -44,4 +44,4 @@ Before calling a task done, run the test, lint, format-check and type-check comm
 - Roadmap tasks flagged `needs-adr` need their ADR before implementation.
 - Follow `docs/conventions.md`: Conventional Commits (scopes `web`, `server`, `e2e`, `docs`, `ci`, `deps`), **no AI attribution trailers**, one branch per task (`feat/<id>-<slug>`), and PRs squash-merged into protected `main`. The owner approves commits, pushes, PRs and merges.
 - UI work follows `docs/ui.md`; product scope and done-when criteria are in `docs/product.md` and `docs/roadmap.md`.
-- Workflow skills in `.claude/skills/`: `/feature`, `/fix`, `/commit`, `/ship`, `/adr`.
+- Workflow skills in `.claude/skills/`: `/feature`, `/fix`, `/retest`, `/commit`, `/ship`, `/adr`.

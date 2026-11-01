@@ -28,7 +28,7 @@ Format ([conventionalcommits.org](https://www.conventionalcommits.org/)):
   4. Verify against the definition of done below.
   5. Claude commits on the branch (the plan approval covers it; `/feature` and `/fix` do this) and ends with the reviewer command for the branch.
   6. The owner runs `/code-review low <branch>` in a fresh context (`medium` only for risky changes: storage, auth, document format). One round per branch, with no re-review after the fixes: fix correctness bugs there; a cleanup becomes a follow-up issue labelled `review` only if the owner wants it (created with the owner's OK), otherwise it is dropped. Severity-based triage keeps the review loop finite.
-  7. Back in the authoring session, `/ship`: sync the docs the branch made stale (roadmap tick, plan status, others with the owner's OK) as a commit in the same PR, then push and open a PR (title = the future squash commit, in Conventional Commit format) on the owner's command; the owner reviews the PR, and every PR comment thread is fixed or answered and resolved before merge.
+  7. Back in the authoring session, `/retest` re-runs the checks and re-verifies each review fix in the browser; then `/ship`: sync the docs the branch made stale (roadmap tick, plan status, others with the owner's OK) as a commit in the same PR, then push and open a PR (title = the future squash commit, in Conventional Commit format) on the owner's command; the owner reviews the PR, and every PR comment thread is fixed or answered and resolved before merge.
   8. Squash-merge on the owner's command; delete the branch; `/clear`.
 - Worktrees only for genuinely parallel sessions (e.g. web and server at once), each on its own branch.
 
@@ -58,6 +58,7 @@ A task is done only when all of these hold:
 |---|---|
 | `/feature <task id or description>` | A roadmap task or new behaviour, end to end up to the PR. |
 | `/fix <issue # or bug description>` | A bug: reproduce, failing test, fix, verify. |
+| `/retest [branch]` | After the review round: re-run the checks and re-verify the review fixes and affected done-when items. |
 | `/commit` | Propose a Conventional Commit for the current changes. |
 | `/ship` | Push, open the PR, review, and merge on command. |
 | `/adr <decision>` | Record an architectural decision as an ADR. |

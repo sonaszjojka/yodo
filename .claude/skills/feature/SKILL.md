@@ -45,4 +45,4 @@ Give the recap: what was done, why that way, what's worth learning. End with the
 ```
 /code-review low <branch>
 ```
-Review rules to repeat in one line under the block: one round per branch, with no re-review after the fixes; fix correctness bugs; a cleanup becomes a `review` issue only if the user wants it, otherwise drop it. Suggest `medium` only for risky changes (storage, auth, document format). When the user comes back after the review, suggest `/ship` — do not push on your own.
+Review rules to repeat in one line under the block: one round per branch, with no re-review after the fixes; fix correctness bugs; a cleanup becomes a `review` issue only if the user wants it, otherwise drop it. Suggest `medium` only for risky changes (storage, auth, document format). When the user comes back after the review, suggest `/retest`, then `/ship` — do not push on your own.
