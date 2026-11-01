@@ -18,7 +18,7 @@ Why Yodo is built the way it is. See [0001](0001-record-architecture-decisions.m
 | [0005](0005-browser-storage-indexeddb.md) | IndexedDB via `idb` in hosted mode, repository interface | Accepted |
 | [0006](0006-self-hosted-storage-go-sqlite.md) | Self-hosted storage: Go server + SQLite | Accepted |
 | [0007](0007-distribution-pages-and-docker-go-server.md) | GitHub Pages + Docker image with Go server | Accepted |
-| [0008](0008-auth-none-hosted-optional-password-self-hosted.md) | Auth: none hosted; localhost + optional password self-hosted | Accepted |
+| [0008](0008-auth-none-hosted-optional-password-self-hosted.md) | Auth: none hosted; localhost + optional password self-hosted | Superseded by [0020](0020-auth-and-origin-checks.md) |
 | [0009](0009-go-http-standard-library.md) | Go HTTP: standard library `net/http` | Accepted |
 | [0010](0010-sql-sqlc-modernc-sqlite-goose.md) | SQL: sqlc + modernc SQLite + embedded goose | Accepted |
 | [0011](0011-testing-strategy.md) | Testing: pyramid + repository contract + few e2e/visual | Accepted |
@@ -30,3 +30,4 @@ Why Yodo is built the way it is. See [0001](0001-record-architecture-decisions.m
 | [0017](0017-formatting-go-lint-and-go-tools.md) | Prettier + gofmt, golangci-lint, Go tools via `go tool` | Accepted |
 | [0018](0018-ci-github-actions-gate-job.md) | CI: one workflow, path filters, `ci` gate job | Accepted |
 | [0019](0019-docker-image-build-and-publishing.md) | Docker image: dist copied into the Go package, distroless, multi-arch from `main` | Accepted |
+| [0020](0020-auth-and-origin-checks.md) | Auth as 0008, plus check `Origin` whenever present and deny unlisted methods | Accepted |

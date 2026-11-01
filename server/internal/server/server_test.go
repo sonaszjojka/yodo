@@ -33,7 +33,10 @@ func TestHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rec := httptest.NewRecorder()
-			New(tt.static).ServeHTTP(rec, httptest.NewRequest(tt.method, tt.path, nil))
+			// httptest requests use Host example.com.
+			req := httptest.NewRequest(tt.method, tt.path, nil)
+			req.Header.Set("Origin", "http://example.com")
+			New(tt.static, mustParse(t, "http://example.com")).ServeHTTP(rec, req)
 
 			if rec.Code != tt.wantStatus {
 				t.Fatalf("status = %d, want %d", rec.Code, tt.wantStatus)
@@ -45,5 +48,18 @@ func TestHandler(t *testing.T) {
 				t.Errorf("body = %q, want it to contain %q", rec.Body.String(), tt.wantBodyHas)
 			}
 		})
+	}
+}
+
+// The origin rules themselves are tested in origin_test.go; this only checks
+// that New puts them in front of every route.
+func TestHandlerChecksOrigin(t *testing.T) {
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/health", nil)
+	req.Host = "evil.example"
+	New(builtFS, mustParse(t, "http://example.com")).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
 	}
 }

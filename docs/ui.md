@@ -22,7 +22,7 @@
 | Search results | Split into "In names" (cards) and "In text on the canvas" (rows with highlighted snippets). |
 | Export dialog | Tabs PNG / SVG / Yodo file; scope (whole drawing or selection), background on/off, dark version, scale (PNG), file name, Copy / Download. |
 | Keyboard shortcuts | Modal with search, grouped (Tools, Editing, View, Drawings). Key choices are placeholders until each feature is built. |
-| Password screen | Self-hosted only, when `YODO_PASSWORD` is set (ADR 0008): password, "Remember this browser", Unlock, clear error state. |
+| Password screen | Self-hosted only, when `YODO_PASSWORD` is set (ADR 0020): password, "Remember this browser", Unlock, clear error state. |
 
 ## Editing styles
 - **Contextual bar** above the selection:
