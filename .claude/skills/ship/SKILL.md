@@ -9,7 +9,7 @@ disable-model-invocation: true
 
 Issue: $ARGUMENTS
 
-Ask before each of: push, opening the PR, merging. Never merge without an explicit "merge".
+Ask once for the docs sync, the push and the PR together (step 1b), to save a round-trip. Never merge without an explicit "merge".
 
 ## 1. Pre-flight
 - Not on `main`; working tree clean; definition of done (`docs/conventions.md`) met — re-run tests/lint if anything changed since the last run.
@@ -18,11 +18,11 @@ Ask before each of: push, opening the PR, merging. Never merge without an explic
 ## 1b. Sync docs (before pushing, so they land in the same PR)
 - Sweep for data, requirements or decisions this branch made stale:
   - `docs/roadmap.md`: tick the task row (`✓`, as 0.1 shows).
-  - `docs/plan.md`: add a dated "Done" line to Status and move "Next step" to the next task and its issue.
+  - `docs/plan.md`: add a dated "Done" line to History, and update Status ("Last done" and "Next step" with the next task and its issue).
   - Also `docs/adr/README.md`, `docs/product.md`, `docs/ui.md`, `docs/conventions.md`, README, CLAUDE.md and project memory.
-- List each stale item (file, what's outdated, proposed fix) and wait for the user's OK; if nothing is stale, say so. Leave superseded ADRs as history.
-- Commit the approved edits on the branch as `docs: sync docs for <task id>` (commit workflow, no separate approval needed after the OK).
 - Note issues the branch also resolves (beyond the task's own), to list as `Closes #n` in the PR body.
+- In **one message**, list each stale item (file, what's outdated, proposed fix; or say nothing is stale) plus the proposed PR title and a one-line body outline, and ask one question: apply the sync, push and open the PR? Leave superseded ADRs as history.
+- On the OK: commit the edits as `docs: sync docs for <task id>` (commit workflow), then go straight on to step 2 without asking again.
 
 ## 2. Push and open the PR
 - Push with `git push -u origin <branch>`.
@@ -32,7 +32,8 @@ Ask before each of: push, opening the PR, merging. Never merge without an explic
   - No AI attribution line in the body (owner's convention).
 
 ## 3. CI
-- Watch with `gh pr checks --watch`. If a check fails, read the log (`gh run view --log-failed`), fix on the branch via the commit workflow, push again.
+- Do not watch or poll CI (it burns tokens while nothing happens). Give the PR link, then stop: the user reports when CI is green or which job failed.
+- On a failure, read only the failed log (`gh run view --log-failed`), fix on the branch via the commit workflow, push again.
 
 ## 4. Review
 - The branch is normally reviewed before `/ship`: `/feature` and `/fix` end with the reviewer command, and the user fixes findings in that clean session. If the user says the branch was not reviewed, give that command now (same format as the `/feature` hand-off) and wait until they come back.
