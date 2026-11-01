@@ -12,12 +12,12 @@ A local-first, hand-drawn style drawing app, in the spirit of Excalidraw. Early 
 docker run -p 127.0.0.1:8080:8080 -v yodo-data:/data ghcr.io/sonaszjojka/yodo
 ```
 
-Then open <http://localhost:8080>. Publishing on `127.0.0.1` keeps the server reachable from this machine only ([ADR 0008](docs/adr/0008-auth-none-hosted-optional-password-self-hosted.md)).
+Then open <http://localhost:8080>. Publishing on `127.0.0.1` keeps the server reachable from this machine only ([ADR 0020](docs/adr/0020-auth-and-origin-checks.md)).
 
 | Variable | Default | Meaning |
 |---|---|---|
 | `YODO_ADDR` | `127.0.0.1:8080` (`0.0.0.0:8080` in the image) | Address the server listens on |
-| `YODO_ALLOWED_ORIGINS` | `http://localhost:8080,http://127.0.0.1:8080` | Comma-separated origins the server accepts requests for; others get 403. Set it when you open Yodo under another hostname or port, e.g. `http://yodo.home:8080` |
+| `YODO_ALLOWED_ORIGINS` | `http://localhost:8080,http://127.0.0.1:8080` | Comma-separated origins the server accepts requests for; others get 403. Set it when you open Yodo under another hostname or port, e.g. `http://yodo.home:8080`. In Docker this is the port you publish (`-p 127.0.0.1:3000:8080` → `http://localhost:3000`), not the container's 8080 |
 
 ## Develop
 

@@ -1,6 +1,6 @@
 # 0008. No auth in hosted mode; localhost-only with an optional password when self-hosted
 
-- Status: Accepted
+- Status: Superseded by [0020](0020-auth-and-origin-checks.md)
 - Date: 2026-10-30
 - Amended: 2026-10-30 — configurable allowed origins and the rule for requests without an `Origin` header
 

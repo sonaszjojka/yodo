@@ -29,6 +29,8 @@ func TestParseAllowedOrigins(t *testing.T) {
 		{"bad scheme", "ftp://yodo.home", nil, true},
 		{"no host", "http://", nil, true},
 		{"port only", "http://:8080", nil, true},
+		{"empty port", "http://yodo.home:", nil, true},
+		{"empty port ipv6", "http://[::1]:", nil, true},
 		{"path", "http://yodo.home/app", nil, true},
 		{"query", "http://yodo.home?x=1", nil, true},
 		{"fragment", "http://yodo.home#x", nil, true},
@@ -69,6 +71,12 @@ func TestRequireAllowedOrigin(t *testing.T) {
 		{"GET foreign host, allowed Origin", defaults, http.MethodGet, "evil.example", "http://localhost:8080", http.StatusForbidden},
 		{"GET wrong port", defaults, http.MethodGet, "localhost:9000", "", http.StatusForbidden},
 		{"GET empty host", defaults, http.MethodGet, "", "", http.StatusForbidden},
+
+		// Origin check: any request that carries one (CSRF, cross-site WebSocket).
+		{"GET allowed Origin", defaults, http.MethodGet, local, "http://localhost:8080", http.StatusOK},
+		{"GET foreign Origin", defaults, http.MethodGet, local, "http://evil.example", http.StatusForbidden},
+		{"HEAD foreign Origin", defaults, http.MethodHead, local, "http://evil.example", http.StatusForbidden},
+		{"GET null Origin", defaults, http.MethodGet, local, "null", http.StatusForbidden},
 
 		// Origin check: state-changing requests (CSRF).
 		{"POST allowed Origin", defaults, http.MethodPost, local, "http://localhost:8080", http.StatusOK},

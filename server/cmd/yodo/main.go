@@ -6,7 +6,7 @@
 //	YODO_ADDR  listen address, default 127.0.0.1:8080 (the Docker image sets
 //	           0.0.0.0:8080, ADR 0019)
 //	YODO_ALLOWED_ORIGINS  comma-separated origins the server accepts requests
-//	           for, default http://localhost:8080,http://127.0.0.1:8080 (ADR 0008)
+//	           for, default http://localhost:8080,http://127.0.0.1:8080 (ADR 0020)
 package main
 
 import (
