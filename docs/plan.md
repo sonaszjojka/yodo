@@ -9,9 +9,9 @@ Rule: every stage ends with a **file of decisions**, not just a conversation. Co
 
 ## Status (2026-11-01)
 Read this section, not the whole file; finished work is in History at the end.
-- **Last done:** roadmap 1.1 (issue #10): v1 document model and migration pipeline in `web/src/core/document/` (ADR 0013).
-- Open items: **frontend state management and undo/redo design** (ADRs at roadmap tasks 1.2 and 1.7).
-- **Next step:** roadmap 1.2 (canvas + rectangle, issue #11); write the frontend state management ADR first.
+- **Last done:** roadmap 1.2 (issue #11): full-window canvas and rectangle tool; editor state in a framework-free store (ADR 0021).
+- Open items: **undo/redo design** (ADR at roadmap task 1.7).
+- **Next step:** roadmap 1.3 (pan + zoom, issue #12).
 
 ## Working mode: an educational project
 The goal is both the app and learning how to program with Claude as effectively as possible, so that the knowledge stays with you.
@@ -144,3 +144,4 @@ One dated line per finished stage or task, oldest first. `/ship` appends here.
 - Done (2026-11-01): Part B step 4 (= roadmap 0.4): Go server serves the embedded web app and `/api/health`; multi-stage Dockerfile on distroless nonroot; CI builds amd64+arm64 on PRs and pushes `ghcr.io/sonaszjojka/yodo` from `main` (ADR 0019); root README with the `docker run` command.
 - Done (2026-11-01): Part B step 5 (= roadmap 0.5): Host/Origin middleware against CSRF, cross-site WebSocket hijacking and DNS rebinding; `YODO_ALLOWED_ORIGINS` validated at startup; review widened the rule to check `Origin` whenever present and deny unlisted methods (ADR 0020 supersedes 0008). M0 complete.
 - Done (2026-11-01): roadmap 1.1: v1 document and M1 element types in `web/src/core/document/`; `loadDocument` → `migrate` (envelope checks, refuses newer versions) → migration chain. Review added per-step and post-migration validation and an ID fallback for non-secure contexts (ADR 0013 amended).
+- Done (2026-11-01): roadmap 1.2: full-window HiDPI canvas; rough.js rectangle with a seed fixed at pointer-down; Shift squares, live mid-drag; Escape cancels; editor state in a framework-free store (ADR 0021). Review: only the pointer that starts a drag drives it.

@@ -20,7 +20,7 @@ Goal: open Yodo, draw basic shapes, close the browser, come back to the same dra
 | # | Task | Done when… |
 |---|---|---|
 | 1.1 | Document model + migrations skeleton ✓ (PR [#34](https://github.com/sonaszjojka/yodo/pull/34)) | `web/src/core` defines the v1 document (ADR 0013) and element types; `migrate()` runs on load and is tested with a fixture. |
-| 1.2 | Canvas + rectangle ([#11](https://github.com/sonaszjojka/yodo/issues/11)) | Full-window canvas, HiDPI-sharp; click-drag draws a rough.js rectangle with a fixed per-element seed; Shift keeps it square. **ADR:** frontend state management (open item from Stage 3). |
+| 1.2 | Canvas + rectangle ✓ (PR [#35](https://github.com/sonaszjojka/yodo/pull/35)) | Full-window canvas, HiDPI-sharp; click-drag draws a rough.js rectangle with a fixed per-element seed; Shift keeps it square. **ADR:** frontend state management (open item from Stage 3). |
 | 1.3 | Pan + zoom ([#12](https://github.com/sonaszjojka/yodo/issues/12)) | Hand tool / Space-drag pans; wheel/pinch zooms around the cursor; zoom % shown and resettable. Screen↔world transforms unit-tested. |
 | 1.4 | Diamond, ellipse, line, arrow ([#13](https://github.com/sonaszjojka/yodo/issues/13)) | Each tool draws at the dragged size; Shift constrains; arrowhead on arrow. Hit-testing for every shape unit-tested. |
 | 1.5 | Selection ([#14](https://github.com/sonaszjojka/yodo/issues/14)) | Click, Shift+click, box select; selection outline + handles per `docs/ui.md`; move and Delete. |

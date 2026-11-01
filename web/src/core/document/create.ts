@@ -1,4 +1,9 @@
-import { CURRENT_SCHEMA_VERSION, type YodoDocument } from './types.ts'
+import type { Bounds } from '../geometry/rect.ts'
+import {
+  CURRENT_SCHEMA_VERSION,
+  type RectangleElement,
+  type YodoDocument,
+} from './types.ts'
 
 /**
  * A random UUID v4. `crypto.randomUUID` exists only in secure contexts (HTTPS,
@@ -32,5 +37,35 @@ export function createDocument(name = 'Untitled'): YodoDocument {
     elements: [],
     appState: { viewport: { x: 0, y: 0, zoom: 1 } },
     fileIds: [],
+  }
+}
+
+/**
+ * A rough.js seed: an integer in [1, 2^31 - 1]. rough.js treats 0 as "random
+ * on every draw", which would make a shape wobble each frame (ADR 0004).
+ */
+export function randomSeed(): number {
+  const [value] = crypto.getRandomValues(new Uint32Array(1))
+  return (value! % (2 ** 31 - 1)) + 1
+}
+
+/** A new rectangle with the default style (Ink stroke, docs/ui.md). */
+export function createRectangle(
+  bounds: Bounds,
+  seed = randomSeed(),
+): RectangleElement {
+  return {
+    type: 'rectangle',
+    id: randomId(),
+    ...bounds,
+    angle: 0,
+    seed,
+    strokeColor: '#1E1F22',
+    backgroundColor: 'transparent',
+    fillStyle: 'hachure',
+    strokeWidth: 2,
+    strokeStyle: 'solid',
+    roughness: 1,
+    opacity: 100,
   }
 }

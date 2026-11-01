@@ -31,3 +31,4 @@ Why Yodo is built the way it is. See [0001](0001-record-architecture-decisions.m
 | [0018](0018-ci-github-actions-gate-job.md) | CI: one workflow, path filters, `ci` gate job | Accepted |
 | [0019](0019-docker-image-build-and-publishing.md) | Docker image: dist copied into the Go package, distroless, multi-arch from `main` | Accepted |
 | [0020](0020-auth-and-origin-checks.md) | Auth as 0008, plus check `Origin` whenever present and deny unlisted methods | Accepted |
+| [0021](0021-frontend-state-external-store.md) | Editor state in a framework-free store, read by React via `useSyncExternalStore` | Accepted |

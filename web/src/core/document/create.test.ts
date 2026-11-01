@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest'
-import { createDocument } from './create.ts'
+import { createDocument, createRectangle, randomSeed } from './create.ts'
 import { loadDocument } from './migrate.ts'
 import { CURRENT_SCHEMA_VERSION } from './types.ts'
 
@@ -49,4 +49,41 @@ test('creates an id where crypto.randomUUID is missing (plain HTTP)', () => {
 
   expect(a.id).toMatch(UUID)
   expect(a.id).not.toBe(b.id)
+})
+
+test('randomSeed is a positive 31-bit integer, never 0', () => {
+  // rough.js treats seed 0 as "pick a new random seed on every draw".
+  for (let i = 0; i < 1000; i++) {
+    const seed = randomSeed()
+    expect(Number.isInteger(seed)).toBe(true)
+    expect(seed).toBeGreaterThanOrEqual(1)
+    expect(seed).toBeLessThanOrEqual(2 ** 31 - 1)
+  }
+})
+
+test('createRectangle uses the given bounds and seed with default styles', () => {
+  const rect = createRectangle({ x: 1, y: 2, width: 3, height: 4 }, 42)
+
+  expect(rect).toEqual({
+    type: 'rectangle',
+    id: expect.stringMatching(UUID),
+    x: 1,
+    y: 2,
+    width: 3,
+    height: 4,
+    angle: 0,
+    seed: 42,
+    strokeColor: '#1E1F22',
+    backgroundColor: 'transparent',
+    fillStyle: 'hachure',
+    strokeWidth: 2,
+    strokeStyle: 'solid',
+    roughness: 1,
+    opacity: 100,
+  })
+})
+
+test('createRectangle picks a random seed when none is given', () => {
+  const rect = createRectangle({ x: 0, y: 0, width: 1, height: 1 })
+  expect(rect.seed).toBeGreaterThanOrEqual(1)
 })

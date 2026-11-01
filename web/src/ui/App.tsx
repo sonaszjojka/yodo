@@ -1,13 +1,11 @@
-import { Logo } from './Logo.tsx'
+import { useState } from 'react'
+import { createDocument } from '../core/document/create.ts'
+import { createEditor } from '../core/editor/editor.ts'
+import { Canvas } from './Canvas.tsx'
 
-// Placeholder page for the walking skeleton (roadmap M0); replaced by Home in M1.
+// The editor on a fresh, unsaved drawing; Home and saving arrive in M1 (1.14, 1.15).
 export function App() {
-  return (
-    <main className="placeholder">
-      <h1>
-        <Logo />
-      </h1>
-      <p>Your own design tool. Coming soon.</p>
-    </main>
-  )
+  // A lazy initialiser creates the editor once, not on every render.
+  const [editor] = useState(() => createEditor(createDocument()))
+  return <Canvas editor={editor} />
 }
