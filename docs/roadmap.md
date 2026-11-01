@@ -8,7 +8,7 @@ M0 builds a thin end-to-end path through every part of the system (web app, Go s
 ## M0 — Walking skeleton (= Part B of `docs/plan.md`)
 | # | Task | Done when… |
 |---|---|---|
-| 0.1 | Repo + scaffold | `sonaszjojka/yodo` exists with `web/` (Vite + React + TS strict) and `server/` (Go module) laid out per ADR 0012; `npm run dev` shows a placeholder page with the logo. |
+| 0.1 | Repo + scaffold ✓ (#1) | `sonaszjojka/yodo` exists with `web/` (Vite + React + TS strict) and `server/` (Go module) laid out per ADR 0012; `npm run dev` shows a placeholder page with the logo. |
 | 0.2 | Tooling | Format for TS and Go, lint for Go (TS lint: oxlint, ADR 0016), `npm test` and `go test ./...` each run one passing test, `sqlc generate` runs on an empty schema. Project CLAUDE.md via `/init`, extended with ADR rule + conventions. |
 | 0.3 | CI + Pages deploy | GitHub Actions runs web and server jobs with path filters; merging to `main` deploys the placeholder to `sonaszjojka.github.io/yodo/` (ADR 0007). |
 | 0.4 | Go server + Docker image | `server` embeds `dist/` and serves it with hash routing; `/api/health` returns 200; multi-stage `Dockerfile` builds an image pushed to GHCR; the documented `docker run` command shows the placeholder. |

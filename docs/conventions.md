@@ -46,11 +46,12 @@ A task is done only when all of these hold:
 |---|---|---|
 | Plan, code, tests, verification | does | approves the plan |
 | Commit | prepares message + diff | approves |
-| Branch, push, PR, merge | prepares the command | approves each one |
+| Branch, push, PR | prepares the command | approves each one |
+| Merge | prepares the command | runs it (`! gh pr merge <n> --squash`; Claude Code blocks Claude from merging) |
 | Review | runs `/code-review --comment`, triages findings, proposes follow-up issues | approves issues, final review + merge |
 
 ## License
-**MIT.** Short, permissive and common for self-hostable tools (Excalidraw also uses MIT); fits the goal of letting anyone run their own copy. `LICENSE` is added with the repo in Part B.
+**MIT.** Short, permissive and common for self-hostable tools (Excalidraw also uses MIT); fits the goal of letting anyone run their own copy. `LICENSE` is in the repo root.
 
 ## Skills (`.claude/skills/`)
 | Command | Use for |

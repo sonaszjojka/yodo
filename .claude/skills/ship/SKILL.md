@@ -38,7 +38,8 @@ Ask before each of: push, opening the PR, merging. Never merge without an explic
 - The user does the final review.
 
 ## 5. Merge (only on explicit command)
-- `gh pr merge --squash --delete-branch`, keeping the PR title as the commit subject.
-- `git switch main && git pull --ff-only`.
+- Claude Code's auto mode blocks Claude from merging, and the owner merges anyway: give the user `! gh pr merge <n> --squash` to run. The PR title becomes the commit subject, and GitHub deletes the remote branch.
+- Then `git fetch --prune && git switch main && git pull --ff-only`.
+- Delete the local branch only after checking nothing is lost: a squash merge makes `git branch -d` always refuse, so confirm `git diff <branch> main` is empty first, then `git branch -D <branch>`. If the diff is not empty, stop and show it to the user.
 - If the task came from `docs/roadmap.md`, mark it done there in the next docs commit (or include it in the PR).
 - Recap and suggest `/clear` before the next task.
