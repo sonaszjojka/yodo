@@ -5,65 +5,83 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 )
 
-// defaultAllowedOrigins match the documented run command, which publishes the
+// DefaultAllowedOrigins match the documented run command, which publishes the
 // port on 127.0.0.1:8080 (ADR 0008).
-var defaultAllowedOrigins = []string{"http://localhost:8080", "http://127.0.0.1:8080"}
+const DefaultAllowedOrigins = "http://localhost:8080,http://127.0.0.1:8080"
+
+// AllowedOrigins is a validated set of origins the server accepts requests
+// for. Build it with ParseAllowedOrigins; the zero value allows nothing.
+type AllowedOrigins struct {
+	list    []string        // canonical origins, in the order given
+	origins map[string]bool // canonical origins
+	hosts   map[string]bool // accepted Host header values
+}
 
 // ParseAllowedOrigins parses YODO_ALLOWED_ORIGINS: a comma-separated list of
-// origins such as "http://yodo.home:8080". It returns the origins in canonical
-// form (lowercase, no default port, no trailing slash), or the defaults when
-// the list is empty.
-func ParseAllowedOrigins(s string) ([]string, error) {
-	var origins []string
+// origins such as "http://yodo.home:8080". An empty list means
+// DefaultAllowedOrigins.
+func ParseAllowedOrigins(s string) (AllowedOrigins, error) {
+	if strings.TrimSpace(strings.ReplaceAll(s, ",", "")) == "" {
+		s = DefaultAllowedOrigins
+	}
+	a := AllowedOrigins{origins: map[string]bool{}, hosts: map[string]bool{}}
 	for raw := range strings.SplitSeq(s, ",") {
 		raw = strings.TrimSpace(raw)
 		if raw == "" {
 			continue
 		}
-		o, err := normalizeOrigin(raw)
+		u, err := parseOrigin(raw)
 		if err != nil {
-			return nil, fmt.Errorf("YODO_ALLOWED_ORIGINS: %q: %w", raw, err)
+			return AllowedOrigins{}, fmt.Errorf("YODO_ALLOWED_ORIGINS: %q: %w", raw, err)
 		}
-		origins = append(origins, o)
+		o := u.Scheme + "://" + u.Host
+		a.list = append(a.list, o)
+		a.origins[o] = true
+		a.hosts[u.Host] = true
+		// Clients may spell out the default port in Host ("yodo.home:80").
+		if u.Port() == "" {
+			a.hosts[u.Host+":"+defaultPort[u.Scheme]] = true
+		}
 	}
-	if len(origins) == 0 {
-		return defaultAllowedOrigins, nil
-	}
-	return origins, nil
+	return a, nil
 }
 
-// normalizeOrigin returns the canonical "scheme://host[:port]" form of an
-// origin, or an error if raw is not a plain http(s) origin.
-func normalizeOrigin(raw string) (string, error) {
+// List returns the canonical origins, for logging.
+func (a AllowedOrigins) List() []string { return slices.Clone(a.list) }
+
+var defaultPort = map[string]string{"http": "80", "https": "443"}
+
+// parseOrigin parses a plain http(s) origin and returns it in canonical form:
+// lowercase, and without the port when it is the scheme's default.
+func parseOrigin(raw string) (*url.URL, error) {
 	u, err := url.Parse(raw)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	if u.Scheme != "http" && u.Scheme != "https" {
-		return "", fmt.Errorf("scheme must be http or https")
+	u.Scheme = strings.ToLower(u.Scheme)
+	if defaultPort[u.Scheme] == "" {
+		return nil, fmt.Errorf("scheme must be http or https")
 	}
-	if u.Host == "" {
-		return "", fmt.Errorf("missing host")
+	if u.Hostname() == "" {
+		return nil, fmt.Errorf("missing host")
 	}
 	if u.User != nil || u.Opaque != "" || (u.Path != "" && u.Path != "/") ||
 		u.RawQuery != "" || u.ForceQuery || u.Fragment != "" {
-		return "", fmt.Errorf("must be scheme://host[:port] only")
+		return nil, fmt.Errorf("must be scheme://host[:port] only")
 	}
-	return u.Scheme + "://" + normalizeHost(u.Host), nil
+	u.Host = strings.ToLower(u.Host)
+	if p := u.Port(); p == defaultPort[u.Scheme] {
+		u.Host = strings.TrimSuffix(u.Host, ":"+p)
+	}
+	return u, nil
 }
 
-// normalizeHost lowercases a host[:port] and drops a default port, so that
-// "Yodo.Home:80" and "yodo.home" compare equal.
-func normalizeHost(h string) string {
-	h = strings.ToLower(h)
-	for _, p := range []string{":80", ":443"} {
-		h = strings.TrimSuffix(h, p)
-	}
-	return h
-}
+// maxLoggedLen bounds the client-controlled values a blocked request logs.
+const maxLoggedLen = 100
 
 // requireAllowedOrigin enforces ADR 0008 against CSRF and DNS rebinding:
 //   - every request must be addressed (Host header) to an allowed origin's host;
@@ -71,27 +89,27 @@ func normalizeHost(h string) string {
 //     allowed origin. Browsers may omit Origin on same-origin GETs, so safe
 //     methods don't need it. Non-safe methods are denied by default, which is
 //     stricter than the ADR's POST/PUT/PATCH/DELETE list.
-func requireAllowedOrigin(allowed []string, next http.Handler) http.Handler {
-	origins := make(map[string]bool, len(allowed))
-	hosts := make(map[string]bool, len(allowed))
-	for _, o := range allowed {
-		origins[o] = true
-		hosts[normalizeHost(strings.SplitN(o, "://", 2)[1])] = true
-	}
-
+func requireAllowedOrigin(allowed AllowedOrigins, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
-		ok := hosts[normalizeHost(r.Host)]
+		ok := allowed.hosts[strings.ToLower(r.Host)]
 		if ok && r.Method != http.MethodGet && r.Method != http.MethodHead {
-			o, err := normalizeOrigin(origin)
-			ok = err == nil && origins[o]
+			u, err := parseOrigin(origin)
+			ok = err == nil && allowed.origins[u.Scheme+"://"+u.Host]
 		}
 		if !ok {
 			slog.Warn("request blocked: host or origin not allowed",
-				"method", r.Method, "host", r.Host, "origin", origin)
+				"method", truncate(r.Method), "host", truncate(r.Host), "origin", truncate(origin))
 			http.Error(w, "forbidden: host or origin not allowed (see YODO_ALLOWED_ORIGINS)", http.StatusForbidden)
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func truncate(s string) string {
+	if len(s) <= maxLoggedLen {
+		return s
+	}
+	return s[:maxLoggedLen] + "…"
 }

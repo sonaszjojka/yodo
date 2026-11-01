@@ -13,6 +13,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -44,9 +45,14 @@ func run(ctx context.Context, getenv func(string) string) error {
 	}
 
 	// Fail fast on a typo instead of blocking every request later.
-	origins, err := server.ParseAllowedOrigins(getenv("YODO_ALLOWED_ORIGINS"))
+	originsEnv := getenv("YODO_ALLOWED_ORIGINS")
+	origins, err := server.ParseAllowedOrigins(originsEnv)
 	if err != nil {
 		return err
+	}
+	if _, port, _ := net.SplitHostPort(addr); originsEnv == "" && port != "8080" {
+		slog.Warn("the default allowed origins use port 8080, so requests on another port get 403; set YODO_ALLOWED_ORIGINS",
+			"addr", addr)
 	}
 
 	srv := &http.Server{
@@ -58,7 +64,7 @@ func run(ctx context.Context, getenv func(string) string) error {
 
 	errc := make(chan error, 1)
 	go func() {
-		slog.Info("yodo server listening", "addr", addr, "allowed_origins", origins)
+		slog.Info("yodo server listening", "addr", addr, "allowed_origins", origins.List())
 		errc <- srv.ListenAndServe()
 	}()
 

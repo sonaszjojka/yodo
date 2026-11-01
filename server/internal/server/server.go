@@ -8,10 +8,10 @@ import (
 )
 
 // New returns the root handler. static holds the built web app (index.html at
-// its root). allowedOrigins (from ParseAllowedOrigins) guard every route
-// against CSRF and DNS rebinding (ADR 0008). The app uses hash routing (ADR 0007), so every page is served by
-// index.html at / and no SPA fallback is needed: unknown paths are 404.
-func New(static fs.FS, allowedOrigins []string) http.Handler {
+// its root). allowedOrigins guard every route against CSRF and DNS rebinding
+// (ADR 0008). The app uses hash routing (ADR 0007), so every page is served
+// by index.html at / and no SPA fallback is needed: unknown paths are 404.
+func New(static fs.FS, allowedOrigins AllowedOrigins) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", handleHealth)
 

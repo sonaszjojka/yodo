@@ -23,9 +23,12 @@ func TestParseAllowedOrigins(t *testing.T) {
 		{"default https port stripped", "https://yodo.home:443", []string{"https://yodo.home"}, false},
 		{"default http port stripped", "http://yodo.home:80", []string{"http://yodo.home"}, false},
 		{"ipv6", "http://[::1]:8080", []string{"http://[::1]:8080"}, false},
+		{"https port kept on http", "http://yodo.home:443", []string{"http://yodo.home:443"}, false},
+		{"http port kept on https", "https://yodo.home:80", []string{"https://yodo.home:80"}, false},
 		{"no scheme", "yodo.home:8080", nil, true},
 		{"bad scheme", "ftp://yodo.home", nil, true},
 		{"no host", "http://", nil, true},
+		{"port only", "http://:8080", nil, true},
 		{"path", "http://yodo.home/app", nil, true},
 		{"query", "http://yodo.home?x=1", nil, true},
 		{"fragment", "http://yodo.home#x", nil, true},
@@ -37,21 +40,21 @@ func TestParseAllowedOrigins(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("err = %v, wantErr %v", err, tt.wantErr)
 			}
-			if !slices.Equal(got, tt.want) {
-				t.Errorf("got %q, want %q", got, tt.want)
+			if !slices.Equal(got.List(), tt.want) {
+				t.Errorf("got %q, want %q", got.List(), tt.want)
 			}
 		})
 	}
 }
 
 func TestRequireAllowedOrigin(t *testing.T) {
-	defaults := []string{"http://localhost:8080", "http://127.0.0.1:8080"}
-	custom := []string{"http://yodo.home:8080"}
+	defaults := DefaultAllowedOrigins
+	custom := "http://yodo.home:8080"
 	const local = "localhost:8080"
 
 	tests := []struct {
 		name    string
-		allowed []string
+		allowed string
 		method  string
 		host    string
 		origin  string // "" means no Origin header
@@ -84,7 +87,9 @@ func TestRequireAllowedOrigin(t *testing.T) {
 		// YODO_ALLOWED_ORIGINS replaces the defaults.
 		{"custom host allowed", custom, http.MethodPost, "yodo.home:8080", "http://yodo.home:8080", http.StatusOK},
 		{"custom blocks localhost", custom, http.MethodGet, local, "", http.StatusForbidden},
-		{"default port in Host", []string{"http://yodo.home"}, http.MethodGet, "yodo.home:80", "", http.StatusOK},
+		{"default port in Host", "http://yodo.home", http.MethodGet, "yodo.home:80", "", http.StatusOK},
+		{"https port is not http default", "http://yodo.home", http.MethodGet, "yodo.home:443", "", http.StatusForbidden},
+		{"Origin with https port on http", "http://yodo.home", http.MethodPost, "yodo.home", "http://yodo.home:443", http.StatusForbidden},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -95,7 +100,7 @@ func TestRequireAllowedOrigin(t *testing.T) {
 				req.Header.Set("Origin", tt.origin)
 			}
 			rec := httptest.NewRecorder()
-			requireAllowedOrigin(tt.allowed, next).ServeHTTP(rec, req)
+			requireAllowedOrigin(mustParse(t, tt.allowed), next).ServeHTTP(rec, req)
 
 			if rec.Code != tt.want {
 				t.Fatalf("status = %d, want %d", rec.Code, tt.want)
@@ -105,4 +110,40 @@ func TestRequireAllowedOrigin(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestParseAllowedOriginsDefaultsAreFresh(t *testing.T) {
+	a := mustParse(t, "")
+	a.List()[0] = "http://evil.example"
+	if got := mustParse(t, "").List()[0]; got != "http://localhost:8080" {
+		t.Errorf("defaults changed to %q", got)
+	}
+}
+
+func TestZeroAllowedOriginsBlocksEverything(t *testing.T) {
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+	rec := httptest.NewRecorder()
+	requireAllowedOrigin(AllowedOrigins{}, next).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusForbidden)
+	}
+}
+
+func TestTruncate(t *testing.T) {
+	long := strings.Repeat("a", 5000)
+	if got := truncate(long); len(got) > maxLoggedLen+len("…") {
+		t.Errorf("len = %d, want at most %d", len(got), maxLoggedLen+len("…"))
+	}
+	if got := truncate("short"); got != "short" {
+		t.Errorf("got %q", got)
+	}
+}
+
+func mustParse(t *testing.T, s string) AllowedOrigins {
+	t.Helper()
+	a, err := ParseAllowedOrigins(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return a
 }
