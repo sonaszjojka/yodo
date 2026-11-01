@@ -19,6 +19,7 @@ Format ([conventionalcommits.org](https://www.conventionalcommits.org/)):
 
 ## Branches and flow: GitHub flow with squash merge
 - `main` is always deployable (it deploys to GitHub Pages) and is protected: changes land only through PRs with green CI.
+- Enforced on GitHub: repo settings allow squash merge only (commit title = PR title) and delete merged branches; the ruleset "Protect main" requires a PR (0 approvals, since a solo owner cannot approve their own PR) with all review threads resolved, and blocks force-push and deletion, with no bypass. The CI status check is added to the ruleset in roadmap task 0.3.
 - One short-lived branch per roadmap task or bug: `<type>/<id>-<slug>`, e.g. `feat/1.2-rectangle-tool`, `fix/42-undo-after-delete`, `docs/roadmap-m2`.
 - The loop for every change:
   1. `/clear`, then state one goal (a roadmap task or an issue).
@@ -27,7 +28,7 @@ Format ([conventionalcommits.org](https://www.conventionalcommits.org/)):
   4. Verify against the definition of done below.
   5. Claude proposes the commit (message + diff summary); the owner approves before it is made.
   6. Push and open a PR (title = the future squash commit, in Conventional Commit format) on the owner's command.
-  7. `/code-review` in a fresh context, then the owner reviews the PR.
+  7. `/code-review --comment` in a fresh context (findings become inline PR comments), then the owner reviews the PR. Each finding is fixed in the PR, deferred to a follow-up issue labelled `review` (created with the owner's OK), or answered with a reason; every thread is resolved before merge.
   8. Squash-merge on the owner's command; delete the branch; `/clear`.
 - Worktrees only for genuinely parallel sessions (e.g. web and server at once), each on its own branch.
 
@@ -46,7 +47,7 @@ A task is done only when all of these hold:
 | Plan, code, tests, verification | does | approves the plan |
 | Commit | prepares message + diff | approves |
 | Branch, push, PR, merge | prepares the command | approves each one |
-| Review | runs `/code-review` | final review + merge |
+| Review | runs `/code-review --comment`, triages findings, proposes follow-up issues | approves issues, final review + merge |
 
 ## License
 **MIT.** Short, permissive and common for self-hostable tools (Excalidraw also uses MIT); fits the goal of letting anyone run their own copy. `LICENSE` is added with the repo in Part B.

@@ -26,7 +26,15 @@ Ask before each of: push, opening the PR, merging. Never merge without an explic
 - Watch with `gh pr checks --watch`. If a check fails, read the log (`gh run view --log-failed`), fix on the branch via the commit workflow, push again.
 
 ## 4. Review
-- Suggest the user run `/code-review` on the PR (a fresh context catches what the authoring session misses). Address findings with new commits; explain any finding you disagree with instead of silently skipping it.
+- Suggest the user run `/code-review --comment` on the PR (a fresh context catches what the authoring session misses); findings land as inline PR comments.
+- Triage every finding with the user, one of:
+  - **Fix now:** a new commit on the branch; resolve the comment thread (the ruleset blocks merging with unresolved threads).
+  - **Later:** propose a follow-up issue and create it only after the user agrees: `gh issue create --label review` with the finding, the file/line and a link to the PR. Reply on the comment thread with the issue link, then resolve it.
+  - **Disagree:** reply on the thread explaining why, then resolve it. Never skip a finding silently.
+- `gh` has no subcommand for review threads; use GraphQL (`{owner}`/`{repo}` are filled in by `gh`):
+  - List: `gh api graphql -F owner='{owner}' -F repo='{repo}' -F pr=<n> -f query='query($owner:String!,$repo:String!,$pr:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$pr){reviewThreads(first:100){nodes{id isResolved path line comments(first:1){nodes{body}}}}}}}'`
+  - Reply: `gh api graphql -F id=<thread id> -f body='<text>' -f query='mutation($id:ID!,$body:String!){addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$id,body:$body}){comment{url}}}'`
+  - Resolve: `gh api graphql -F id=<thread id> -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}'`
 - The user does the final review.
 
 ## 5. Merge (only on explicit command)
