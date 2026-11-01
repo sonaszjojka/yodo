@@ -6,6 +6,7 @@ import type {
 } from '../document/types.ts'
 import { rectFromDrag } from '../geometry/rect.ts'
 import {
+  clampZoom,
   panBy,
   screenToWorld,
   zoomAt,
@@ -86,7 +87,12 @@ export function createEditor(document: YodoDocument): Editor {
   const store = createStore<EditorState>({
     document,
     draft: null,
-    viewport: document.appState.viewport,
+    // The format only promises a finite zoom; 0 or negative would break
+    // screenToWorld, so bring it into range like every other zoom change.
+    viewport: {
+      ...document.appState.viewport,
+      zoom: clampZoom(document.appState.viewport.zoom),
+    },
     tool: 'rectangle',
     spaceHeld: false,
     panning: false,

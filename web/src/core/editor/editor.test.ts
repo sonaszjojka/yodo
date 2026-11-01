@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest'
 import { createDocument } from '../document/create.ts'
+import { MAX_ZOOM, MIN_ZOOM } from '../geometry/viewport.ts'
 import { createEditor } from './editor.ts'
 
 function setup() {
@@ -178,6 +179,20 @@ test('the viewport starts from the document and defaults to the rectangle tool',
     spaceHeld: false,
     panning: false,
   })
+})
+
+test.each([
+  [0, MIN_ZOOM],
+  [-2, MIN_ZOOM],
+  [500, MAX_ZOOM],
+])('a stored zoom of %d starts clamped to %d', (stored, expected) => {
+  const document = {
+    ...createDocument(),
+    appState: { viewport: { x: 5, y: 6, zoom: stored } },
+  }
+  const { store } = createEditor(document)
+
+  expect(store.getState().viewport).toEqual({ x: 5, y: 6, zoom: expected })
 })
 
 test('a drag while panned and zoomed draws at world coordinates', () => {
