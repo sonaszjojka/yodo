@@ -23,7 +23,8 @@ Rule: every stage ends with a **file of decisions**, not just a conversation. Co
 - Done (2026-11-01): roadmap tasks for M0 and M1 are GitHub Issues #6–#25, grouped in milestones M0–M3 and linked from `docs/roadmap.md`. M2 and M3 issues are created when M1 ends.
 - Done (2026-11-01): Part B step 2 (= roadmap 0.2): Prettier, golangci-lint, Vitest + go test smoke tests, sqlc via `go tool`, Node 24, project CLAUDE.md (ADR 0017). Review now runs on the branch before `/ship`, one `low` round; `/ship` syncs docs into the PR.
 - Done (2026-11-01): Part B step 3 (= roadmap 0.3): one CI workflow with path filters and a `ci` gate job as the required check, Pages deploy on merge, actions pinned by SHA (ADR 0018).
-- **Next step:** Part B step 4 (= roadmap 0.4, Go server + Docker image, issue #8).
+- Done (2026-11-01): Part B step 4 (= roadmap 0.4): Go server serves the embedded web app and `/api/health`; multi-stage Dockerfile on distroless nonroot; CI builds amd64+arm64 on PRs and pushes `ghcr.io/sonaszjojka/yodo` from `main` (ADR 0019); root README with the `docker run` command.
+- **Next step:** Part B step 5 (= roadmap 0.5, server security baseline, issue #9).
 
 ## Working mode: an educational project
 The goal is both the app and learning how to program with Claude as effectively as possible, so that the knowledge stays with you.
