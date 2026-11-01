@@ -129,13 +129,18 @@ export function Canvas({ editor }: { editor: Editor }) {
       editor.setShift(false)
     }
 
+    // Listens on window, not the canvas: a pinch or Ctrl+wheel over floating UI
+    // (the zoom bar) must zoom the drawing, never the whole page.
     function onWheel(event: WheelEvent) {
+      const zoom = event.ctrlKey || event.metaKey
+      // Plain wheel over other UI is left alone, so panels can scroll.
+      if (!zoom && event.target !== canvas) return
       // Without this the browser zooms the page (Ctrl) or swipes back.
       event.preventDefault()
       const unit = event.deltaMode === 1 ? LINE_HEIGHT : 1
       const dx = event.deltaX * unit
       const dy = event.deltaY * unit
-      if (event.ctrlKey || event.metaKey) {
+      if (zoom) {
         // Trackpad pinch arrives here too, as a wheel with ctrlKey set.
         editor.zoomAt(
           toCanvasPoint(event.clientX, event.clientY),
@@ -170,9 +175,9 @@ export function Canvas({ editor }: { editor: Editor }) {
     window.addEventListener('keyup', onKey)
     window.addEventListener('blur', onBlur)
     // React's onWheel is passive and cannot preventDefault, hence addEventListener.
-    canvas.addEventListener('wheel', onWheel, { passive: false })
-    canvas.addEventListener('gesturestart', onGestureStart)
-    canvas.addEventListener('gesturechange', onGestureChange)
+    window.addEventListener('wheel', onWheel, { passive: false })
+    window.addEventListener('gesturestart', onGestureStart)
+    window.addEventListener('gesturechange', onGestureChange)
 
     return () => {
       unsubscribe()
@@ -182,9 +187,9 @@ export function Canvas({ editor }: { editor: Editor }) {
       window.removeEventListener('keydown', onKey)
       window.removeEventListener('keyup', onKey)
       window.removeEventListener('blur', onBlur)
-      canvas.removeEventListener('wheel', onWheel)
-      canvas.removeEventListener('gesturestart', onGestureStart)
-      canvas.removeEventListener('gesturechange', onGestureChange)
+      window.removeEventListener('wheel', onWheel)
+      window.removeEventListener('gesturestart', onGestureStart)
+      window.removeEventListener('gesturechange', onGestureChange)
     }
   }, [editor])
 
