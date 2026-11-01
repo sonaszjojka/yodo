@@ -26,3 +26,4 @@ Why Yodo is built the way it is. See [0001](0001-record-architecture-decisions.m
 | [0013](0013-drawing-document-format-and-versioning.md) | Versioned drawing document, opaque JSON on the server | Accepted |
 | [0014](0014-import-excalidraw-files.md) | Import `.excalidraw` files via a one-way converter | Accepted |
 | [0015](0015-store-light-colours-adapt-in-dark-mode.md) | Store light colours, adapt them when rendering dark | Accepted |
+| [0016](0016-typescript-lint-oxlint.md) | Lint TypeScript with oxlint | Accepted |
