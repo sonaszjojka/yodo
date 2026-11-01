@@ -5,8 +5,10 @@ import v1Fixture from './fixtures/v1-every-element.json?raw'
 import {
   DocumentError,
   type Migrations,
+  type RawDocument,
   loadDocument,
   migrate,
+  migrateWith,
   runMigrations,
 } from './migrate.ts'
 import { CURRENT_SCHEMA_VERSION } from './types.ts'
@@ -61,6 +63,15 @@ describe('migrate', () => {
     ['an Excalidraw file', { ...validEnvelope, type: 'excalidraw' }],
     ['a document without elements', { ...validEnvelope, elements: undefined }],
     ['a document with non-array elements', { ...validEnvelope, elements: {} }],
+    ['a document without appState', { ...validEnvelope, appState: undefined }],
+    [
+      'a document with a broken viewport',
+      { ...validEnvelope, appState: { viewport: { x: 0, y: 0 } } },
+    ],
+    ['a document without fileIds', { ...validEnvelope, fileIds: undefined }],
+    ['a document with non-string fileIds', { ...validEnvelope, fileIds: [1] }],
+    ['a document without an id', { ...validEnvelope, id: undefined }],
+    ['a document with a non-string name', { ...validEnvelope, name: 7 }],
   ])('rejects %s as not-yodo', (_label, raw) => {
     expect(errorCode(() => migrate(raw))).toBe('not-yodo')
   })
@@ -70,6 +81,8 @@ describe('migrate', () => {
     ['a string', '1'],
     ['a fraction', 1.5],
     ['zero', 0],
+    ['a symbol', Symbol('v')],
+    ['an object', { major: 1 }],
   ])('rejects a schemaVersion that is %s', (_label, schemaVersion) => {
     expect(errorCode(() => migrate({ ...validEnvelope, schemaVersion }))).toBe(
       'bad-version',
@@ -83,6 +96,31 @@ describe('migrate', () => {
 
   test('returns a current-version document as is', () => {
     expect(migrate(validEnvelope)).toEqual(validEnvelope)
+  })
+})
+
+describe('migrateWith', () => {
+  // A fake v1 -> v2 step that edits nested data in place, as a careless real
+  // step might.
+  const v1 = () => ({ ...validEnvelope, elements: [{ n: 1 }] })
+  const steps: Migrations = {
+    1: (doc) => {
+      ;(doc.elements as { n: number }[])[0]!.n = 2
+      return { ...doc, schemaVersion: 2 }
+    },
+  }
+
+  test("does not change the caller's input while migrating", () => {
+    const raw = v1()
+    expect(migrateWith(raw, steps, 2).elements).toEqual([{ n: 2 }])
+    expect(raw.elements).toEqual([{ n: 1 }])
+  })
+
+  test('rejects a migrated document whose envelope is broken', () => {
+    const dropsFileIds: Migrations = {
+      1: (doc) => ({ ...doc, schemaVersion: 2, fileIds: undefined }),
+    }
+    expect(errorCode(() => migrateWith(v1(), dropsFileIds, 2))).toBe('not-yodo')
   })
 })
 
@@ -116,9 +154,21 @@ describe('runMigrations', () => {
     expect(runMigrations(doc, fakeMigrations, 3)).toBe(doc)
   })
 
-  test('throws when a step is missing', () => {
+  test('reports a missing step as an app bug, not bad data', () => {
     expect(
       errorCode(() => runMigrations({ schemaVersion: 1 }, fakeMigrations, 4)),
-    ).toBe('bad-version')
+    ).toBe('migration-error')
+  })
+
+  test.each([
+    ['does not bump the version', (doc: RawDocument) => ({ ...doc })],
+    [
+      'skips a version',
+      (doc: RawDocument) => ({ ...doc, schemaVersion: doc.schemaVersion + 2 }),
+    ],
+  ])('throws instead of looping when a step %s', (_label, step) => {
+    expect(
+      errorCode(() => runMigrations({ schemaVersion: 1 }, { 1: step }, 3)),
+    ).toBe('migration-error')
   })
 })
