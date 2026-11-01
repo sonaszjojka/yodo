@@ -21,7 +21,8 @@ Rule: every stage ends with a **file of decisions**, not just a conversation. Co
 - Done (2026-10-30): Stage 6. `docs/conventions.md` approved: Conventional Commits without AI attribution trailers, GitHub flow (branch per task, PR, CI, `/code-review`, squash-merge to protected `main`), definition of done, MIT license. Workflow skills written in `.claude/skills/` (`feature`, `fix`, `commit`, `ship`, `adr`).
 - Done (2026-11-01): Part B step 1 (= roadmap 0.1). Repo `sonaszjojka/yodo` created (public, MIT); `web/` (Vite + React + TS strict, placeholder page with the logo) and `server/` (Go module stub) merged in PR #1. Also decided: TypeScript lint with oxlint (ADR 0016). `main` is protected on GitHub (squash merge only, ruleset "Protect main"), and `/code-review --comment` findings are triaged into fixes, `review` issues or replies (`docs/conventions.md`).
 - Done (2026-11-01): roadmap tasks for M0 and M1 are GitHub Issues #6–#25, grouped in milestones M0–M3 and linked from `docs/roadmap.md`. M2 and M3 issues are created when M1 ends.
-- **Next step:** Part B step 2 (= roadmap 0.2, tooling, issue #6).
+- Done (2026-11-01): Part B step 2 (= roadmap 0.2): Prettier, golangci-lint, Vitest + go test smoke tests, sqlc via `go tool`, Node 24, project CLAUDE.md (ADR 0017). Review now runs on the branch before `/ship`, one `low` round; `/ship` syncs docs into the PR.
+- **Next step:** Part B step 3 (= roadmap 0.3, CI + Pages deploy, issue #7).
 
 ## Working mode: an educational project
 The goal is both the app and learning how to program with Claude as effectively as possible, so that the knowledge stays with you.
