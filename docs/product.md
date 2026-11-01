@@ -54,7 +54,7 @@ Shipped in usable milestones; the split into milestones and tasks is in `docs/ro
 ### Canvas features
 | Feature | Done when… |
 |---|---|
-| Infinite canvas + zoom | Wheel / pinch zooms around the cursor; there are no canvas edges; zoom level is visible and can be reset. |
+| Infinite canvas + zoom | Pinch / Ctrl+wheel zooms around the cursor and the wheel pans; there are no canvas edges; zoom level is visible and can be reset. |
 | Keyboard shortcuts | Every tool has a single-key shortcut, plus Delete, copy/paste, undo/redo, select all; a shortcut list is viewable in the app. |
 | Attached arrows | An arrow drawn from/to a shape stays connected when either shape is moved or resized. |
 | Style controls | Selected elements can change stroke colour, fill colour, stroke width, and hand-drawn vs clean look. The full set of controls and where they live is in `docs/ui.md`. |

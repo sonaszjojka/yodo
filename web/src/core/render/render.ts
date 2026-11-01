@@ -2,6 +2,7 @@
 // the parts of the canvas and rough.js APIs it uses, so tests can pass fakes.
 import type { RoughCanvas } from 'roughjs/bin/canvas'
 import type { StrokeStyle, YodoElement } from '../document/types.ts'
+import type { Viewport } from '../geometry/viewport.ts'
 
 export type SceneContext = Pick<
   CanvasRenderingContext2D,
@@ -12,8 +13,8 @@ export interface SceneRough {
   rectangle(...args: Parameters<RoughCanvas['rectangle']>): unknown
 }
 
-/** The visible size in CSS pixels plus the device pixel ratio. */
-export interface Viewport {
+/** The canvas's visible size in CSS pixels plus the device pixel ratio. */
+export interface Surface {
   width: number
   height: number
   dpr: number
@@ -40,11 +41,17 @@ export function renderScene(
   ctx: SceneContext,
   rough: SceneRough,
   elements: readonly YodoElement[],
+  surface: Surface,
   viewport: Viewport,
 ) {
-  // Scale once so everything below draws in CSS pixels.
-  ctx.setTransform(viewport.dpr, 0, 0, viewport.dpr, 0, 0)
-  ctx.clearRect(0, 0, viewport.width, viewport.height)
+  const { dpr } = surface
+  // Clear in CSS pixels, before the camera transform applies.
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  ctx.clearRect(0, 0, surface.width, surface.height)
+  // One transform maps world units to device pixels, so elements below draw
+  // in world coordinates: device = (world - (x, y)) * zoom * dpr.
+  const scale = dpr * viewport.zoom
+  ctx.setTransform(scale, 0, 0, scale, -viewport.x * scale, -viewport.y * scale)
 
   for (const element of elements) {
     // Other element types get their renderers with their tools (roadmap 1.4+).
