@@ -39,4 +39,4 @@ Bug: $ARGUMENTS
 Commit without a separate approval step, as in `/feature` step 6. Follow `.claude/skills/commit/SKILL.md` (type `fix`; body states the root cause; footer `Closes #<issue>` if there is one).
 
 ## 9. Hand off
-Recap: cause, fix, how the test guards it, what's worth learning. End with the reviewer command for the branch, in the same format as the `/feature` hand-off (`.claude/skills/feature/SKILL.md`, step 7). When the user comes back after the review, suggest `/ship` — do not push on your own.
+Recap: cause, fix, how the test guards it, what's worth learning. End with the reviewer command for the branch, in the same format as the `/feature` hand-off (`.claude/skills/feature/SKILL.md`, step 7). When the user comes back after the review, suggest `/retest`, then `/ship` — do not push on your own.
