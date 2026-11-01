@@ -12,7 +12,7 @@ M0 builds a thin end-to-end path through every part of the system (web app, Go s
 | 0.2 | Tooling ✓ ([#6](https://github.com/sonaszjojka/yodo/issues/6)) | Format for TS and Go, lint for Go (TS lint: oxlint, ADR 0016), `npm test` and `go test ./...` each run one passing test, `sqlc generate` runs on an empty schema. Project CLAUDE.md via `/init`, extended with ADR rule + conventions. |
 | 0.3 | CI + Pages deploy ✓ ([#7](https://github.com/sonaszjojka/yodo/issues/7)) | GitHub Actions runs web and server jobs with path filters; merging to `main` deploys the placeholder to `sonaszjojka.github.io/yodo/` (ADR 0007). |
 | 0.4 | Go server + Docker image ✓ ([#8](https://github.com/sonaszjojka/yodo/issues/8)) | `server` embeds `dist/` and serves it with hash routing; `/api/health` returns 200; multi-stage `Dockerfile` builds an image pushed to GHCR; the documented `docker run` command shows the placeholder. |
-| 0.5 | Server security baseline ([#9](https://github.com/sonaszjojka/yodo/issues/9)) | Host/Origin middleware per ADR 0008 (`YODO_ALLOWED_ORIGINS`), table-driven tests for allowed/blocked/missing-Origin cases. |
+| 0.5 | Server security baseline ✓ ([#9](https://github.com/sonaszjojka/yodo/issues/9)) | Host/Origin middleware per ADR 0020 (`YODO_ALLOWED_ORIGINS`), table-driven tests for allowed/blocked/missing-Origin cases. |
 
 ## M1 — Draw and keep it (both usage modes)
 Goal: open Yodo, draw basic shapes, close the browser, come back to the same drawing listed on Home, in hosted and self-hosted mode.
@@ -49,7 +49,7 @@ Goal: open Yodo, draw basic shapes, close the browser, come back to the same dra
 | 2.8 | `.yodo` export / import | Export inlines images as base64; import recreates the drawing exactly, also from an older-version fixture. |
 | 2.9 | Excalidraw import | Converter for shapes, text, arrows, pencil, images; summary of skipped features (ADR 0014). |
 | 2.10 | Shortcuts modal | Searchable, grouped list of every shortcut. |
-| 2.11 | Optional password | `YODO_PASSWORD` + session cookie + password screen (ADR 0008); tests for locked/unlocked/wrong password. |
+| 2.11 | Optional password | `YODO_PASSWORD` + session cookie + password screen (ADR 0020); tests for locked/unlocked/wrong password. |
 | 2.12 | Performance benchmark | Playwright perf test on the generated reference board (`docs/product.md`); results recorded, tracked over time. Fix anything below target. |
 
 ## M3 — Organise

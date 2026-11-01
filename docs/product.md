@@ -16,7 +16,7 @@ A full, local-first Excalidraw-style drawing app. For me, my colleagues, and any
 | Data lives | In the browser (IndexedDB) | On disk, in a Docker volume (small Go server + SQLite) |
 | Survives clearing browser data | No (export a Yodo file to be safe) | Yes |
 | Same drawings across browsers | No | Yes |
-| Login | None | None by default; optional password (ADR 0008) |
+| Login | None | None by default; optional password (ADR 0020) |
 
 Moving drawings between the two modes is done with Yodo file export / import.
 
@@ -79,7 +79,7 @@ Shipped in usable milestones; the split into milestones and tasks is in `docs/ro
 
 ## Later
 - Real-time collaboration
-- User accounts and a shared multi-user server (PostgreSQL; ADR 0006, 0008)
+- User accounts and a shared multi-user server (PostgreSQL; ADR 0006, 0020)
 - Sync between the browser and a server (local-first sync)
 - Snapping / alignment guides
 - Version history: automatic snapshots + manually named versions; preview and restore (design already agreed)
