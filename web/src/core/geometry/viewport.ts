@@ -37,11 +37,15 @@ export function zoomAt(v: Viewport, anchor: Point, nextZoom: number): Viewport {
   return { zoom, x: wx - anchor[0] / zoom, y: wy - anchor[1] / zoom }
 }
 
+/** The largest zoom ratio one wheel event may apply (one mouse notch). */
+const MAX_WHEEL_STEP = 1.25
+
 /**
- * The zoom multiplier for a wheel delta (pixels). Exponential, so the same
- * delta always zooms by the same ratio: tiny pinch deltas feel smooth, large
- * mouse-wheel notches take bigger steps, and in/out are symmetric.
+ * The zoom multiplier for a wheel delta (pixels). Exponential, so in and out
+ * are symmetric and tiny pinch deltas feel smooth. Capped per event, because a
+ * mouse notch arrives as a single ~100 px delta and would otherwise jump ~2.7x.
  */
 export function wheelZoomFactor(deltaY: number): number {
-  return Math.exp(-deltaY * 0.01)
+  const factor = Math.exp(-deltaY * 0.01)
+  return Math.min(MAX_WHEEL_STEP, Math.max(1 / MAX_WHEEL_STEP, factor))
 }

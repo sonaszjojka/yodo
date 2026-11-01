@@ -85,4 +85,14 @@ describe('wheelZoomFactor', () => {
     expect(wheelZoomFactor(100)).toBeLessThan(1)
     expect(wheelZoomFactor(-100) * wheelZoomFactor(100)).toBeCloseTo(1)
   })
+
+  test('one mouse-wheel notch zooms at most one step of 1.25x', () => {
+    // Chrome reports ~100 px per notch (120 on some setups).
+    expect(wheelZoomFactor(-120)).toBeLessThanOrEqual(1.25)
+    expect(wheelZoomFactor(120)).toBeGreaterThanOrEqual(1 / 1.25)
+  })
+
+  test('small trackpad-pinch deltas are not slowed down by the cap', () => {
+    expect(wheelZoomFactor(-5)).toBeCloseTo(Math.exp(0.05))
+  })
 })
