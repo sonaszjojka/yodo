@@ -60,6 +60,14 @@ describe('handleAt', () => {
     },
   )
 
+  test('on a small outline the middle is no handle, so the selection can be moved', () => {
+    // A 12 px outline at zoom 0.25: fixed 6 px zones would cover all of it.
+    const small = { x: 0, y: 0, width: 48, height: 48 }
+    expect(handleAt(small, [24, 24], 4)).toBeNull()
+    expect(handleAt(small, [-8, -8], 4)).toBe('nw')
+    expect(handleAt(small, [24, -8], 4)).toBe('n')
+  })
+
   test('reach is in screen pixels, so it shrinks in world units when zoomed in', () => {
     expect(handleAt(outline, [50, 3], 1)).toBe('n')
     expect(handleAt(outline, [50, 3], 0.5)).toBeNull()

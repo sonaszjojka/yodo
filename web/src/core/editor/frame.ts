@@ -61,7 +61,9 @@ export function selectionFrame(
 
 /**
  * The handle at `point` on `outline`, or null. Corners win over sides, so the
- * ends of a side resize diagonally, as the drawn handles suggest.
+ * ends of a side resize diagonally, as the drawn handles suggest. Inside the
+ * outline a zone reaches at most a quarter of the way across, so the middle
+ * of a small selection (or one at low zoom) still moves it.
  */
 export function handleAt(
   outline: Bounds,
@@ -73,13 +75,17 @@ export function handleAt(
   const right = outline.x + outline.width
   const top = outline.y
   const bottom = outline.y + outline.height
-  const corner = (HANDLE_SIZE / 2 + HANDLE_SLOP) * px
-  const near = (a: number, b: number, reach: number) => Math.abs(a - b) <= reach
+  const capX = outline.width / 4
+  const capY = outline.height / 4
+  /** `inside` is the distance from an edge towards the outline's middle. */
+  const near = (inside: number, reach: number, cap: number) =>
+    inside >= -reach && inside <= Math.min(reach, cap)
 
-  const nearLeft = near(x, left, corner)
-  const nearRight = near(x, right, corner)
-  const nearTop = near(y, top, corner)
-  const nearBottom = near(y, bottom, corner)
+  const corner = (HANDLE_SIZE / 2 + HANDLE_SLOP) * px
+  const nearLeft = near(x - left, corner, capX)
+  const nearRight = near(right - x, corner, capX)
+  const nearTop = near(y - top, corner, capY)
+  const nearBottom = near(bottom - y, corner, capY)
   if (nearTop && nearLeft) return 'nw'
   if (nearTop && nearRight) return 'ne'
   if (nearBottom && nearRight) return 'se'
@@ -88,9 +94,9 @@ export function handleAt(
   const side = SIDE_REACH * px
   const alongX = x >= left && x <= right
   const alongY = y >= top && y <= bottom
-  if (alongX && near(y, top, side)) return 'n'
-  if (alongX && near(y, bottom, side)) return 's'
-  if (alongY && near(x, left, side)) return 'w'
-  if (alongY && near(x, right, side)) return 'e'
+  if (alongX && near(y - top, side, capY)) return 'n'
+  if (alongX && near(bottom - y, side, capY)) return 's'
+  if (alongY && near(x - left, side, capX)) return 'w'
+  if (alongY && near(right - x, side, capX)) return 'e'
   return null
 }

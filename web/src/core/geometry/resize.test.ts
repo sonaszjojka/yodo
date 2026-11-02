@@ -1,7 +1,12 @@
 import { describe, expect, test } from 'vitest'
 import { createLinear, createShape } from '../document/create.ts'
 import { lineFromDrag } from './line.ts'
-import { resizeTransform, scaleElement } from './resize.ts'
+import {
+  canResize,
+  flippedHandle,
+  resizeTransform,
+  scaleElement,
+} from './resize.ts'
 
 const box = { x: 0, y: 0, width: 100, height: 50 }
 
@@ -76,6 +81,29 @@ describe('resizeTransform', () => {
     const t = resizeTransform(flat, 'se', [100, 0], [50, 0], true)
     expect(t).toMatchObject({ sx: 0.5 })
   })
+
+  test('a side dragged onto the opposite side keeps 1 unit, so it stays resizable', () => {
+    expect(resizeTransform(box, 'e', [100, 25], [0, 25], false)).toMatchObject({
+      sx: 0.01,
+      sy: 1,
+    })
+    expect(resizeTransform(box, 'n', [50, 0], [50, 50], false)).toMatchObject({
+      sx: 1,
+      sy: 0.02,
+    })
+  })
+
+  test('Shift onto the opposite corner shrinks to the minimum, not back to full size', () => {
+    // 100×50 keeps its ratio, so the short side sets the minimum: 2×1.
+    const t = resizeTransform(box, 'se', [100, 50], [0, 0], true)
+    expect(t).toMatchObject({ sx: 0.02, sy: 0.02 })
+  })
+
+  test('Shift with no axis to scale keeps scale 1', () => {
+    const flat = { x: 0, y: 0, width: 100, height: 0 }
+    const t = resizeTransform(flat, 's', [50, 0], [50, 40], true)
+    expect(t).toMatchObject({ sx: 1, sy: 1 })
+  })
 })
 
 describe('scaleElement', () => {
@@ -111,5 +139,26 @@ describe('scaleElement', () => {
     const line = createLinear('arrow', lineFromDrag([10, 10], [20, 10], false))
     const scaled = scaleElement(line, { anchor: [0, 0], sx: 2, sy: 2 })
     expect(scaled).toMatchObject({ x: 20, y: 20, endArrowhead: 'arrow' })
+  })
+})
+
+describe('canResize', () => {
+  test('a handle resizes only if it pulls an axis that has a size', () => {
+    const flat = { x: 0, y: 0, width: 100, height: 0 }
+    expect(canResize(flat, 'n')).toBe(false)
+    expect(canResize(flat, 'e')).toBe(true)
+    expect(canResize(flat, 'se')).toBe(true)
+    expect(canResize({ ...flat, width: 0 }, 'se')).toBe(false)
+  })
+})
+
+describe('flippedHandle', () => {
+  const t = { anchor: [0, 0] as [number, number], sx: 1, sy: 1 }
+  test('a negative scale mirrors the handle on that axis', () => {
+    expect(flippedHandle('se', t)).toBe('se')
+    expect(flippedHandle('se', { ...t, sx: -1 })).toBe('sw')
+    expect(flippedHandle('se', { ...t, sx: -1, sy: -1 })).toBe('nw')
+    expect(flippedHandle('n', { ...t, sy: -0.5 })).toBe('s')
+    expect(flippedHandle('n', { ...t, sx: -1 })).toBe('n')
   })
 })

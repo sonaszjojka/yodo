@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'vitest'
-import { createDocument, createShape } from '../document/create.ts'
+import {
+  createDocument,
+  createLinear,
+  createShape,
+} from '../document/create.ts'
+import { lineFromDrag } from '../geometry/line.ts'
 import { MAX_ZOOM, MIN_ZOOM } from '../geometry/viewport.ts'
 import { createEditor, type Tool } from './editor.ts'
 
@@ -868,6 +873,77 @@ describe('resize', () => {
     const { editor } = setupSelection()
     editor.pointerMove(1, [107, 107], false)
     expect(editor.store.getState().hoverHandle).toBeNull()
+  })
+
+  test('a click on a handle selects the element lying under it', () => {
+    const a = {
+      ...createShape('rectangle', { x: 0, y: 0, width: 100, height: 100 }),
+      backgroundColor: FILL,
+    }
+    const c = {
+      ...createShape('rectangle', { x: 104, y: 104, width: 50, height: 50 }),
+      backgroundColor: FILL,
+    }
+    const editor = createEditor({ ...createDocument(), elements: [a, c] })
+    click(editor, [50, 50])
+    click(editor, [107, 107])
+    expect(editor.store.getState().selectedIds).toEqual([c.id])
+  })
+
+  test('Shift+click on a group edge in a side zone toggles that element off', () => {
+    const { editor, a } = selectA()
+    click(editor, [250, 50], true)
+    // 4 from b's right edge: b is hit, and the outline's 'e' side (307) is near.
+    click(editor, [304, 50], true)
+    expect(editor.store.getState().selectedIds).toEqual([a.id])
+  })
+
+  test('a flat line moves when pressed beside it, as it has no height to resize', () => {
+    const line = createLinear('line', lineFromDrag([0, 0], [100, 0], false))
+    const editor = createEditor({ ...createDocument(), elements: [line] })
+    click(editor, [50, 0])
+    // Within hit tolerance of the line and on the outline's top side.
+    editor.pointerMove(1, [50, -5], false)
+    expect(editor.store.getState().hoverHandle).toBeNull()
+    drag(editor, [50, -5], [50, 15])
+    expect(editor.store.getState().document.elements[0]).toMatchObject({
+      x: 0,
+      y: 20,
+    })
+  })
+
+  test('the cursor handle follows a flip, and is re-read from the pointer after', () => {
+    const { editor } = selectA()
+    editor.pointerDown(1, [107, 107], primary)
+    editor.pointerMove(1, [-100, 207], false)
+    // Dragged past the west side: the pointer now pulls the sw corner.
+    expect(editor.store.getState().resize?.handle).toBe('sw')
+    editor.pointerUp(1)
+    // The new box is (-107, 0, 107, 200): the pointer is on its bottom side.
+    expect(editor.store.getState().hoverHandle).toBe('s')
+  })
+
+  test('panning or zooming re-reads the handle under the pointer', () => {
+    const { editor } = selectA()
+    editor.pointerMove(1, [107, 107], false)
+    expect(editor.store.getState().hoverHandle).toBe('se')
+    editor.panBy(100, 100)
+    expect(editor.store.getState().hoverHandle).toBeNull()
+    editor.panBy(-100, -100)
+    expect(editor.store.getState().hoverHandle).toBe('se')
+    editor.zoomAt([0, 0], 2)
+    expect(editor.store.getState().hoverHandle).toBeNull()
+  })
+
+  test('a pan drag re-reads the handle where the pointer ends up', () => {
+    const { editor } = selectA()
+    editor.setSpaceHeld(true)
+    // Grabbed on the se handle: the content moves with the pointer, so the
+    // pointer is still on it, now at (207, 207) on screen.
+    editor.pointerDown(1, [107, 107], primary)
+    editor.pointerMove(1, [207, 207], false)
+    editor.pointerUp(1)
+    expect(editor.store.getState().hoverHandle).toBe('se')
   })
 
   test('a selection change forgets the hovered handle', () => {
