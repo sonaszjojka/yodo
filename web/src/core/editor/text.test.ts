@@ -394,3 +394,26 @@ describe('editBox', () => {
     ).toBeNull()
   })
 })
+
+describe('review fixes', () => {
+  test('text under a later transparent shape is still edited, not the shape label', () => {
+    const text = {
+      ...createText([50, 40], 1),
+      text: 'Hello',
+      width: 55,
+      height: 25,
+    }
+    const rect = createShape('rectangle', {
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+    })
+    const editor = setup([text, rect])
+    editor.doubleClick([60, 50])
+    expect(state(editor).editing).toMatchObject({
+      target: 'text',
+      id: text.id,
+    })
+  })
+})

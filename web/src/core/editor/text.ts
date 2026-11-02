@@ -42,8 +42,10 @@ export function isLabelled(element: YodoElement): element is LabelledShape {
 }
 
 /**
- * The text or shape a text click at `point` edits: the topmost text under it,
- * or the topmost shape it falls inside (filled or not), else null.
+ * The text or shape a text click at `point` edits. What the click really hits
+ * comes first, so text inside a transparent shape drawn later stays
+ * editable; only then does the topmost shape the point falls inside (filled
+ * or not) count. Null means a new text.
  */
 export function textTargetAt(
   elements: readonly YodoElement[],
@@ -52,8 +54,13 @@ export function textTargetAt(
 ): TextElement | LabelledShape | null {
   for (let i = elements.length - 1; i >= 0; i--) {
     const element = elements[i]!
-    if (element.type === 'text' && hitTest(element, point, tolerance))
-      return element
+    if (!hitTest(element, point, tolerance)) continue
+    if (element.type === 'text' || isLabelled(element)) return element
+    // A line or stroke on top: look for a shape around the point instead.
+    break
+  }
+  for (let i = elements.length - 1; i >= 0; i--) {
+    const element = elements[i]!
     // A label counts as a fill for hit-testing, so this finds a click inside.
     if (
       isLabelled(element) &&
