@@ -35,3 +35,6 @@ Why Yodo is built the way it is. See [0001](0001-record-architecture-decisions.m
 | [0022](0022-viewport-is-editor-state.md) | Viewport lives in editor state; pans and zooms are not document changes | Accepted |
 | [0023](0023-undo-redo-document-snapshots.md) | Undo/redo with snapshots of the immutable document | Accepted |
 | [0024](0024-pencil-strokes-smoothed-canvas-path.md) | Pencil strokes drawn as a smoothed Canvas path, not with rough.js | Accepted |
+| [0025](0025-ship-fonts-with-fontsource.md) | Fonts as Fontsource npm packages bundled by Vite | Accepted |
+| [0026](0026-shape-text-as-label-field.md) | Text inside a shape is a `label` field on the shape | Accepted |
+| [0027](0027-edit-text-in-textarea-overlay.md) | Edit text in an HTML textarea over the canvas | Accepted |
