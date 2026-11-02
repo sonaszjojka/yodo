@@ -26,6 +26,18 @@ test('shows the selection shifted by the move in progress', () => {
   expect(scene.selected).toEqual([scene.elements[1]])
 })
 
+test('shows the selection scaled by the resize in progress', () => {
+  const scene = sceneOf(
+    stateWith({
+      selectedIds: [b.id],
+      resize: { handle: 'e', anchor: [50, 0], sx: 3, sy: 1 },
+    }),
+  )
+  expect(scene.elements[0]).toBe(a)
+  expect(scene.elements[1]).toMatchObject({ x: 50, width: 30 })
+  expect(scene.selected).toEqual([scene.elements[1]])
+})
+
 test('draws the draft on top', () => {
   const draft = createShape('ellipse', { x: 0, y: 0, width: 5, height: 5 })
   expect(sceneOf(stateWith({ draft })).elements).toEqual([a, b, draft])

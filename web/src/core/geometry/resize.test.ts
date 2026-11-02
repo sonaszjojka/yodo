@@ -1,0 +1,115 @@
+import { describe, expect, test } from 'vitest'
+import { createLinear, createShape } from '../document/create.ts'
+import { lineFromDrag } from './line.ts'
+import { resizeTransform, scaleElement } from './resize.ts'
+
+const box = { x: 0, y: 0, width: 100, height: 50 }
+
+describe('resizeTransform', () => {
+  test('a corner scales both axes from the opposite corner', () => {
+    expect(resizeTransform(box, 'se', [100, 50], [150, 100], false)).toEqual({
+      anchor: [0, 0],
+      sx: 1.5,
+      sy: 2,
+    })
+    expect(resizeTransform(box, 'nw', [0, 0], [50, 25], false)).toEqual({
+      anchor: [100, 50],
+      sx: 0.5,
+      sy: 0.5,
+    })
+  })
+
+  test('a side scales only its axis, from the opposite side', () => {
+    expect(resizeTransform(box, 'e', [100, 25], [120, 90], false)).toEqual({
+      anchor: [0, 25],
+      sx: 1.2,
+      sy: 1,
+    })
+    expect(resizeTransform(box, 'n', [50, 0], [80, 25], false)).toEqual({
+      anchor: [50, 50],
+      sx: 1,
+      sy: 0.5,
+    })
+  })
+
+  test('the grab offset is kept: only the pointer delta counts', () => {
+    // Grabbed 3 units outside the corner (the handle sits on the outline).
+    const t = resizeTransform(box, 'se', [103, 53], [153, 103], false)
+    expect(t).toMatchObject({ sx: 1.5, sy: 2 })
+  })
+
+  test('dragging past the opposite side flips (negative scale)', () => {
+    const t = resizeTransform(box, 'e', [100, 25], [-50, 25], false)
+    expect(t).toMatchObject({ anchor: [0, 25], sx: -0.5, sy: 1 })
+  })
+
+  test('Shift on a corner keeps proportions, taking the larger scale', () => {
+    const t = resizeTransform(box, 'se', [100, 50], [150, 60], true)
+    expect(t).toMatchObject({ sx: 1.5, sy: 1.5 })
+  })
+
+  test('Shift on a corner keeps each axis direction when flipped', () => {
+    const t = resizeTransform(box, 'se', [100, 50], [-200, 60], true)
+    expect(t).toMatchObject({ sx: -2, sy: 2 })
+  })
+
+  test('Shift on a side scales the other axis around the centre', () => {
+    const t = resizeTransform(box, 'e', [100, 25], [200, 25], true)
+    expect(t).toEqual({ anchor: [0, 25], sx: 2, sy: 2 })
+  })
+
+  test('an axis with no size keeps scale 1', () => {
+    const flat = { x: 0, y: 0, width: 100, height: 0 }
+    expect(resizeTransform(flat, 'se', [100, 0], [200, 40], false)).toEqual({
+      anchor: [0, 0],
+      sx: 2,
+      sy: 1,
+    })
+    expect(resizeTransform(flat, 's', [50, 0], [50, 40], false)).toMatchObject({
+      sx: 1,
+      sy: 1,
+    })
+  })
+
+  test('Shift ignores an axis with no size', () => {
+    const flat = { x: 0, y: 0, width: 100, height: 0 }
+    const t = resizeTransform(flat, 'se', [100, 0], [50, 0], true)
+    expect(t).toMatchObject({ sx: 0.5 })
+  })
+})
+
+describe('scaleElement', () => {
+  const rect = createShape('rectangle', { x: 10, y: 20, width: 40, height: 30 })
+
+  test('maps a box through the anchor', () => {
+    const scaled = scaleElement(rect, { anchor: [10, 20], sx: 2, sy: 0.5 })
+    expect(scaled).toMatchObject({ x: 10, y: 20, width: 80, height: 15 })
+    expect(scaled).toMatchObject({ id: rect.id, seed: rect.seed })
+  })
+
+  test('normalises a flipped box to a positive size', () => {
+    const scaled = scaleElement(rect, { anchor: [10, 20], sx: -1, sy: 1 })
+    expect(scaled).toMatchObject({ x: -30, y: 20, width: 40, height: 30 })
+  })
+
+  test('scales line points and mirrors them on a flip', () => {
+    const line = createLinear('line', lineFromDrag([0, 0], [100, 50], false))
+    const scaled = scaleElement(line, { anchor: [0, 0], sx: -0.5, sy: 2 })
+    expect(scaled).toMatchObject({
+      x: 0,
+      y: 0,
+      width: 50,
+      height: 100,
+      points: [
+        [0, 0],
+        [-50, 100],
+      ],
+    })
+  })
+
+  test('moves a line origin that is not the anchor', () => {
+    const line = createLinear('arrow', lineFromDrag([10, 10], [20, 10], false))
+    const scaled = scaleElement(line, { anchor: [0, 0], sx: 2, sy: 2 })
+    expect(scaled).toMatchObject({ x: 20, y: 20, endArrowhead: 'arrow' })
+  })
+})

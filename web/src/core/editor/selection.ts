@@ -1,8 +1,9 @@
 // Pure selection helpers: which element a click picks, what a box selects,
-// and the document edits a selection makes (move, delete).
+// and the document edits a selection makes (move, resize, delete).
 import type { Point, YodoElement } from '../document/types.ts'
 import { hitTest } from '../geometry/hit.ts'
 import { containsBounds, elementBounds, type Bounds } from '../geometry/rect.ts'
+import { scaleElement, type ResizeTransform } from '../geometry/resize.ts'
 
 function insideBox(point: Point, box: Bounds, reach: number) {
   return (
@@ -66,6 +67,17 @@ export function moveElements(
     ids.has(element.id)
       ? { ...element, x: element.x + dx, y: element.y + dy }
       : element,
+  )
+}
+
+/** Scales the elements in `ids` by `t`; like `moveElements`, others keep their identity. */
+export function resizeElements(
+  elements: readonly YodoElement[],
+  ids: ReadonlySet<string>,
+  t: ResizeTransform,
+): YodoElement[] {
+  return elements.map((element) =>
+    ids.has(element.id) ? scaleElement(element, t) : element,
   )
 }
 

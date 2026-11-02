@@ -3,6 +3,7 @@ import { useEffect, useRef, type PointerEvent } from 'react'
 import type { Point } from '../core/document/types.ts'
 import type { Editor, EditorState, Tool } from '../core/editor/editor.ts'
 import { sceneOf } from '../core/editor/scene.ts'
+import type { Handle } from '../core/geometry/resize.ts'
 import { wheelZoomFactor } from '../core/geometry/viewport.ts'
 import { canvasSize, renderScene, type Surface } from '../core/render/render.ts'
 
@@ -31,9 +32,24 @@ const TOOL_KEYS: Partial<Record<string, Tool>> = {
   a: 'arrow',
 }
 
-function cursorFor({ panning, tool, spaceHeld, move }: EditorState) {
+/** Opposite handles resize along the same line, so they share a cursor. */
+const HANDLE_CURSORS: Record<Handle, string> = {
+  nw: 'nwse-resize',
+  se: 'nwse-resize',
+  ne: 'nesw-resize',
+  sw: 'nesw-resize',
+  n: 'ns-resize',
+  s: 'ns-resize',
+  e: 'ew-resize',
+  w: 'ew-resize',
+}
+
+function cursorFor(state: EditorState) {
+  const { panning, tool, spaceHeld, move, resize, hoverHandle } = state
   if (panning) return 'grabbing'
   if (tool === 'hand' || spaceHeld) return 'grab'
+  const handle = resize?.handle ?? hoverHandle
+  if (handle) return HANDLE_CURSORS[handle]
   if (move) return 'move'
   return tool === 'select' ? 'default' : 'crosshair'
 }
