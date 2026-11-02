@@ -38,7 +38,7 @@
 - Bar and panel edit the same state and always agree.
 
 ## Selection
-Thin solid accent outline (1.25 px) with a small gap around the element, 8 px rounded white corner handles, a rotate handle above, and a size badge below (e.g. `220 × 120`).
+Thin solid accent outline (1.25 px) with a small gap around the element, 8 px rounded white corner handles, a rotate handle above, and a size badge below (e.g. `220 × 120`). The rotate handle appears once rotation is in scope (not in the MVP).
 
 ## Visual tokens
 **Typography:** UI in Manrope. Canvas fonts: Hand (Caveat), Sans (Manrope), Mono (JetBrains Mono). Final font licences are checked when they are added.
