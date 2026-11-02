@@ -148,6 +148,20 @@ export function Canvas({ editor }: { editor: Editor }) {
         // Backspace would otherwise navigate back in some browsers.
         event.preventDefault()
         editor.deleteSelected()
+      } else if (mod && !event.altKey && event.key.toLowerCase() === 'z') {
+        // `key`, not `code`, so it follows the layout (Z sits elsewhere on
+        // AZERTY). preventDefault stops the browser's own undo.
+        event.preventDefault()
+        if (event.shiftKey) editor.redo()
+        else editor.undo()
+      } else if (
+        event.ctrlKey &&
+        !event.altKey &&
+        event.key.toLowerCase() === 'y'
+      ) {
+        // The Windows redo shortcut.
+        event.preventDefault()
+        editor.redo()
       } else if (mod && event.key === '0') {
         // Replaces the browser's own "reset page zoom".
         event.preventDefault()

@@ -33,3 +33,4 @@ Why Yodo is built the way it is. See [0001](0001-record-architecture-decisions.m
 | [0020](0020-auth-and-origin-checks.md) | Auth as 0008, plus check `Origin` whenever present and deny unlisted methods | Accepted |
 | [0021](0021-frontend-state-external-store.md) | Editor state in a framework-free store, read by React via `useSyncExternalStore` | Accepted |
 | [0022](0022-viewport-is-editor-state.md) | Viewport lives in editor state; pans and zooms are not document changes | Accepted |
+| [0023](0023-undo-redo-document-snapshots.md) | Undo/redo with snapshots of the immutable document | Accepted |

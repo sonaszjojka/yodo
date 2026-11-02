@@ -34,10 +34,16 @@ body {
 }
 
 /* Bottom-left part of the editor's bottom bar (docs/ui.md). */
-.zoom-control {
+.bottom-bar {
   position: fixed;
   left: 16px;
   bottom: 16px;
+  display: flex;
+  gap: 8px;
+}
+
+/* A floating group of buttons in a bar (undo/redo, zoom). */
+.control-group {
   display: flex;
   padding: 2px;
   background: var(--surface);
@@ -46,7 +52,7 @@ body {
   box-shadow: var(--shadow-float);
 }
 
-.zoom-control button {
+.control-group button {
   min-width: 40px;
   height: 40px;
   padding: 0 8px;
@@ -59,16 +65,21 @@ body {
   cursor: pointer;
 }
 
-.zoom-control button:hover {
+.control-group button:hover:enabled {
   background: var(--raised);
 }
 
-.zoom-control button:focus-visible {
+.control-group button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.control-group button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
 
-.zoom-control .zoom-value {
+.control-group .zoom-value {
   min-width: 64px;
   font-size: 13px;
   font-weight: 600;

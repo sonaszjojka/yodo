@@ -18,7 +18,7 @@ export function ZoomControl({ editor }: { editor: Editor }) {
   const zoom = useStore(editor.store, selectZoom)
 
   return (
-    <div className="zoom-control">
+    <div className="control-group">
       <button
         type="button"
         aria-label="Zoom out"

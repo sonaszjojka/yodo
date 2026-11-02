@@ -25,7 +25,7 @@ Goal: open Yodo, draw basic shapes, close the browser, come back to the same dra
 | 1.4 | Diamond, ellipse, line, arrow ✓ (PR [#38](https://github.com/sonaszjojka/yodo/pull/38)) | Each tool draws at the dragged size; Shift constrains; arrowhead on arrow. Hit-testing for every shape unit-tested. |
 | 1.5 | Selection ✓ (PR [#39](https://github.com/sonaszjojka/yodo/pull/39)) ([#14](https://github.com/sonaszjojka/yodo/issues/14)) | Click, Shift+click, box select; selection outline + handles per `docs/ui.md`; move and Delete. |
 | 1.6 | Resize ✓ (PR [#40](https://github.com/sonaszjojka/yodo/pull/40)) ([#15](https://github.com/sonaszjojka/yodo/issues/15)) | Corner/edge handles resize one or many elements; Shift keeps proportions; size badge shown. |
-| 1.7 | Undo / redo ([#16](https://github.com/sonaszjojka/yodo/issues/16)) | Every change from 1.2–1.6 undoes/redoes with Cmd/Ctrl+Z and Shift+Cmd/Ctrl+Z. **ADR:** undo/redo design (open item from Stage 3). |
+| 1.7 | Undo / redo ✓ (PR [#41](https://github.com/sonaszjojka/yodo/pull/41)) ([#16](https://github.com/sonaszjojka/yodo/issues/16)) | Every change from 1.2–1.6 undoes/redoes with Cmd/Ctrl+Z and Shift+Cmd/Ctrl+Z. **ADR:** undo/redo design (open item from Stage 3). |
 | 1.8 | Pencil ([#17](https://github.com/sonaszjojka/yodo/issues/17)) | Freehand strokes are smooth, selectable and movable as one element. |
 | 1.9 | Text ([#18](https://github.com/sonaszjojka/yodo/issues/18)) | Click places a text box; double-click edits; text inside shapes. |
 | 1.10 | Eraser + tool shortcuts ([#19](https://github.com/sonaszjojka/yodo/issues/19)) | Dragging erases (undoable); every tool so far has a single-key shortcut; editor toolbar per `docs/ui.md`. |
