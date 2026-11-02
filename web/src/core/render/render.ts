@@ -2,7 +2,13 @@
 // the parts of the canvas and rough.js APIs it uses, so tests can pass fakes.
 import type { RoughCanvas } from 'roughjs/bin/canvas'
 import type { Options } from 'roughjs/bin/core'
-import type { Point, StrokeStyle, YodoElement } from '../document/types.ts'
+import type {
+  PencilElement,
+  Point,
+  StrokeStyle,
+  YodoElement,
+} from '../document/types.ts'
+import { smoothPath } from '../geometry/freehand.ts'
 import { arrowhead } from '../geometry/line.ts'
 import { GAP, grow, HANDLE_SIZE, selectionFrame } from '../geometry/frame.ts'
 import { diamondPoints, type Bounds } from '../geometry/rect.ts'
@@ -28,6 +34,12 @@ export type SceneContext = Pick<
   | 'textBaseline'
   | 'measureText'
   | 'fillText'
+  | 'moveTo'
+  | 'lineTo'
+  | 'quadraticCurveTo'
+  | 'lineCap'
+  | 'lineJoin'
+  | 'setLineDash'
 >
 /** The return value (a Drawable) is unused, so fakes may return nothing. */
 export interface SceneRough {
@@ -77,7 +89,34 @@ function roughOptions(element: YodoElement): Options {
   }
 }
 
-function drawElement(rough: SceneRough, element: YodoElement) {
+/**
+ * A pencil stroke: a plain, smoothed canvas path with no rough.js wobble
+ * (ADR 0024). The caller's save/restore resets the style set here.
+ */
+function drawStroke(ctx: SceneContext, element: PencilElement) {
+  const path = smoothPath(
+    element.points.map(([dx, dy]): Point => [element.x + dx, element.y + dy]),
+  )
+  if (path.length === 0) return
+  ctx.beginPath()
+  for (const step of path) {
+    if (step.type === 'move') ctx.moveTo(...step.to)
+    else if (step.type === 'line') ctx.lineTo(...step.to)
+    else ctx.quadraticCurveTo(...step.control, ...step.to)
+  }
+  ctx.strokeStyle = element.strokeColor
+  ctx.lineWidth = element.strokeWidth
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.setLineDash(DASHES[element.strokeStyle] ?? [])
+  ctx.stroke()
+}
+
+function drawElement(
+  ctx: SceneContext,
+  rough: SceneRough,
+  element: YodoElement,
+) {
   const options = roughOptions(element)
   const { x, y, width, height } = element
   switch (element.type) {
@@ -105,8 +144,10 @@ function drawElement(rough: SceneRough, element: YodoElement) {
       return
     }
     case 'pencil':
+      drawStroke(ctx, element)
+      return
     case 'text':
-      // Their renderers arrive with their tools (roadmap 1.8, 1.9).
+      // Its renderer arrives with the text tool (roadmap 1.9).
       return
   }
 }
@@ -250,7 +291,7 @@ export function renderScene(
   for (const element of elements) {
     ctx.save()
     ctx.globalAlpha = element.opacity / 100
-    drawElement(rough, element)
+    drawElement(ctx, rough, element)
     ctx.restore()
   }
   drawOverlay(ctx, overlay, viewport, dpr)

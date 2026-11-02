@@ -5,6 +5,7 @@ import {
   type ArrowElement,
   type BaseElement,
   type LineElement,
+  type PencilElement,
   type YodoDocument,
   type YodoElement,
 } from './types.ts'
@@ -112,4 +113,12 @@ export function createLinear(
   return type === 'arrow'
     ? { type, ...base, endArrowhead: 'arrow' }
     : { type, ...base }
+}
+
+/** A new pencil stroke with the given geometry (see `geometry/freehand.ts`). */
+export function createPencil(
+  geometry: LinearGeometry,
+  seed = randomSeed(),
+): PencilElement {
+  return { type: 'pencil', ...defaults(seed), ...geometry }
 }

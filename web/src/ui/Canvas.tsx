@@ -6,6 +6,7 @@ import { sceneOf } from '../core/editor/scene.ts'
 import type { Handle } from '../core/geometry/resize.ts'
 import { wheelZoomFactor } from '../core/geometry/viewport.ts'
 import { canvasSize, renderScene, type Surface } from '../core/render/render.ts'
+import { pointerSamples } from './pointerSamples.ts'
 
 /** `WheelEvent.deltaMode` 1 counts lines (some mice); convert to pixels. */
 const LINE_HEIGHT = 16
@@ -30,6 +31,7 @@ const TOOL_KEYS: Partial<Record<string, Tool>> = {
   o: 'ellipse',
   l: 'line',
   a: 'arrow',
+  p: 'pencil',
 }
 
 /** Opposite handles resize along the same line, so they share a cursor. */
@@ -260,7 +262,12 @@ export function Canvas({ editor }: { editor: Editor }) {
   }
 
   function onPointerMove(event: PointerEvent<HTMLCanvasElement>) {
-    editor.pointerMove(event.pointerId, toPoint(event), event.shiftKey)
+    // Every coalesced sample, so fast pencil strokes keep their shape. Drawing
+    // is batched per frame (scheduleDraw), so the extra moves cost no redraws.
+    const origin = event.currentTarget.getBoundingClientRect()
+    for (const point of pointerSamples(event.nativeEvent, origin)) {
+      editor.pointerMove(event.pointerId, point, event.shiftKey)
+    }
   }
 
   return (

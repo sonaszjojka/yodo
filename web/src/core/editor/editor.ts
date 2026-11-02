@@ -1,10 +1,12 @@
 import {
   createLinear,
+  createPencil,
   createShape,
   type LinearType,
   type ShapeType,
 } from '../document/create.ts'
 import type { Point, YodoDocument, YodoElement } from '../document/types.ts'
+import { appendPoint, startStroke } from '../geometry/freehand.ts'
 import { lineFromDrag } from '../geometry/line.ts'
 import {
   handleAt,
@@ -74,7 +76,7 @@ export interface EditorState {
 }
 
 /** Tools that draw an element by dragging. */
-export type DrawingTool = ShapeType | LinearType
+export type DrawingTool = ShapeType | LinearType | 'pencil'
 export type Tool = DrawingTool | 'select' | 'hand'
 
 function isDrawingTool(tool: Tool): tool is DrawingTool {
@@ -85,6 +87,8 @@ function isDrawingTool(tool: Tool): tool is DrawingTool {
 export const HIT_TOLERANCE = 6
 /** A press moves less than this (screen px) to still count as a click. */
 export const DRAG_THRESHOLD = 3
+/** Pencil samples closer than this (screen px) to the previous one are dropped. */
+export const MIN_SAMPLE_DISTANCE = 1
 
 function isLinear(tool: DrawingTool): tool is LinearType {
   return tool === 'line' || tool === 'arrow'
@@ -95,7 +99,7 @@ function isLinear(tool: DrawingTool): tool is LinearType {
  * an offset for lines. Shift squares a box or snaps a line's angle.
  */
 function geometryFromDrag(
-  tool: DrawingTool,
+  tool: ShapeType | LinearType,
   start: Point,
   end: Point,
   shift: boolean,
@@ -107,8 +111,8 @@ function geometryFromDrag(
 
 /** A click or a degenerate drag draws nothing. */
 function isVisible(element: YodoElement) {
-  // A line needs length in any direction; a box needs both sides.
-  return element.type === 'line' || element.type === 'arrow'
+  // A line or stroke needs length in any direction; a box needs both sides.
+  return 'points' in element
     ? Math.hypot(element.width, element.height) >= 1
     : element.width >= 1 && element.height >= 1
 }
@@ -221,7 +225,8 @@ export function createEditor(document: YodoDocument): Editor {
   }
 
   function updateDraft() {
-    if (!drag) return
+    // A stroke grows sample by sample in pointerMove; Shift doesn't reshape it.
+    if (!drag || drag.tool === 'pencil') return
     const geometry = geometryFromDrag(
       drag.tool,
       drag.start,
@@ -233,6 +238,19 @@ export function createEditor(document: YodoDocument): Editor {
     )
   }
 
+  /** Adds a pointer sample to the pencil draft, unless it is too close. */
+  function appendSample(point: Point) {
+    store.setState((prev) => {
+      if (prev.draft?.type !== 'pencil') return prev
+      const minDistance = MIN_SAMPLE_DISTANCE / prev.viewport.zoom
+      const stroke = appendPoint(prev.draft, point, minDistance)
+      // The same geometry back means the sample was dropped: no redraw.
+      return stroke === prev.draft
+        ? prev
+        : { ...prev, draft: { ...prev.draft, ...stroke } }
+    })
+  }
+
   const drawTool: PointerTool = {
     pointerDown(pointerId, point, shift) {
       if (drag && !owns(pointerId)) return
@@ -240,15 +258,19 @@ export function createEditor(document: YodoDocument): Editor {
       if (!isDrawingTool(tool)) return
       drag = { pointerId, tool, start: point, last: point, shift }
       // The seed is picked once here and kept for the element's lifetime.
-      const draft = isLinear(tool)
-        ? createLinear(tool, lineFromDrag(point, point, shift))
-        : createShape(tool, rectFromDrag(point, point, shift))
+      const draft =
+        tool === 'pencil'
+          ? createPencil(startStroke(point))
+          : isLinear(tool)
+            ? createLinear(tool, lineFromDrag(point, point, shift))
+            : createShape(tool, rectFromDrag(point, point, shift))
       store.setState((prev) => ({ ...prev, draft }))
     },
     pointerMove(pointerId, point, shift) {
       if (!drag || !owns(pointerId)) return
       drag = { ...drag, last: point, shift }
-      updateDraft()
+      if (drag.tool === 'pencil') appendSample(point)
+      else updateDraft()
     },
     setShift(shift) {
       if (!drag || drag.shift === shift) return
@@ -272,8 +294,10 @@ export function createEditor(document: YodoDocument): Editor {
           },
         }
         // A tool picked mid-drag wins: the shape is still drawn, but the
-        // user's new tool and its cleared selection are kept.
-        if (prev.tool !== ended.tool) return committed
+        // user's new tool and its cleared selection are kept. The pencil
+        // stays active for the next stroke, as handwriting takes many.
+        if (prev.tool !== ended.tool || ended.tool === 'pencil')
+          return committed
         // The new element is selected and Select becomes active, so it can be
         // moved right away (as in Excalidraw).
         return { ...committed, tool: 'select', selectedIds: [draft.id] }

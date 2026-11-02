@@ -2,6 +2,7 @@ import { afterEach, expect, test, vi } from 'vitest'
 import {
   createDocument,
   createLinear,
+  createPencil,
   createShape,
   randomSeed,
 } from './create.ts'
@@ -120,4 +121,27 @@ test('createLinear gives an arrow an arrowhead at the end', () => {
   const arrow = createLinear('arrow', GEOMETRY, 9)
 
   expect(arrow).toMatchObject({ type: 'arrow', endArrowhead: 'arrow' })
+})
+
+test('createPencil uses the given stroke geometry and seed with default styles', () => {
+  const geometry = {
+    x: 5,
+    y: 6,
+    width: 10,
+    height: 4,
+    points: [
+      [0, 0],
+      [10, 4],
+    ] as [number, number][],
+  }
+
+  expect(createPencil(geometry, 9)).toMatchObject({
+    type: 'pencil',
+    id: expect.stringMatching(UUID),
+    ...geometry,
+    seed: 9,
+    strokeColor: '#1E1F22',
+    strokeWidth: 2,
+    opacity: 100,
+  })
 })
