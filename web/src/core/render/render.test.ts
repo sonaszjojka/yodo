@@ -31,6 +31,14 @@ function fakeContext() {
     save: vi.fn(),
     restore: vi.fn(),
     globalAlpha: 1,
+    beginPath: vi.fn(),
+    rect: vi.fn(),
+    roundRect: vi.fn(),
+    stroke: vi.fn(),
+    fill: vi.fn(),
+    strokeStyle: '',
+    fillStyle: '',
+    lineWidth: 1,
   } satisfies SceneContext
 }
 
@@ -255,4 +263,83 @@ describe('renderScene', () => {
       expect(rough.rectangle).toHaveBeenCalledTimes(1)
     },
   )
+})
+
+describe('selection overlay', () => {
+  const rect = createShape('rectangle', {
+    x: 10,
+    y: 20,
+    width: 100,
+    height: 50,
+  })
+
+  test('draws nothing without a selection or box', () => {
+    const ctx = fakeContext()
+    renderScene(ctx, fakeRough(), [rect], SURFACE, IDENTITY)
+    expect(ctx.rect).not.toHaveBeenCalled()
+    expect(ctx.roundRect).not.toHaveBeenCalled()
+  })
+
+  test('outlines the selection with a gap and puts a handle on each corner', () => {
+    const ctx = fakeContext()
+    renderScene(ctx, fakeRough(), [rect], SURFACE, IDENTITY, {
+      selected: [rect],
+      marquee: null,
+    })
+    // Around (10, 20, 100, 50): 3 world units for the 2-wide stroke and its
+    // rough wobble (roughness 1 × offset 2), then the 4 px gap.
+    expect(ctx.rect).toHaveBeenCalledExactlyOnceWith(3, 13, 114, 64)
+    expect(ctx.roundRect).toHaveBeenCalledTimes(4)
+    // Handles are 8 px squares centred on the gapped corners.
+    expect(ctx.roundRect).toHaveBeenCalledWith(-1, 9, 8, 8, 2)
+    expect(ctx.roundRect).toHaveBeenCalledWith(113, 73, 8, 8, 2)
+  })
+
+  test('keeps the overlay the same size on screen at any zoom', () => {
+    const ctx = fakeContext()
+    renderScene(
+      ctx,
+      fakeRough(),
+      [rect],
+      SURFACE,
+      { x: 0, y: 0, zoom: 2 },
+      {
+        selected: [rect],
+        marquee: null,
+      },
+    )
+    // At zoom 2, 4 px of gap is 2 world units and a handle is 4 units wide;
+    // the stroke margin (3) stays in world units.
+    expect(ctx.rect).toHaveBeenCalledExactlyOnceWith(5, 15, 110, 60)
+    expect(ctx.roundRect).toHaveBeenCalledWith(3, 13, 4, 4, 1)
+  })
+
+  test('with several selected, outlines each plus one box with handles', () => {
+    const other = createShape('ellipse', {
+      x: 200,
+      y: 20,
+      width: 50,
+      height: 50,
+    })
+    const ctx = fakeContext()
+    renderScene(ctx, fakeRough(), [rect, other], SURFACE, IDENTITY, {
+      selected: [rect, other],
+      marquee: null,
+    })
+    // Two element outlines and the group box.
+    expect(ctx.rect).toHaveBeenCalledTimes(3)
+    expect(ctx.rect).toHaveBeenLastCalledWith(3, 13, 254, 64)
+    expect(ctx.roundRect).toHaveBeenCalledTimes(4)
+  })
+
+  test('draws the selection box', () => {
+    const ctx = fakeContext()
+    renderScene(ctx, fakeRough(), [], SURFACE, IDENTITY, {
+      selected: [],
+      marquee: { x: 1, y: 2, width: 30, height: 40 },
+    })
+    expect(ctx.rect).toHaveBeenCalledExactlyOnceWith(1, 2, 30, 40)
+    expect(ctx.fill).toHaveBeenCalled()
+    expect(ctx.stroke).toHaveBeenCalled()
+  })
 })

@@ -1,10 +1,13 @@
-import { expect, test } from 'vitest'
-import { createDocument } from '../document/create.ts'
+import { describe, expect, test } from 'vitest'
+import { createDocument, createShape } from '../document/create.ts'
 import { MAX_ZOOM, MIN_ZOOM } from '../geometry/viewport.ts'
 import { createEditor, type Tool } from './editor.ts'
 
+/** An editor on an empty drawing with the rectangle tool active. */
 function setup() {
-  return createEditor(createDocument())
+  const editor = createEditor(createDocument())
+  editor.setTool('rectangle')
+  return editor
 }
 
 test('a drag commits one rectangle with the dragged bounds', () => {
@@ -294,7 +297,7 @@ function drag(
   editor.pointerUp(1)
 }
 
-test('the viewport starts from the document and defaults to the rectangle tool', () => {
+test('the viewport starts from the document and defaults to the select tool', () => {
   const document = {
     ...createDocument(),
     appState: { viewport: { x: 5, y: 6, zoom: 2 } },
@@ -303,9 +306,12 @@ test('the viewport starts from the document and defaults to the rectangle tool',
 
   expect(store.getState()).toMatchObject({
     viewport: { x: 5, y: 6, zoom: 2 },
-    tool: 'rectangle',
+    tool: 'select',
     spaceHeld: false,
     panning: false,
+    selectedIds: [],
+    move: null,
+    marquee: null,
   })
 })
 
@@ -495,3 +501,230 @@ test.each(['rectangle', 'diamond', 'ellipse', 'line', 'arrow'] as const)(
     ])
   },
 )
+
+// Selection: the select tool through the router (zoom 1, so screen = world).
+
+const FILL = '#E0E9FB'
+
+/** Two filled 100×100 squares at (0, 0) and (200, 0), with Select active. */
+function setupSelection() {
+  const a = {
+    ...createShape('rectangle', { x: 0, y: 0, width: 100, height: 100 }),
+    backgroundColor: FILL,
+  }
+  const b = {
+    ...createShape('rectangle', { x: 200, y: 0, width: 100, height: 100 }),
+    backgroundColor: FILL,
+  }
+  const editor = createEditor({ ...createDocument(), elements: [a, b] })
+  return { editor, a, b }
+}
+
+function click(
+  editor: ReturnType<typeof setup>,
+  at: [number, number],
+  shift = false,
+) {
+  editor.pointerDown(1, at, { button: 0, shift })
+  editor.pointerUp(1)
+}
+
+describe('select tool', () => {
+  test('a click selects the element under the cursor', () => {
+    const { editor, a } = setupSelection()
+    click(editor, [50, 50])
+    expect(editor.store.getState().selectedIds).toEqual([a.id])
+  })
+
+  test('a click selects only the new element', () => {
+    const { editor, b } = setupSelection()
+    click(editor, [50, 50])
+    click(editor, [250, 50])
+    expect(editor.store.getState().selectedIds).toEqual([b.id])
+  })
+
+  test('Shift+click adds to the selection and toggles back off', () => {
+    const { editor, a, b } = setupSelection()
+    click(editor, [50, 50])
+    click(editor, [250, 50], true)
+    expect(editor.store.getState().selectedIds).toEqual([a.id, b.id])
+
+    click(editor, [50, 50], true)
+    expect(editor.store.getState().selectedIds).toEqual([b.id])
+  })
+
+  test('a plain click on one of several selected narrows to it', () => {
+    const { editor, a } = setupSelection()
+    click(editor, [50, 50])
+    click(editor, [250, 50], true)
+    click(editor, [50, 50])
+    expect(editor.store.getState().selectedIds).toEqual([a.id])
+  })
+
+  test('a click on empty space clears the selection', () => {
+    const { editor } = setupSelection()
+    click(editor, [50, 50])
+    click(editor, [500, 500])
+    expect(editor.store.getState().selectedIds).toEqual([])
+  })
+
+  test('a box drag selects the elements fully inside it', () => {
+    const { editor, a } = setupSelection()
+    editor.pointerDown(1, [-10, -10], primary)
+    editor.pointerMove(1, [150, 150], false)
+    expect(editor.store.getState().marquee).toEqual({
+      x: -10,
+      y: -10,
+      width: 160,
+      height: 160,
+    })
+    editor.pointerUp(1)
+
+    expect(editor.store.getState()).toMatchObject({
+      selectedIds: [a.id],
+      marquee: null,
+    })
+  })
+
+  test('Shift+box adds to the selection', () => {
+    const { editor, a, b } = setupSelection()
+    click(editor, [250, 50])
+    editor.pointerDown(1, [-10, -10], { button: 0, shift: true })
+    editor.pointerMove(1, [150, 150], true)
+    editor.pointerUp(1)
+    expect(editor.store.getState().selectedIds).toEqual([b.id, a.id])
+  })
+
+  test('dragging moves every selected element in one document change', () => {
+    const { editor } = setupSelection()
+    click(editor, [50, 50])
+    click(editor, [250, 50], true)
+    const before = editor.store.getState().document
+
+    editor.pointerDown(1, [50, 50], primary)
+    editor.pointerMove(1, [60, 75], false)
+    // While dragging, only the preview offset changes.
+    expect(editor.store.getState().document).toBe(before)
+    expect(editor.store.getState().move).toEqual({ dx: 10, dy: 25 })
+    editor.pointerUp(1)
+
+    const { document, move } = editor.store.getState()
+    expect(move).toBeNull()
+    expect(document.elements.map(({ x, y }) => [x, y])).toEqual([
+      [10, 25],
+      [210, 25],
+    ])
+  })
+
+  test('dragging an unselected element selects and moves only it', () => {
+    const { editor, a, b } = setupSelection()
+    click(editor, [50, 50])
+    drag(editor, [250, 50], [260, 50])
+    const { selectedIds, document } = editor.store.getState()
+    expect(selectedIds).toEqual([b.id])
+    expect(document.elements).toEqual([a, { ...b, x: 210 }])
+  })
+
+  test('a selected transparent shape can be dragged by its middle', () => {
+    const shape = createShape('rectangle', {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+    })
+    const editor = createEditor({ ...createDocument(), elements: [shape] })
+    click(editor, [0, 50]) // on the outline
+    drag(editor, [50, 50], [70, 50])
+    expect(editor.store.getState().document.elements[0]!.x).toBe(20)
+  })
+
+  test('a move below the drag threshold stays a click', () => {
+    const { editor, a } = setupSelection()
+    editor.pointerDown(1, [50, 50], primary)
+    editor.pointerMove(1, [51, 51], false)
+    editor.pointerUp(1)
+    const { document, move } = editor.store.getState()
+    expect(move).toBeNull()
+    expect(document.elements[0]).toBe(a)
+  })
+
+  test('the drag threshold is in screen pixels', () => {
+    const { editor } = setupSelection()
+    editor.setZoom(4, [0, 0])
+    // 2 screen px at zoom 4 is 0.5 world units: still a click.
+    editor.pointerDown(1, [200, 200], primary)
+    editor.pointerMove(1, [202, 200], false)
+    expect(editor.store.getState().move).toBeNull()
+  })
+
+  test('Escape mid-move puts everything back', () => {
+    const { editor, a } = setupSelection()
+    editor.pointerDown(1, [50, 50], primary)
+    editor.pointerMove(1, [90, 90], false)
+    editor.cancel()
+    editor.pointerUp(1)
+    const { document, move, selectedIds } = editor.store.getState()
+    expect(move).toBeNull()
+    expect(document.elements[0]).toBe(a)
+    expect(selectedIds).toEqual([a.id])
+  })
+
+  test('Escape mid-box drops the box and its selection', () => {
+    const { editor } = setupSelection()
+    editor.pointerDown(1, [-10, -10], primary)
+    editor.pointerMove(1, [150, 150], false)
+    editor.cancel()
+    expect(editor.store.getState()).toMatchObject({
+      marquee: null,
+      selectedIds: [],
+    })
+  })
+
+  test('Escape with nothing in progress clears the selection', () => {
+    const { editor } = setupSelection()
+    click(editor, [50, 50])
+    editor.cancel()
+    expect(editor.store.getState().selectedIds).toEqual([])
+  })
+
+  test('deleteSelected removes the selected elements', () => {
+    const { editor, b } = setupSelection()
+    click(editor, [50, 50])
+    editor.deleteSelected()
+    expect(editor.store.getState()).toMatchObject({
+      selectedIds: [],
+      document: { elements: [b] },
+    })
+  })
+
+  test('deleteSelected with nothing selected changes nothing', () => {
+    const { editor } = setupSelection()
+    const before = editor.store.getState()
+    editor.deleteSelected()
+    expect(editor.store.getState()).toBe(before)
+  })
+
+  test('changing tool clears the selection', () => {
+    const { editor } = setupSelection()
+    click(editor, [50, 50])
+    editor.setTool('ellipse')
+    expect(editor.store.getState().selectedIds).toEqual([])
+  })
+})
+
+test('drawing selects the new element and switches to Select', () => {
+  const editor = setup()
+  drag(editor, [0, 0], [30, 40])
+  const { tool, selectedIds, document } = editor.store.getState()
+  expect(tool).toBe('select')
+  expect(selectedIds).toEqual([document.elements[0]!.id])
+})
+
+test('a click that draws nothing keeps the drawing tool', () => {
+  const editor = setup()
+  click(editor, [10, 10])
+  expect(editor.store.getState()).toMatchObject({
+    tool: 'rectangle',
+    selectedIds: [],
+  })
+})

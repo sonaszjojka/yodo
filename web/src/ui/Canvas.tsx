@@ -2,6 +2,7 @@ import rough from 'roughjs'
 import { useEffect, useRef, type PointerEvent } from 'react'
 import type { Point } from '../core/document/types.ts'
 import type { Editor, EditorState, Tool } from '../core/editor/editor.ts'
+import { sceneOf } from '../core/editor/scene.ts'
 import { wheelZoomFactor } from '../core/geometry/viewport.ts'
 import { canvasSize, renderScene, type Surface } from '../core/render/render.ts'
 
@@ -20,6 +21,8 @@ interface GestureEvent extends UIEvent {
 
 /** Single-key tool shortcuts (Excalidraw's letters); the toolbar is roadmap 1.10. */
 const TOOL_KEYS: Partial<Record<string, Tool>> = {
+  v: 'select',
+  '1': 'select',
   h: 'hand',
   r: 'rectangle',
   d: 'diamond',
@@ -28,10 +31,11 @@ const TOOL_KEYS: Partial<Record<string, Tool>> = {
   a: 'arrow',
 }
 
-function cursorFor({ panning, tool, spaceHeld }: EditorState) {
+function cursorFor({ panning, tool, spaceHeld, move }: EditorState) {
   if (panning) return 'grabbing'
   if (tool === 'hand' || spaceHeld) return 'grab'
-  return 'crosshair'
+  if (move) return 'move'
+  return tool === 'select' ? 'default' : 'crosshair'
 }
 
 /** Typing in a field must not trigger canvas shortcuts. */
@@ -61,9 +65,11 @@ export function Canvas({ editor }: { editor: Editor }) {
     function draw() {
       frame = 0
       const state = editor.store.getState()
-      const { document, draft } = state
-      const elements = draft ? [...document.elements, draft] : document.elements
-      renderScene(ctx, rc, elements, surface, state.viewport)
+      const { elements, selected, marquee } = sceneOf(state)
+      renderScene(ctx, rc, elements, surface, state.viewport, {
+        selected,
+        marquee,
+      })
       canvas.style.cursor = cursorFor(state)
     }
 
@@ -122,6 +128,10 @@ export function Canvas({ editor }: { editor: Editor }) {
       const mod = event.ctrlKey || event.metaKey
       if (event.key === 'Escape') {
         editor.cancel()
+      } else if (event.key === 'Delete' || event.key === 'Backspace') {
+        // Backspace would otherwise navigate back in some browsers.
+        event.preventDefault()
+        editor.deleteSelected()
       } else if (mod && event.key === '0') {
         // Replaces the browser's own "reset page zoom".
         event.preventDefault()

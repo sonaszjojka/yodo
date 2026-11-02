@@ -4,12 +4,29 @@ import type { RoughCanvas } from 'roughjs/bin/canvas'
 import type { Options } from 'roughjs/bin/core'
 import type { Point, StrokeStyle, YodoElement } from '../document/types.ts'
 import { arrowhead } from '../geometry/line.ts'
-import { diamondPoints } from '../geometry/rect.ts'
+import {
+  diamondPoints,
+  elementBounds,
+  unionBounds,
+  type Bounds,
+} from '../geometry/rect.ts'
 import type { Viewport } from '../geometry/viewport.ts'
 
 export type SceneContext = Pick<
   CanvasRenderingContext2D,
-  'setTransform' | 'clearRect' | 'save' | 'restore' | 'globalAlpha'
+  | 'setTransform'
+  | 'clearRect'
+  | 'save'
+  | 'restore'
+  | 'globalAlpha'
+  | 'beginPath'
+  | 'rect'
+  | 'roundRect'
+  | 'stroke'
+  | 'fill'
+  | 'strokeStyle'
+  | 'fillStyle'
+  | 'lineWidth'
 >
 /** The return value (a Drawable) is unused, so fakes may return nothing. */
 export interface SceneRough {
@@ -93,12 +110,111 @@ function drawElement(rough: SceneRough, element: YodoElement) {
   }
 }
 
+/** Editor UI drawn over the elements, in world coordinates. */
+export interface Overlay {
+  selected: readonly YodoElement[]
+  marquee: Bounds | null
+}
+
+const NO_OVERLAY: Overlay = { selected: [], marquee: null }
+
+// Overlay look from docs/ui.md "Selection", in screen px; light theme only
+// until dark mode (roadmap M2).
+const ACCENT = '#0F766E'
+const ACCENT_SOFT = '#E3F2EF'
+const HANDLE_FILL = '#FFFFFF'
+const OUTLINE_WIDTH = 1.25
+const ELEMENT_OUTLINE_WIDTH = 1
+const GAP = 4
+const HANDLE_SIZE = 8
+const HANDLE_RADIUS = 2
+
+/** rough.js's default `maxRandomnessOffset`: how far, per unit of roughness, a line may wander. */
+const ROUGH_OFFSET = 2
+
+/** How far an element's drawn stroke can reach outside its geometry, in world units. */
+function strokeReach(element: YodoElement) {
+  return element.strokeWidth / 2 + element.roughness * ROUGH_OFFSET
+}
+
+function strokeBox(ctx: SceneContext, box: Bounds, lineWidth: number) {
+  ctx.beginPath()
+  ctx.rect(box.x, box.y, box.width, box.height)
+  ctx.lineWidth = lineWidth
+  ctx.stroke()
+}
+
+function grow({ x, y, width, height }: Bounds, by: number): Bounds {
+  return {
+    x: x - by,
+    y: y - by,
+    width: width + 2 * by,
+    height: height + 2 * by,
+  }
+}
+
+/**
+ * Draws the selection and box-select overlay. `px` is one screen pixel in
+ * world units (1 / zoom), so the overlay keeps its size at any zoom.
+ */
+function drawOverlay(ctx: SceneContext, overlay: Overlay, px: number) {
+  ctx.save()
+  ctx.strokeStyle = ACCENT
+  // The drawn stroke reaches past the geometry; the gap starts past it, or a
+  // thick stroke at high zoom would cover the outline.
+  const boxes = overlay.selected.map((element) =>
+    grow(elementBounds(element), strokeReach(element)),
+  )
+  const group = unionBounds(boxes)
+  if (group) {
+    // With several selected, a thin outline shows which ones are in the group.
+    if (boxes.length > 1) {
+      for (const box of boxes) {
+        strokeBox(ctx, grow(box, GAP * px), ELEMENT_OUTLINE_WIDTH * px)
+      }
+    }
+    const outline = grow(group, GAP * px)
+    strokeBox(ctx, outline, OUTLINE_WIDTH * px)
+    // Corner handles; resizing with them arrives in roadmap 1.6.
+    const size = HANDLE_SIZE * px
+    ctx.fillStyle = HANDLE_FILL
+    ctx.lineWidth = OUTLINE_WIDTH * px
+    for (const cx of [outline.x, outline.x + outline.width]) {
+      for (const cy of [outline.y, outline.y + outline.height]) {
+        ctx.beginPath()
+        ctx.roundRect(
+          cx - size / 2,
+          cy - size / 2,
+          size,
+          size,
+          HANDLE_RADIUS * px,
+        )
+        ctx.fill()
+        ctx.stroke()
+      }
+    }
+  }
+  if (overlay.marquee) {
+    const { x, y, width, height } = overlay.marquee
+    ctx.beginPath()
+    ctx.rect(x, y, width, height)
+    ctx.fillStyle = ACCENT_SOFT
+    ctx.globalAlpha = 0.5
+    ctx.fill()
+    ctx.globalAlpha = 1
+    ctx.lineWidth = px
+    ctx.stroke()
+  }
+  ctx.restore()
+}
+
 export function renderScene(
   ctx: SceneContext,
   rough: SceneRough,
   elements: readonly YodoElement[],
   surface: Surface,
   viewport: Viewport,
+  overlay: Overlay = NO_OVERLAY,
 ) {
   const { dpr } = surface
   // Clear in CSS pixels, before the camera transform applies.
@@ -115,4 +231,5 @@ export function renderScene(
     drawElement(rough, element)
     ctx.restore()
   }
+  drawOverlay(ctx, overlay, 1 / viewport.zoom)
 }

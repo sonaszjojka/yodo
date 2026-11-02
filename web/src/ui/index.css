@@ -29,8 +29,8 @@ body {
   inset: 0;
   /* Pointer drags draw instead of scrolling or zooming the page on touch. */
   touch-action: none;
-  /* Canvas.tsx sets the cursor from the tool (crosshair, grab, grabbing). */
-  cursor: crosshair;
+  /* Canvas.tsx sets the cursor from the tool and drag (default, crosshair, grab, move…). */
+  cursor: default;
 }
 
 /* Bottom-left part of the editor's bottom bar (docs/ui.md). */
