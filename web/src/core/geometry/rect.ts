@@ -32,3 +32,13 @@ export function rectFromDrag(
     height: Math.abs(dy),
   }
 }
+
+/** A diamond's corners in its box: the midpoints of the box's edges. */
+export function diamondPoints({ x, y, width, height }: Bounds): Point[] {
+  return [
+    [x + width / 2, y],
+    [x + width, y + height / 2],
+    [x + width / 2, y + height],
+    [x, y + height / 2],
+  ]
+}

@@ -1,18 +1,18 @@
 import { expect, test } from 'vitest'
 import { createDocument } from '../document/create.ts'
 import { MAX_ZOOM, MIN_ZOOM } from '../geometry/viewport.ts'
-import { createEditor } from './editor.ts'
+import { createEditor, type Tool } from './editor.ts'
 
 function setup() {
   return createEditor(createDocument())
 }
 
 test('a drag commits one rectangle with the dragged bounds', () => {
-  const { store, rectangleTool } = setup()
+  const { store, drawTool } = setup()
 
-  rectangleTool.pointerDown(1, [10, 20], false)
-  rectangleTool.pointerMove(1, [40, 60], false)
-  rectangleTool.pointerUp(1)
+  drawTool.pointerDown(1, [10, 20], false)
+  drawTool.pointerMove(1, [40, 60], false)
+  drawTool.pointerUp(1)
 
   const { document, draft } = store.getState()
   expect(draft).toBeNull()
@@ -27,14 +27,14 @@ test('a drag commits one rectangle with the dragged bounds', () => {
 })
 
 test('the draft keeps its id and seed while it is dragged', () => {
-  const { store, rectangleTool } = setup()
+  const { store, drawTool } = setup()
 
-  rectangleTool.pointerDown(1, [0, 0], false)
-  rectangleTool.pointerMove(1, [10, 10], false)
+  drawTool.pointerDown(1, [0, 0], false)
+  drawTool.pointerMove(1, [10, 10], false)
   const first = store.getState().draft!
-  rectangleTool.pointerMove(1, [50, 80], false)
+  drawTool.pointerMove(1, [50, 80], false)
   const second = store.getState().draft!
-  rectangleTool.pointerUp(1)
+  drawTool.pointerUp(1)
 
   expect(second.width).toBe(50)
   expect(second.seed).toBe(first.seed)
@@ -43,11 +43,11 @@ test('the draft keeps its id and seed while it is dragged', () => {
 })
 
 test('Shift keeps the rectangle square', () => {
-  const { store, rectangleTool } = setup()
+  const { store, drawTool } = setup()
 
-  rectangleTool.pointerDown(1, [0, 0], true)
-  rectangleTool.pointerMove(1, [30, 50], true)
-  rectangleTool.pointerUp(1)
+  drawTool.pointerDown(1, [0, 0], true)
+  drawTool.pointerMove(1, [30, 50], true)
+  drawTool.pointerUp(1)
 
   const rect = store.getState().document.elements[0]!
   expect(rect.width).toBe(50)
@@ -55,77 +55,77 @@ test('Shift keeps the rectangle square', () => {
 })
 
 test('pressing and releasing Shift mid-drag updates the draft without a move', () => {
-  const { store, rectangleTool } = setup()
+  const { store, drawTool } = setup()
 
-  rectangleTool.pointerDown(1, [0, 0], false)
-  rectangleTool.pointerMove(1, [30, 50], false)
+  drawTool.pointerDown(1, [0, 0], false)
+  drawTool.pointerMove(1, [30, 50], false)
 
-  rectangleTool.setShift(true)
+  drawTool.setShift(true)
   expect(store.getState().draft).toMatchObject({ width: 50, height: 50 })
 
-  rectangleTool.setShift(false)
+  drawTool.setShift(false)
   expect(store.getState().draft).toMatchObject({ width: 30, height: 50 })
 })
 
 test('setShift without a drag changes nothing', () => {
-  const { store, rectangleTool } = setup()
+  const { store, drawTool } = setup()
   const before = store.getState()
 
-  rectangleTool.setShift(true)
+  drawTool.setShift(true)
 
   expect(store.getState()).toBe(before)
 })
 
 test('a click without a drag adds nothing', () => {
-  const { store, rectangleTool } = setup()
+  const { store, drawTool } = setup()
 
-  rectangleTool.pointerDown(1, [10, 10], false)
-  rectangleTool.pointerUp(1)
+  drawTool.pointerDown(1, [10, 10], false)
+  drawTool.pointerUp(1)
 
   expect(store.getState().document.elements).toEqual([])
   expect(store.getState().draft).toBeNull()
 })
 
 test('a drag along one axis only adds nothing', () => {
-  const { store, rectangleTool } = setup()
+  const { store, drawTool } = setup()
 
-  rectangleTool.pointerDown(1, [10, 10], false)
-  rectangleTool.pointerMove(1, [60, 10], false)
-  rectangleTool.pointerUp(1)
+  drawTool.pointerDown(1, [10, 10], false)
+  drawTool.pointerMove(1, [60, 10], false)
+  drawTool.pointerUp(1)
 
   expect(store.getState().document.elements).toEqual([])
 })
 
 test('cancel drops the draft', () => {
-  const { store, rectangleTool } = setup()
+  const { store, drawTool } = setup()
 
-  rectangleTool.pointerDown(1, [0, 0], false)
-  rectangleTool.pointerMove(1, [30, 30], false)
-  rectangleTool.cancel()
-  rectangleTool.pointerUp(1)
+  drawTool.pointerDown(1, [0, 0], false)
+  drawTool.pointerMove(1, [30, 30], false)
+  drawTool.cancel()
+  drawTool.pointerUp(1)
 
   expect(store.getState().draft).toBeNull()
   expect(store.getState().document.elements).toEqual([])
 })
 
 test('moves after the drag ended are ignored', () => {
-  const { store, rectangleTool } = setup()
+  const { store, drawTool } = setup()
 
-  rectangleTool.pointerMove(1, [30, 30], false)
+  drawTool.pointerMove(1, [30, 30], false)
 
   expect(store.getState().draft).toBeNull()
 })
 
 test('a second pointer cannot restart, reshape or end the drag', () => {
-  const { store, rectangleTool } = setup()
+  const { store, drawTool } = setup()
 
-  rectangleTool.pointerDown(1, [0, 0], false)
-  rectangleTool.pointerMove(1, [30, 40], false)
+  drawTool.pointerDown(1, [0, 0], false)
+  drawTool.pointerMove(1, [30, 40], false)
   // A second finger touches, moves and lifts mid-drag.
-  rectangleTool.pointerDown(2, [100, 100], false)
-  rectangleTool.pointerMove(2, [200, 200], false)
-  rectangleTool.pointerUp(2)
-  rectangleTool.pointerCancel(2)
+  drawTool.pointerDown(2, [100, 100], false)
+  drawTool.pointerMove(2, [200, 200], false)
+  drawTool.pointerUp(2)
+  drawTool.pointerCancel(2)
 
   expect(store.getState().document.elements).toHaveLength(0)
   expect(store.getState().draft).toMatchObject({
@@ -135,20 +135,148 @@ test('a second pointer cannot restart, reshape or end the drag', () => {
     height: 40,
   })
 
-  rectangleTool.pointerUp(1)
+  drawTool.pointerUp(1)
   expect(store.getState().document.elements).toHaveLength(1)
 })
 
 test('a cancelled pointer drops the draft', () => {
-  const { store, rectangleTool } = setup()
+  const { store, drawTool } = setup()
 
-  rectangleTool.pointerDown(1, [0, 0], false)
-  rectangleTool.pointerMove(1, [30, 30], false)
-  rectangleTool.pointerCancel(1)
-  rectangleTool.pointerUp(1)
+  drawTool.pointerDown(1, [0, 0], false)
+  drawTool.pointerMove(1, [30, 30], false)
+  drawTool.pointerCancel(1)
+  drawTool.pointerUp(1)
 
   expect(store.getState().draft).toBeNull()
   expect(store.getState().document.elements).toHaveLength(0)
+})
+
+// Other tools: the active tool picks the element type at pointer down.
+
+function setupWith(tool: Tool) {
+  const editor = setup()
+  editor.setTool(tool)
+  return editor
+}
+
+test.each(['diamond', 'ellipse'] as const)(
+  'the %s tool commits a %s with the dragged bounds',
+  (tool) => {
+    const { store, drawTool } = setupWith(tool)
+
+    drawTool.pointerDown(1, [40, 60], false)
+    drawTool.pointerMove(1, [10, 20], false)
+    drawTool.pointerUp(1)
+
+    expect(store.getState().document.elements).toEqual([
+      expect.objectContaining({
+        type: tool,
+        x: 10,
+        y: 20,
+        width: 30,
+        height: 40,
+      }),
+    ])
+  },
+)
+
+test.each(['diamond', 'ellipse'] as const)(
+  'Shift keeps the %s proportions equal',
+  (tool) => {
+    const { store, drawTool } = setupWith(tool)
+
+    drawTool.pointerDown(1, [0, 0], true)
+    drawTool.pointerMove(1, [30, 50], true)
+    drawTool.pointerUp(1)
+
+    expect(store.getState().document.elements[0]).toMatchObject({
+      width: 50,
+      height: 50,
+    })
+  },
+)
+
+test.each(['line', 'arrow'] as const)(
+  'the %s tool commits from the start point to the cursor',
+  (tool) => {
+    const { store, drawTool } = setupWith(tool)
+
+    drawTool.pointerDown(1, [40, 60], false)
+    drawTool.pointerMove(1, [10, 20], false)
+    drawTool.pointerUp(1)
+
+    const [element] = store.getState().document.elements
+    expect(element).toMatchObject({
+      type: tool,
+      x: 40,
+      y: 60,
+      width: 30,
+      height: 40,
+      points: [
+        [0, 0],
+        [-30, -40],
+      ],
+    })
+  },
+)
+
+test('the arrow has an arrowhead at its end', () => {
+  const { store, drawTool } = setupWith('arrow')
+
+  drawTool.pointerDown(1, [0, 0], false)
+  drawTool.pointerMove(1, [50, 0], false)
+  drawTool.pointerUp(1)
+
+  expect(store.getState().document.elements[0]).toMatchObject({
+    endArrowhead: 'arrow',
+  })
+})
+
+test('Shift snaps a line to 15° steps, also mid-drag', () => {
+  const { store, drawTool } = setupWith('line')
+
+  drawTool.pointerDown(1, [0, 0], false)
+  drawTool.pointerMove(1, [100, 8], false)
+  expect(store.getState().draft).toMatchObject({ height: 8 })
+
+  drawTool.setShift(true)
+  drawTool.pointerUp(1)
+
+  expect(store.getState().document.elements[0]).toMatchObject({ height: 0 })
+})
+
+test('a flat line commits, unlike a flat rectangle', () => {
+  const { store, drawTool } = setupWith('line')
+
+  drawTool.pointerDown(1, [0, 0], false)
+  drawTool.pointerMove(1, [50, 0], false)
+  drawTool.pointerUp(1)
+
+  expect(store.getState().document.elements).toHaveLength(1)
+})
+
+test('a click with the line tool adds nothing', () => {
+  const { store, drawTool } = setupWith('line')
+
+  drawTool.pointerDown(1, [10, 10], false)
+  drawTool.pointerUp(1)
+
+  expect(store.getState().document.elements).toEqual([])
+})
+
+test('switching tools mid-drag keeps drawing the original shape', () => {
+  const { store, drawTool, setTool } = setupWith('ellipse')
+
+  drawTool.pointerDown(1, [0, 0], false)
+  setTool('line')
+  drawTool.pointerMove(1, [30, 40], false)
+  drawTool.pointerUp(1)
+
+  expect(store.getState().document.elements[0]).toMatchObject({
+    type: 'ellipse',
+    width: 30,
+    height: 40,
+  })
 })
 
 // Input router: screen points, routed to drawing or panning.
@@ -354,3 +482,16 @@ test('Shift through the router squares the rectangle', () => {
     height: 50,
   })
 })
+
+test.each(['rectangle', 'diamond', 'ellipse', 'line', 'arrow'] as const)(
+  'the router draws with the %s tool',
+  (tool) => {
+    const editor = setupWith(tool)
+
+    drag(editor, [0, 0], [30, 40])
+
+    expect(editor.store.getState().document.elements).toEqual([
+      expect.objectContaining({ type: tool }),
+    ])
+  },
+)
