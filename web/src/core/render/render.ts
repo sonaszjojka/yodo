@@ -20,6 +20,7 @@ import {
   labelBox,
   layoutText,
   LINE_HEIGHT,
+  MIN_LABEL_EMS,
   type Measure,
 } from '../text/layout.ts'
 
@@ -163,7 +164,7 @@ function drawLabel(
 ) {
   const { label } = shape
   if (!label?.text) return
-  const box = labelBox(shape)
+  const box = labelBox(shape, label.fontSize * MIN_LABEL_EMS)
   const layout = layoutText(
     label.text,
     label.fontFamily,

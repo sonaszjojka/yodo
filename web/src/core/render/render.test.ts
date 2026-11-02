@@ -50,7 +50,7 @@ function fakeContext() {
     textAlign: 'start' as CanvasTextAlign,
     textBaseline: 'alphabetic' as CanvasTextBaseline,
     // Every badge text measures 40 px wide.
-    measureText: vi.fn(() => ({ width: 40 }) as TextMetrics),
+    measureText: vi.fn((_text: string) => ({ width: 40 }) as TextMetrics),
     fillText: vi.fn(),
     moveTo: vi.fn(),
     lineTo: vi.fn(),
@@ -535,9 +535,12 @@ describe('text (ADR 0027)', () => {
 
   test('wraps a label to the label box width', () => {
     const ctx = fakeContext()
-    // measureText says every string is 40 px wide, and the box is 30 wide.
+    // 40 px per character; the label box is 90 wide, above the minimum.
+    ctx.measureText.mockImplementation(
+      (text: string) => ({ width: text.length * 40 }) as TextMetrics,
+    )
     const shape = {
-      ...createShape('rectangle', { x: 0, y: 0, width: 40, height: 100 }, 1),
+      ...createShape('rectangle', { x: 0, y: 0, width: 100, height: 100 }, 1),
       label: {
         text: 'a b',
         fontFamily: 'hand',

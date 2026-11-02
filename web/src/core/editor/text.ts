@@ -19,6 +19,7 @@ import {
   labelBox,
   layoutText,
   LINE_HEIGHT,
+  MIN_LABEL_EMS,
   type Measure,
 } from '../text/layout.ts'
 
@@ -126,7 +127,7 @@ function withLabel(
     label.fontFamily,
     label.fontSize,
     measure,
-    labelBox(shape).width,
+    labelBox(shape, label.fontSize * MIN_LABEL_EMS).width,
   )
   const height = Math.max(shape.height, heightForLabel(shape.type, textHeight))
   return { ...shape, label, height }
@@ -219,7 +220,7 @@ export function editBox(
   }
   if (!isLabelled(element)) return null
   const { fontFamily, fontSize, textAlign } = element.label ?? DEFAULT_LABEL
-  const box = labelBox(element)
+  const box = labelBox(element, fontSize * MIN_LABEL_EMS)
   const layout = layoutText(edit.text, fontFamily, fontSize, measure, box.width)
   return {
     x: box.x,

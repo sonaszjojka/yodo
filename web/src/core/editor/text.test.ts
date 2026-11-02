@@ -435,4 +435,26 @@ describe('review fixes', () => {
       id: rect.id,
     })
   })
+
+  test('a tiny shape wraps its label at a minimum width, not per character', () => {
+    const diamond = createShape('diamond', {
+      x: 0,
+      y: 0,
+      width: 20,
+      height: 20,
+    })
+    const editor = setup([diamond])
+    editor.doubleClick([10, 10])
+    type(editor, 'Hello')
+    const { document, editing } = state(editor)
+    expect(editBox(document, editing!, estimateMeasure)!.width).toBeGreaterThan(
+      5 * CHAR,
+    )
+    editor.commitText()
+
+    // One line, so the diamond grows only to fit one line.
+    expect(elements(editor)[0]).toMatchObject({
+      height: heightForLabel('diamond', LINE),
+    })
+  })
 })

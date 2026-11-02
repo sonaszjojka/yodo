@@ -97,4 +97,12 @@ describe('labelBox', () => {
     expect(box.width).toBe(0)
     expect(box.height).toBe(0)
   })
+
+  test('widens to a minimum width around the centre', () => {
+    const box = labelBox(
+      createShape('rectangle', { x: 0, y: 0, width: 20, height: 20 }, 1),
+      80,
+    )
+    expect(box).toMatchObject({ x: -30, width: 80 })
+  })
 })

@@ -116,10 +116,20 @@ const INNER_RATIO: Record<LabelledShape['type'], number> = {
   diamond: 0.5,
 }
 
-/** The box a shape's label wraps and centres in, in world coordinates. */
-export function labelBox(shape: LabelledShape): Bounds {
+/**
+ * The narrowest a label wraps, in ems of its font size. A tiny shape's inner
+ * box would otherwise wrap one character per line, so its label overflows
+ * the shape sideways instead.
+ */
+export const MIN_LABEL_EMS = 4
+
+/**
+ * The box a shape's label wraps and centres in, in world coordinates: the
+ * shape's inner box, widened around its centre to `minWidth` if narrower.
+ */
+export function labelBox(shape: LabelledShape, minWidth = 0): Bounds {
   const ratio = INNER_RATIO[shape.type]
-  const width = Math.max(0, shape.width * ratio - 2 * LABEL_PADDING)
+  const width = Math.max(minWidth, shape.width * ratio - 2 * LABEL_PADDING)
   const height = Math.max(0, shape.height * ratio - 2 * LABEL_PADDING)
   return {
     x: shape.x + (shape.width - width) / 2,
