@@ -188,3 +188,26 @@ describe('text', () => {
     expect(hits(text, [100 + REACH + 1, 30])).toBe(false)
   })
 })
+
+describe('labelled shapes (ADR 0026)', () => {
+  const label = {
+    text: 'Hi',
+    fontFamily: 'hand',
+    fontSize: 20,
+    textAlign: 'center',
+  } as const
+
+  test.each(['rectangle', 'diamond', 'ellipse'] as const)(
+    'a transparent %s with a label hits in its middle',
+    (type) => {
+      const shape = createShape(type, BOX)
+      expect(hits(shape, [50, 30])).toBe(false)
+      expect(hits({ ...shape, label }, [50, 30])).toBe(true)
+    },
+  )
+
+  test('a labelled ellipse still misses outside its outline', () => {
+    const ellipse = { ...createShape('ellipse', BOX), label }
+    expect(hits(ellipse, [2, 2])).toBe(false)
+  })
+})

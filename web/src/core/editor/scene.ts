@@ -13,10 +13,29 @@ export interface Scene {
   marquee: Bounds | null
 }
 
+/**
+ * The elements without the text being edited: an edited text is left out and
+ * an edited label is taken off its shape, since the textarea shows them
+ * (ADR 0027). A new text is not in the document yet, so needs nothing.
+ */
+function withoutEdited(
+  elements: YodoElement[],
+  editing: EditorState['editing'],
+): YodoElement[] {
+  if (!editing || editing.target === 'new') return elements
+  return elements.flatMap((element) => {
+    if (element.id !== editing.id) return [element]
+    if (element.type === 'text') return []
+    if (!('label' in element)) return [element]
+    const { label: _hidden, ...shape } = element
+    return [shape]
+  })
+}
+
 export function sceneOf(state: EditorState): Scene {
   const { document, draft, move, resize, marquee } = state
   const ids = new Set(state.selectedIds)
-  let shown = document.elements
+  let shown = withoutEdited(document.elements, state.editing)
   if (move) shown = moveElements(shown, ids, move.dx, move.dy)
   if (resize) shown = resizeElements(shown, ids, resize)
   const elements = draft ? [...shown, draft] : [...shown]

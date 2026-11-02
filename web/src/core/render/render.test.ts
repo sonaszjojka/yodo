@@ -1,7 +1,13 @@
 import { describe, expect, test, vi } from 'vitest'
-import { createLinear, createPencil, createShape } from '../document/create.ts'
+import {
+  createLinear,
+  createPencil,
+  createShape,
+  createText,
+} from '../document/create.ts'
 import { appendPoint, startStroke } from '../geometry/freehand.ts'
 import { arrowhead, lineFromDrag } from '../geometry/line.ts'
+import { fontOf } from '../text/layout.ts'
 import {
   canvasSize,
   renderScene,
@@ -44,7 +50,7 @@ function fakeContext() {
     textAlign: 'start' as CanvasTextAlign,
     textBaseline: 'alphabetic' as CanvasTextBaseline,
     // Every badge text measures 40 px wide.
-    measureText: vi.fn(() => ({ width: 40 }) as TextMetrics),
+    measureText: vi.fn((_text: string) => ({ width: 40 }) as TextMetrics),
     fillText: vi.fn(),
     moveTo: vi.fn(),
     lineTo: vi.fn(),
@@ -475,5 +481,75 @@ describe('selection overlay', () => {
     expect(ctx.rect).toHaveBeenCalledExactlyOnceWith(1, 2, 30, 40)
     expect(ctx.fill).toHaveBeenCalled()
     expect(ctx.stroke).toHaveBeenCalled()
+  })
+})
+
+describe('text (ADR 0027)', () => {
+  const text = {
+    ...createText([10, 20], 1),
+    text: 'a\nbb',
+    width: 40,
+    height: 50,
+  }
+
+  test('draws each line in its font and stroke colour, centred in its line box', () => {
+    const ctx = fakeContext()
+    renderScene(ctx, fakeRough(), [text], SURFACE, IDENTITY)
+
+    expect(ctx.fillText).toHaveBeenNthCalledWith(1, 'a', 10, 20 + 12.5)
+    expect(ctx.fillText).toHaveBeenNthCalledWith(2, 'bb', 10, 20 + 37.5)
+    expect(ctx.font).toBe(fontOf('hand', 20))
+    expect(ctx.fillStyle).toBe('#1E1F22')
+    expect(ctx.textBaseline).toBe('middle')
+  })
+
+  test.each([
+    ['center', 30],
+    ['right', 50],
+  ] as const)('aligns %s within the element width', (textAlign, x) => {
+    const ctx = fakeContext()
+    renderScene(ctx, fakeRough(), [{ ...text, textAlign }], SURFACE, IDENTITY)
+
+    expect(ctx.textAlign).toBe(textAlign)
+    expect(ctx.fillText).toHaveBeenNthCalledWith(1, 'a', x, 32.5)
+  })
+
+  test('draws a shape label centred in its label box, after the shape', () => {
+    const ctx = fakeContext()
+    const rough = fakeRough()
+    const shape = {
+      ...createShape('rectangle', { x: 0, y: 0, width: 200, height: 100 }, 1),
+      label: {
+        text: 'Hi',
+        fontFamily: 'hand',
+        fontSize: 20,
+        textAlign: 'center',
+      } as const,
+    }
+    renderScene(ctx, rough, [shape], SURFACE, IDENTITY)
+
+    expect(rough.rectangle).toHaveBeenCalledOnce()
+    // Label box: 5..195 × 5..95; one 25 px line centred in it.
+    expect(ctx.fillText).toHaveBeenCalledWith('Hi', 100, 50)
+  })
+
+  test('wraps a label to the label box width', () => {
+    const ctx = fakeContext()
+    // 40 px per character; the label box is 90 wide, above the minimum.
+    ctx.measureText.mockImplementation(
+      (text: string) => ({ width: text.length * 40 }) as TextMetrics,
+    )
+    const shape = {
+      ...createShape('rectangle', { x: 0, y: 0, width: 100, height: 100 }, 1),
+      label: {
+        text: 'a b',
+        fontFamily: 'hand',
+        fontSize: 20,
+        textAlign: 'left',
+      } as const,
+    }
+    renderScene(ctx, fakeRough(), [shape], SURFACE, IDENTITY)
+
+    expect(ctx.fillText.mock.calls.map(([line]) => line)).toEqual(['a', 'b'])
   })
 })

@@ -6,6 +6,9 @@ import {
   type BaseElement,
   type LineElement,
   type PencilElement,
+  type Point,
+  type TextElement,
+  type TextLabel,
   type YodoDocument,
   type YodoElement,
 } from './types.ts'
@@ -121,4 +124,34 @@ export function createPencil(
   seed = randomSeed(),
 ): PencilElement {
   return { type: 'pencil', ...defaults(seed), ...geometry }
+}
+
+/** The default text size: M in the S/M/L/XL steps of `docs/ui.md`. */
+export const DEFAULT_FONT_SIZE = 20
+
+/**
+ * A new, empty text with its top-left at `at`. Its size is set from its text
+ * when the edit is committed (ADR 0027).
+ */
+export function createText(at: Point, seed = randomSeed()): TextElement {
+  return {
+    type: 'text',
+    ...defaults(seed),
+    x: at[0],
+    y: at[1],
+    width: 0,
+    height: 0,
+    text: '',
+    fontFamily: 'hand',
+    fontSize: DEFAULT_FONT_SIZE,
+    textAlign: 'left',
+  }
+}
+
+/** The style of a new shape label (ADR 0026); its text is filled in when editing. */
+export const DEFAULT_LABEL: TextLabel = {
+  text: '',
+  fontFamily: 'hand',
+  fontSize: DEFAULT_FONT_SIZE,
+  textAlign: 'center',
 }

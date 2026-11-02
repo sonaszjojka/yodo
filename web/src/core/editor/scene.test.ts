@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { createDocument, createShape } from '../document/create.ts'
+import { createDocument, createShape, createText } from '../document/create.ts'
 import { createEditor } from './editor.ts'
 import { sceneOf } from './scene.ts'
 
@@ -41,4 +41,32 @@ test('shows the selection scaled by the resize in progress', () => {
 test('draws the draft on top', () => {
   const draft = createShape('ellipse', { x: 0, y: 0, width: 5, height: 5 })
   expect(sceneOf(stateWith({ draft })).elements).toEqual([a, b, draft])
+})
+
+test('hides the text being edited, which the textarea shows instead', () => {
+  const text = { ...createText([0, 40], 1), text: 'hi', width: 22, height: 25 }
+  const editor = createEditor({ ...createDocument(), elements: [a, text] })
+  const state = {
+    ...editor.store.getState(),
+    editing: { target: 'text', id: text.id, text: 'hi' } as const,
+  }
+  expect(sceneOf(state).elements).toEqual([a])
+})
+
+test('draws a shape whose label is being edited without its label', () => {
+  const label = {
+    text: 'x',
+    fontFamily: 'hand',
+    fontSize: 20,
+    textAlign: 'center',
+  } as const
+  const labelled = { ...a, label }
+  const editor = createEditor({ ...createDocument(), elements: [labelled] })
+  const state = {
+    ...editor.store.getState(),
+    editing: { target: 'label', id: a.id, text: 'x' } as const,
+  }
+  const [shown] = sceneOf(state).elements
+  expect(shown).not.toHaveProperty('label')
+  expect(shown).toMatchObject({ id: a.id, x: a.x })
 })

@@ -1,5 +1,5 @@
 import rough from 'roughjs'
-import { useEffect, useRef, type PointerEvent } from 'react'
+import { useEffect, useRef, type MouseEvent, type PointerEvent } from 'react'
 import type { Point } from '../core/document/types.ts'
 import type { Editor, EditorState, Tool } from '../core/editor/editor.ts'
 import { sceneOf } from '../core/editor/scene.ts'
@@ -32,6 +32,7 @@ const TOOL_KEYS: Partial<Record<string, Tool>> = {
   l: 'line',
   a: 'arrow',
   p: 'pencil',
+  t: 'text',
 }
 
 /** Opposite handles resize along the same line, so they share a cursor. */
@@ -53,6 +54,7 @@ function cursorFor(state: EditorState) {
   const handle = resize?.handle ?? hoverHandle
   if (handle) return HANDLE_CURSORS[handle]
   if (move) return 'move'
+  if (tool === 'text') return 'text'
   return tool === 'select' ? 'default' : 'crosshair'
 }
 
@@ -221,6 +223,9 @@ export function Canvas({ editor }: { editor: Editor }) {
     resize()
     watchPixelRatio()
     const unsubscribe = editor.store.subscribe(scheduleDraw)
+    // The canvas draws with whatever font is loaded and never redraws on its
+    // own, so redraw once a font arrives (ADR 0025).
+    document.fonts.addEventListener('loadingdone', scheduleDraw)
     window.addEventListener('resize', resize)
     window.addEventListener('keydown', onKey)
     window.addEventListener('keyup', onKey)
@@ -232,6 +237,7 @@ export function Canvas({ editor }: { editor: Editor }) {
 
     return () => {
       unsubscribe()
+      document.fonts.removeEventListener('loadingdone', scheduleDraw)
       cancelAnimationFrame(frame)
       dprQuery?.removeEventListener('change', onPixelRatioChange)
       window.removeEventListener('resize', resize)
@@ -244,7 +250,7 @@ export function Canvas({ editor }: { editor: Editor }) {
     }
   }, [editor])
 
-  function toPoint(event: PointerEvent<HTMLCanvasElement>): Point {
+  function toPoint(event: MouseEvent<HTMLCanvasElement>): Point {
     const rect = event.currentTarget.getBoundingClientRect()
     return [event.clientX - rect.left, event.clientY - rect.top]
   }
@@ -278,6 +284,7 @@ export function Canvas({ editor }: { editor: Editor }) {
       onPointerMove={onPointerMove}
       onPointerUp={(event) => editor.pointerUp(event.pointerId)}
       onPointerCancel={(event) => editor.pointerCancel(event.pointerId)}
+      onDoubleClick={(event) => editor.doubleClick(toPoint(event))}
     />
   )
 }
