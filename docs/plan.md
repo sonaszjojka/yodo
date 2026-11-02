@@ -9,9 +9,9 @@ Rule: every stage ends with a **file of decisions**, not just a conversation. Co
 
 ## Status (2026-11-02)
 Read this section, not the whole file; finished work is in History at the end.
-- **Last done:** roadmap 1.6 (issue #15): resize by corner handles and outline sides, Shift keeps proportions, flip past the opposite side, size badge.
-- Open items: **undo/redo design** (ADR at roadmap task 1.7).
-- **Next step:** roadmap 1.7 (undo/redo, issue #16); its ADR comes first.
+- **Last done:** roadmap 1.7 (issue #16): undo/redo with Cmd/Ctrl+Z, Shift+Cmd/Ctrl+Z and Ctrl+Y, plus bottom-bar buttons; history as document snapshots (ADR 0023).
+- Open items: none.
+- **Next step:** roadmap 1.8 (pencil, issue #17).
 
 ## Working mode: an educational project
 The goal is both the app and learning how to program with Claude as effectively as possible, so that the knowledge stays with you.
@@ -149,3 +149,4 @@ One dated line per finished stage or task, oldest first. `/ship` appends here.
 - Done (2026-11-02): roadmap 1.4: diamond (D), ellipse (O), line (L) and arrow (A) through one draw tool; Shift squares box shapes and snaps lines to 15°; lines keep their start as (x, y) with relative points; core hitTest for every element type (transparent shapes hit only near the outline). Review: lines and arrows with fewer than two points render without throwing.
 - Done (2026-11-02): roadmap 1.5: select tool (V/1, the default) with topmost click, Shift+click toggle and box select of fully enclosed elements; a move is a preview offset committed on release (one document change); Delete/Backspace; drawing selects the new shape and switches to Select; overlay outline clears the stroke's rough wobble and keeps its screen size at any zoom. Review: stroke hits beat a selected shape's empty box, a tool picked mid-draw is kept, Delete mid-box removes what is highlighted, box select waits for the drag threshold.
 - Done (2026-11-02): roadmap 1.6: resize by corner handles and outline-side zones (one or many elements, around the opposite side); Shift keeps proportions; dragging past the opposite side flips; a preview committed on release (one document change); size badge under the selection, drawn in screen px. Review: a side keeps at least 1 unit, handle zones reach at most a quarter inward so small selections still move, a flat line's zero-size axis does not grab, a click on a handle zone still selects, the cursor follows flips. Code review minimum raised to `medium`.
+- Done (2026-11-02): roadmap 1.7: undo/redo as past/future stacks of immutable document snapshots, recorded whenever the document reference changes (ADR 0023), so a drag is one step and pans, zooms and selection are none; 100-step limit; undo/redo drops a drag in progress and prunes the selection; Cmd/Ctrl+Z, Shift+Cmd/Ctrl+Z, Ctrl+Y and ↶/↷ buttons next to zoom in a shared bottom bar. Review: Ctrl+Y redoes with Caps Lock on.
