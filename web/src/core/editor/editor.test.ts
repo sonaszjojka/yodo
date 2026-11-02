@@ -984,3 +984,151 @@ test('a click that draws nothing keeps the drawing tool', () => {
     selectedIds: [],
   })
 })
+
+describe('undo and redo', () => {
+  test('undo removes a drawn shape and redo brings it back', () => {
+    const editor = setup()
+    drag(editor, [10, 10], [60, 60])
+    const drawn = editor.store.getState().document
+
+    editor.undo()
+    expect(editor.store.getState().document.elements).toEqual([])
+
+    editor.redo()
+    expect(editor.store.getState().document).toBe(drawn)
+  })
+
+  test('undo and redo a move', () => {
+    const { editor, a } = setupSelection()
+    drag(editor, [50, 50], [80, 90])
+    expect(editor.store.getState().document.elements[0]).toMatchObject({
+      x: 30,
+      y: 40,
+    })
+
+    editor.undo()
+    expect(editor.store.getState().document.elements[0]).toBe(a)
+
+    editor.redo()
+    expect(editor.store.getState().document.elements[0]).toMatchObject({
+      x: 30,
+      y: 40,
+    })
+  })
+
+  test('undo and redo a resize', () => {
+    const { editor, a } = setupSelection()
+    click(editor, [50, 50])
+    drag(editor, [107, 107], [157, 207])
+
+    editor.undo()
+    expect(editor.store.getState().document.elements[0]).toBe(a)
+
+    editor.redo()
+    expect(editor.store.getState().document.elements[0]).toMatchObject({
+      width: 150,
+      height: 200,
+    })
+  })
+
+  test('undo brings deleted elements back, redo deletes them again', () => {
+    const { editor, a, b } = setupSelection()
+    click(editor, [50, 50])
+    editor.deleteSelected()
+
+    editor.undo()
+    expect(editor.store.getState().document.elements).toEqual([a, b])
+
+    editor.redo()
+    expect(editor.store.getState().document.elements).toEqual([b])
+  })
+
+  test('a whole drag is one step', () => {
+    const { editor, a } = setupSelection()
+    editor.pointerDown(1, [50, 50], primary)
+    editor.pointerMove(1, [60, 60], false)
+    editor.pointerMove(1, [70, 70], false)
+    editor.pointerMove(1, [80, 80], false)
+    editor.pointerUp(1)
+
+    editor.undo()
+    expect(editor.store.getState().document.elements[0]).toBe(a)
+    expect(editor.history.getState().canUndo).toBe(false)
+  })
+
+  test('pans, zooms, selection and tool changes are not steps', () => {
+    const { editor } = setupSelection()
+    click(editor, [50, 50])
+    editor.panBy(10, 10)
+    editor.zoomAt([0, 0], 2)
+    editor.setTool('ellipse')
+
+    expect(editor.history.getState()).toEqual({
+      canUndo: false,
+      canRedo: false,
+    })
+  })
+
+  test('a new change after undo clears redo', () => {
+    const editor = setup()
+    drag(editor, [10, 10], [60, 60])
+    editor.undo()
+    editor.setTool('rectangle')
+    drag(editor, [100, 100], [150, 150])
+
+    expect(editor.history.getState().canRedo).toBe(false)
+    const before = editor.store.getState()
+    editor.redo()
+    expect(editor.store.getState()).toBe(before)
+  })
+
+  test('undo with no history changes nothing', () => {
+    const editor = setup()
+    const before = editor.store.getState()
+    editor.undo()
+    editor.redo()
+    expect(editor.store.getState()).toBe(before)
+  })
+
+  test('the selection keeps only elements that exist after the step', () => {
+    const editor = setup()
+    drag(editor, [10, 10], [60, 60])
+    expect(editor.store.getState().selectedIds).toHaveLength(1)
+
+    editor.undo()
+    expect(editor.store.getState().selectedIds).toEqual([])
+  })
+
+  test('undo during a move drops the drag, and pointer up commits nothing', () => {
+    const { editor, a } = setupSelection()
+    drag(editor, [50, 50], [80, 80])
+    editor.pointerDown(1, [80, 80], primary)
+    editor.pointerMove(1, [120, 120], false)
+
+    editor.undo()
+    editor.pointerUp(1)
+
+    const { document, move } = editor.store.getState()
+    expect(move).toBeNull()
+    expect(document.elements[0]).toBe(a)
+    expect(editor.history.getState()).toEqual({
+      canUndo: false,
+      canRedo: true,
+    })
+  })
+
+  test('undo during a draw drops the shape being drawn', () => {
+    const editor = setup()
+    drag(editor, [10, 10], [60, 60])
+    editor.setTool('rectangle')
+    editor.pointerDown(1, [100, 100], primary)
+    editor.pointerMove(1, [150, 150], false)
+
+    editor.undo()
+    editor.pointerUp(1)
+
+    const { document, draft } = editor.store.getState()
+    expect(draft).toBeNull()
+    expect(document.elements).toEqual([])
+  })
+})

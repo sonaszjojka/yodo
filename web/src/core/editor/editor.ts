@@ -26,6 +26,7 @@ import {
   zoomAt,
   type Viewport,
 } from '../geometry/viewport.ts'
+import { createHistory, type HistoryStatus } from '../history/history.ts'
 import { createStore, type Store } from '../store/store.ts'
 import {
   deleteElements,
@@ -155,6 +156,12 @@ export interface Editor {
   cancel(): void
   /** Removes the selected elements from the document (Delete). */
   deleteSelected(): void
+  /** Whether undo and redo are available, for the bottom bar (ADR 0023). */
+  history: Store<HistoryStatus>
+  /** Goes back one document change, dropping any drag in progress first. */
+  undo(): void
+  /** Re-applies the last undone change, dropping any drag in progress first. */
+  redo(): void
   /** Changing tool clears the selection. */
   setTool(tool: Tool): void
   setSpaceHeld(held: boolean): void
@@ -184,6 +191,20 @@ export function createEditor(document: YodoDocument): Editor {
     resize: null,
     hoverHandle: null,
     marquee: null,
+  })
+
+  // Every new document reference is one edit (ADR 0023): drags commit once at
+  // pointer up, and the viewport is not in the document (ADR 0022).
+  const history = createHistory<YodoDocument>()
+  /** The document the history last saw, recorded when it is replaced. */
+  let seen = document
+  /** Undo or redo is swapping the document: that is not a new step. */
+  let restoring = false
+  store.subscribe(() => {
+    const current = store.getState().document
+    if (current === seen) return
+    if (!restoring) history.record(seen)
+    seen = current
   })
 
   // Transient drag data that nothing renders, so it lives outside the store.
@@ -565,6 +586,35 @@ export function createEditor(document: YodoDocument): Editor {
     refreshHover()
   }
 
+  /** Undo or redo: swaps in the document `step` returns, if any. */
+  function travel(step: (current: YodoDocument) => YodoDocument | null) {
+    // A preview (draft, move, resize, box) belongs to the current document;
+    // applying it to the restored one would edit the wrong state.
+    drawTool.cancel()
+    selectTool.cancel()
+    const target = step(store.getState().document)
+    if (target) {
+      const exists = new Set(target.elements.map((element) => element.id))
+      restoring = true
+      try {
+        store.setState((prev) => {
+          const kept = prev.selectedIds.filter((id) => exists.has(id))
+          return {
+            ...prev,
+            document: target,
+            // Keep the reference when nothing was dropped (stable selectors).
+            selectedIds:
+              kept.length === prev.selectedIds.length ? prev.selectedIds : kept,
+            hoverHandle: null,
+          }
+        })
+      } finally {
+        restoring = false
+      }
+    }
+    refreshHover()
+  }
+
   function endPan() {
     pan = null
     store.setState((prev) =>
@@ -667,6 +717,9 @@ export function createEditor(document: YodoDocument): Editor {
         }
       })
     },
+    history: history.status,
+    undo: () => travel(history.undo),
+    redo: () => travel(history.redo),
     setTool(tool) {
       if (store.getState().tool === tool) return
       selectTool.cancel()
