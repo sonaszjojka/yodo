@@ -30,6 +30,7 @@ import {
 } from '../geometry/viewport.ts'
 import { createHistory, type HistoryStatus } from '../history/history.ts'
 import { createStore, type Store } from '../store/store.ts'
+import { estimateMeasure, type Measure } from '../text/layout.ts'
 import {
   deleteElements,
   idsInBox,
@@ -38,6 +39,7 @@ import {
   selectedOf,
   topmostHit,
 } from './selection.ts'
+import { commitEdit, editFor, textTargetAt, type TextEdit } from './text.ts'
 
 export interface EditorState {
   document: YodoDocument
@@ -73,14 +75,19 @@ export interface EditorState {
   hoverHandle: Handle | null
   /** The box of a box-select drag in progress, in world coordinates. */
   marquee: Bounds | null
+  /**
+   * The text being edited in the textarea (ADR 0027). The canvas hides it,
+   * and the document changes only when the edit is committed.
+   */
+  editing: TextEdit | null
 }
 
 /** Tools that draw an element by dragging. */
 export type DrawingTool = ShapeType | LinearType | 'pencil'
-export type Tool = DrawingTool | 'select' | 'hand'
+export type Tool = DrawingTool | 'select' | 'hand' | 'text'
 
 function isDrawingTool(tool: Tool): tool is DrawingTool {
-  return tool !== 'select' && tool !== 'hand'
+  return tool !== 'select' && tool !== 'hand' && tool !== 'text'
 }
 
 /** How close (screen px) a click must be to an element's stroke to hit it. */
@@ -175,9 +182,31 @@ export interface Editor {
   zoomAt(anchor: Point, factor: number): void
   /** Sets the zoom (clamped), keeping `anchor` in place. */
   setZoom(zoom: number, anchor: Point): void
+  /**
+   * With the select tool: edits the text or shape label under `screen`, or
+   * starts a new text there on empty space (a line or stroke does nothing).
+   */
+  doubleClick(screen: Point): void
+  /** The textarea's value changed; not a document change until commit. */
+  setEditingText(text: string): void
+  /**
+   * Ends the edit as one document change (ADR 0027): adds, updates or deletes
+   * the text, or sets or removes the label. Selects the result, Select tool.
+   */
+  commitText(): void
+  /** Measures text for layout; the canvas one in the app (ADR 0027). */
+  measure: Measure
 }
 
-export function createEditor(document: YodoDocument): Editor {
+export interface EditorOptions {
+  /** Defaults to a rough estimate, which is enough for tests. */
+  measure?: Measure
+}
+
+export function createEditor(
+  document: YodoDocument,
+  { measure = estimateMeasure }: EditorOptions = {},
+): Editor {
   const store = createStore<EditorState>({
     document,
     draft: null,
@@ -195,6 +224,7 @@ export function createEditor(document: YodoDocument): Editor {
     resize: null,
     hoverHandle: null,
     marquee: null,
+    editing: null,
   })
 
   // Every new document reference is one edit (ADR 0023): drags commit once at
@@ -575,6 +605,40 @@ export function createEditor(document: YodoDocument): Editor {
     },
   }
 
+  /** A text tool press; the edit starts on release (see `pointerUp`). */
+  let textPress: { pointerId: number; point: Point } | null = null
+
+  function startEdit(point: Point) {
+    const { document, viewport } = store.getState()
+    const target = textTargetAt(
+      document.elements,
+      point,
+      HIT_TOLERANCE / viewport.zoom,
+    )
+    const editing = editFor(target, point)
+    store.setState((prev) => ({
+      ...prev,
+      editing,
+      selectedIds: [],
+      hoverHandle: null,
+    }))
+  }
+
+  function commitText() {
+    const { editing } = store.getState()
+    if (!editing) return
+    store.setState((prev) => {
+      const { document, selectId } = commitEdit(prev.document, editing, measure)
+      return {
+        ...prev,
+        document,
+        editing: null,
+        tool: 'select',
+        selectedIds: selectId ? [selectId] : [],
+      }
+    })
+  }
+
   /** Pointer events go to both tools; each acts only on the pointer it owns. */
   const tools = [drawTool, selectTool]
 
@@ -612,6 +676,8 @@ export function createEditor(document: YodoDocument): Editor {
 
   /** Undo or redo: swaps in the document `step` returns, if any. */
   function travel(step: (current: YodoDocument) => YodoDocument | null) {
+    // Commit first, so undo takes back the edit as a whole.
+    commitText()
     // A preview (draft, move, resize, box) belongs to the current document;
     // applying it to the restored one would edit the wrong state.
     drawTool.cancel()
@@ -652,7 +718,12 @@ export function createEditor(document: YodoDocument): Editor {
     selectTool,
     pointerDown(pointerId, screen, { button, shift }) {
       // One gesture at a time: ignore new pointers while one is active.
-      if (pan || drag || gesture) return
+      if (pan || drag || gesture || textPress) return
+      // A press anywhere on the canvas ends the edit, and does nothing else.
+      if (store.getState().editing) {
+        commitText()
+        return
+      }
       pointerAt = screen
       const { tool, spaceHeld } = store.getState()
       const pans =
@@ -665,6 +736,10 @@ export function createEditor(document: YodoDocument): Editor {
         selectTool.pointerDown(pointerId, toWorld(screen), shift)
       } else if (button === PRIMARY_BUTTON && isDrawingTool(tool)) {
         drawTool.pointerDown(pointerId, toWorld(screen), shift)
+      } else if (button === PRIMARY_BUTTON && tool === 'text') {
+        // Start on release: the press's own mousedown would otherwise take
+        // focus away from the textarea that the edit shows.
+        textPress = { pointerId, point: toWorld(screen) }
       }
     },
     pointerMove(pointerId, screen, shift) {
@@ -688,7 +763,12 @@ export function createEditor(document: YodoDocument): Editor {
       }
     },
     pointerUp(pointerId) {
-      if (pan) {
+      if (textPress) {
+        if (textPress.pointerId !== pointerId) return
+        const { point } = textPress
+        textPress = null
+        startEdit(point)
+      } else if (pan) {
         if (pan.pointerId === pointerId) endPan()
       } else {
         for (const t of tools) t.pointerUp(pointerId)
@@ -696,6 +776,7 @@ export function createEditor(document: YodoDocument): Editor {
       refreshHover()
     },
     pointerCancel(pointerId) {
+      if (textPress?.pointerId === pointerId) textPress = null
       if (pan) {
         if (pan.pointerId === pointerId) endPan()
       } else {
@@ -708,6 +789,7 @@ export function createEditor(document: YodoDocument): Editor {
       selectTool.setShift(shift)
     },
     cancel() {
+      textPress = null
       if (!pan && !drag && !gesture) {
         setSelection([])
         return
@@ -745,6 +827,7 @@ export function createEditor(document: YodoDocument): Editor {
     undo: () => travel(history.undo),
     redo: () => travel(history.redo),
     setTool(tool) {
+      commitText()
       if (store.getState().tool === tool) return
       selectTool.cancel()
       store.setState((prev) => ({
@@ -763,5 +846,30 @@ export function createEditor(document: YodoDocument): Editor {
     zoomAt: (anchor, factor) =>
       setViewport((v) => zoomAt(v, anchor, v.zoom * factor)),
     setZoom: (zoom, anchor) => setViewport((v) => zoomAt(v, anchor, zoom)),
+    doubleClick(screen) {
+      const { tool, editing, document, viewport, selectedIds } =
+        store.getState()
+      if (tool !== 'select' || editing || pan || drag || gesture) return
+      const point = toWorld(screen)
+      const hitId = topmostHit(
+        document.elements,
+        point,
+        HIT_TOLERANCE / viewport.zoom,
+        new Set(selectedIds),
+      )
+      const hit = document.elements.find((element) => element.id === hitId)
+      // Lines, arrows and strokes have no text yet.
+      if (hit && 'points' in hit) return
+      startEdit(point)
+    },
+    setEditingText(text) {
+      store.setState((prev) =>
+        prev.editing && prev.editing.text !== text
+          ? { ...prev, editing: { ...prev.editing, text } }
+          : prev,
+      )
+    },
+    commitText,
+    measure,
   }
 }

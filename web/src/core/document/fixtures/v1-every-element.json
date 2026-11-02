@@ -19,7 +19,13 @@
       "strokeWidth": 2,
       "strokeStyle": "solid",
       "roughness": 1,
-      "opacity": 100
+      "opacity": 100,
+      "label": {
+        "text": "Inside",
+        "fontFamily": "hand",
+        "fontSize": 20,
+        "textAlign": "center"
+      }
     },
     {
       "type": "diamond",

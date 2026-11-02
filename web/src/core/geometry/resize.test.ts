@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { createLinear, createShape } from '../document/create.ts'
+import { createLinear, createShape, createText } from '../document/create.ts'
 import { lineFromDrag } from './line.ts'
 import {
   canResize,
@@ -160,5 +160,47 @@ describe('flippedHandle', () => {
     expect(flippedHandle('se', { ...t, sx: -1, sy: -1 })).toBe('nw')
     expect(flippedHandle('n', { ...t, sy: -0.5 })).toBe('s')
     expect(flippedHandle('n', { ...t, sx: -1 })).toBe('n')
+  })
+})
+
+describe('scaleElement on text', () => {
+  const text = {
+    ...createText([10, 20], 1),
+    text: 'Hi',
+    width: 40,
+    height: 25,
+  }
+
+  test('scales the font and box evenly, by the mean of both axes', () => {
+    const scaled = scaleElement(text, { anchor: [10, 20], sx: 2, sy: 8 })
+    expect(scaled).toMatchObject({
+      x: 10,
+      y: 20,
+      width: 160,
+      height: 100,
+      fontSize: 4 * text.fontSize,
+    })
+  })
+
+  test('never mirrors: a flip keeps the box at the transformed corner', () => {
+    const scaled = scaleElement(text, { anchor: [50, 20], sx: -1, sy: 1 })
+    expect(scaled).toMatchObject({ x: 50, y: 20, width: 40, height: 25 })
+    expect(scaled).toMatchObject({ fontSize: text.fontSize })
+  })
+
+  test('a label keeps its font size when its shape scales', () => {
+    const label = {
+      text: 'Hi',
+      fontFamily: 'hand',
+      fontSize: 20,
+      textAlign: 'center',
+    } as const
+    const shape = {
+      ...createShape('rectangle', { x: 0, y: 0, width: 40, height: 30 }),
+      label,
+    }
+    expect(scaleElement(shape, { anchor: [0, 0], sx: 3, sy: 3 })).toMatchObject(
+      { label },
+    )
   })
 })

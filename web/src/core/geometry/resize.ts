@@ -112,7 +112,8 @@ function noNegativeZero(value: number) {
 /**
  * The element scaled by `t`. Boxes are normalised so width and height stay
  * positive after a flip; line points scale (and mirror) around the element's
- * origin. Stroke width is not scaled.
+ * origin. Stroke width is not scaled, and neither is a shape label's font;
+ * text scales its font evenly instead of stretching.
  */
 export function scaleElement(
   element: YodoElement,
@@ -134,6 +135,22 @@ export function scaleElement(
         noNegativeZero(px * sx),
         noNegativeZero(py * sy),
       ]),
+    }
+  }
+  if (element.type === 'text') {
+    // Text never stretches or mirrors: it scales evenly, by the geometric
+    // mean of both axes, and keeps its top-left at the mapped corner nearest
+    // the original one.
+    const s = Math.sqrt(Math.abs(sx * sy))
+    const width = element.width * s
+    const height = element.height * s
+    return {
+      ...element,
+      x: sx < 0 ? x - width : x,
+      y: sy < 0 ? y - height : y,
+      width,
+      height,
+      fontSize: element.fontSize * s,
     }
   }
   const [x2, y2] = map(element.x + element.width, element.y + element.height)

@@ -3,9 +3,11 @@
 import type { RoughCanvas } from 'roughjs/bin/canvas'
 import type { Options } from 'roughjs/bin/core'
 import type {
+  FontFamily,
   PencilElement,
   Point,
   StrokeStyle,
+  TextAlign,
   YodoElement,
 } from '../document/types.ts'
 import { smoothPath } from '../geometry/freehand.ts'
@@ -13,6 +15,13 @@ import { arrowhead } from '../geometry/line.ts'
 import { GAP, grow, HANDLE_SIZE, selectionFrame } from '../geometry/frame.ts'
 import { diamondPoints, type Bounds } from '../geometry/rect.ts'
 import { worldToScreen, type Viewport } from '../geometry/viewport.ts'
+import {
+  fontOf,
+  labelBox,
+  layoutText,
+  LINE_HEIGHT,
+  type Measure,
+} from '../text/layout.ts'
 
 export type SceneContext = Pick<
   CanvasRenderingContext2D,
@@ -112,6 +121,73 @@ function drawStroke(ctx: SceneContext, element: PencilElement) {
   ctx.stroke()
 }
 
+/** Where an aligned line starts in a box of this left edge and width. */
+function alignedX(align: TextAlign, left: number, width: number) {
+  if (align === 'center') return left + width / 2
+  return align === 'right' ? left + width : left
+}
+
+/**
+ * Draws `lines` from `top` down. Each line is centred in its line box, which
+ * matches how CSS places a line in the editing textarea (ADR 0027).
+ */
+function drawLines(
+  ctx: SceneContext,
+  lines: readonly string[],
+  style: { family: FontFamily; size: number; align: TextAlign; color: string },
+  box: { left: number; top: number; width: number },
+) {
+  const lineHeight = style.size * LINE_HEIGHT
+  ctx.font = fontOf(style.family, style.size)
+  ctx.fillStyle = style.color
+  ctx.textAlign = style.align
+  ctx.textBaseline = 'middle'
+  const x = alignedX(style.align, box.left, box.width)
+  lines.forEach((line, i) => {
+    ctx.fillText(line, x, box.top + (i + 0.5) * lineHeight)
+  })
+}
+
+/** A measure on the scene's own context; the caller's save/restore resets the font. */
+function contextMeasure(ctx: SceneContext): Measure {
+  return (text, font) => {
+    ctx.font = font
+    return ctx.measureText(text).width
+  }
+}
+
+/** A shape's label, wrapped to its label box and centred in it (ADR 0026). */
+function drawLabel(
+  ctx: SceneContext,
+  shape: Extract<YodoElement, { type: 'rectangle' | 'diamond' | 'ellipse' }>,
+) {
+  const { label } = shape
+  if (!label?.text) return
+  const box = labelBox(shape)
+  const layout = layoutText(
+    label.text,
+    label.fontFamily,
+    label.fontSize,
+    contextMeasure(ctx),
+    box.width,
+  )
+  drawLines(
+    ctx,
+    layout.lines,
+    {
+      family: label.fontFamily,
+      size: label.fontSize,
+      align: label.textAlign,
+      color: shape.strokeColor,
+    },
+    {
+      left: box.x,
+      top: box.y + (box.height - layout.height) / 2,
+      width: box.width,
+    },
+  )
+}
+
 function drawElement(
   ctx: SceneContext,
   rough: SceneRough,
@@ -122,12 +198,15 @@ function drawElement(
   switch (element.type) {
     case 'rectangle':
       rough.rectangle(x, y, width, height, options)
+      drawLabel(ctx, element)
       return
     case 'diamond':
       rough.polygon(diamondPoints(element), options)
+      drawLabel(ctx, element)
       return
     case 'ellipse':
       rough.ellipse(x + width / 2, y + height / 2, width, height, options)
+      drawLabel(ctx, element)
       return
     case 'line':
     case 'arrow': {
@@ -147,7 +226,18 @@ function drawElement(
       drawStroke(ctx, element)
       return
     case 'text':
-      // Its renderer arrives with the text tool (roadmap 1.9).
+      // Free text doesn't wrap: its lines are its paragraphs.
+      drawLines(
+        ctx,
+        element.text.split('\n'),
+        {
+          family: element.fontFamily,
+          size: element.fontSize,
+          align: element.textAlign,
+          color: element.strokeColor,
+        },
+        { left: x, top: y, width },
+      )
       return
   }
 }

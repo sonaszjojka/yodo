@@ -35,16 +35,30 @@ export interface BaseElement {
   opacity: number
 }
 
+/**
+ * Text inside a shape (ADR 0026), drawn in the shape's `strokeColor`, wrapped
+ * to its inner box and centred vertically.
+ */
+export interface TextLabel {
+  text: string
+  fontFamily: FontFamily
+  fontSize: number
+  textAlign: TextAlign
+}
+
 export interface RectangleElement extends BaseElement {
   type: 'rectangle'
+  label?: TextLabel
 }
 
 export interface DiamondElement extends BaseElement {
   type: 'diamond'
+  label?: TextLabel
 }
 
 export interface EllipseElement extends BaseElement {
   type: 'ellipse'
+  label?: TextLabel
 }
 
 export interface LineElement extends BaseElement {

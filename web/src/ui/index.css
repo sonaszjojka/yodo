@@ -12,7 +12,7 @@
   --shadow-float:
     0 1px 2px rgb(19 32 31 / 0.06), 0 4px 12px rgb(19 32 31 / 0.08);
 
-  /* Manrope is not loaded yet; how fonts are shipped is decided when they are added. */
+  /* Manrope is not loaded yet; it ships as a Fontsource package when a feature needs it (ADR 0025). */
   font-family: 'Manrope', system-ui, sans-serif;
   color: var(--text);
   background: var(--page);
@@ -98,4 +98,22 @@ body {
 /* Block-level flex box, so the inlined SVG gets no extra space below its baseline. */
 .logo-tile {
   display: flex;
+}
+
+/*
+ * The text editing textarea (ADR 0027): placed over the text it edits, with
+ * the font, size and line height set inline to match the canvas exactly.
+ */
+.text-editor {
+  position: fixed;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  resize: none;
+  overflow: hidden;
+  /* Labels wrap like the canvas: at spaces, breaking words that don't fit. */
+  overflow-wrap: break-word;
+  box-sizing: content-box;
 }

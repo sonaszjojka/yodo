@@ -63,7 +63,7 @@ function ellipseRadius(p: Point, c: Point, a: number, b: number) {
  * world units (a caller converts its screen-pixel slop by dividing by zoom),
  * and half the stroke width is added so thick strokes are as easy to hit.
  * A transparent shape hits only near its outline, so clicks pass through its
- * empty middle; a filled one also hits inside.
+ * empty middle; a filled or labelled one also hits inside.
  */
 export function hitTest(
   element: YodoElement,
@@ -71,7 +71,11 @@ export function hitTest(
   tolerance: number,
 ): boolean {
   const reach = tolerance + element.strokeWidth / 2
-  const filled = element.backgroundColor !== 'transparent'
+  // A label is something to aim at, so a labelled shape hits inside too
+  // (ADR 0026).
+  const filled =
+    element.backgroundColor !== 'transparent' ||
+    ('label' in element && element.label !== undefined)
   const { x, y, width, height } = element
   const [px, py] = point
 

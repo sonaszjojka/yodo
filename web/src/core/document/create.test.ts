@@ -1,9 +1,11 @@
-import { afterEach, expect, test, vi } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 import {
   createDocument,
   createLinear,
   createPencil,
   createShape,
+  createText,
+  DEFAULT_FONT_SIZE,
   randomSeed,
 } from './create.ts'
 import { loadDocument } from './migrate.ts'
@@ -143,5 +145,24 @@ test('createPencil uses the given stroke geometry and seed with default styles',
     strokeColor: '#1E1F22',
     strokeWidth: 2,
     opacity: 100,
+  })
+})
+
+describe('createText', () => {
+  test('is an empty text at the point in the default style', () => {
+    const text = createText([10, 20], 7)
+    expect(text).toMatchObject({
+      type: 'text',
+      x: 10,
+      y: 20,
+      width: 0,
+      height: 0,
+      seed: 7,
+      text: '',
+      fontFamily: 'hand',
+      fontSize: DEFAULT_FONT_SIZE,
+      textAlign: 'left',
+      strokeColor: '#1E1F22',
+    })
   })
 })
