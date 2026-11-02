@@ -704,6 +704,28 @@ describe('select tool', () => {
     expect(editor.store.getState()).toBe(before)
   })
 
+  test('Delete mid-box deletes the elements the box selected', () => {
+    const { editor } = setupSelection()
+    click(editor, [250, 50])
+    editor.pointerDown(1, [-10, -10], { button: 0, shift: true })
+    editor.pointerMove(1, [150, 150], true)
+    // Shown as selected: b (the base) and a (inside the box).
+    editor.deleteSelected()
+    editor.pointerUp(1)
+    expect(editor.store.getState()).toMatchObject({
+      marquee: null,
+      selectedIds: [],
+      document: { elements: [] },
+    })
+  })
+
+  test('a jitter below the drag threshold on empty space shows no box', () => {
+    const { editor } = setupSelection()
+    editor.pointerDown(1, [500, 500], primary)
+    editor.pointerMove(1, [501, 501], false)
+    expect(editor.store.getState().marquee).toBeNull()
+  })
+
   test('changing tool clears the selection', () => {
     const { editor } = setupSelection()
     click(editor, [50, 50])
@@ -718,6 +740,20 @@ test('drawing selects the new element and switches to Select', () => {
   const { tool, selectedIds, document } = editor.store.getState()
   expect(tool).toBe('select')
   expect(selectedIds).toEqual([document.elements[0]!.id])
+})
+
+test('changing tool mid-draw still draws the shape but keeps the new tool', () => {
+  const editor = setup()
+  editor.pointerDown(1, [0, 0], primary)
+  editor.pointerMove(1, [30, 40], false)
+  editor.setTool('hand')
+  editor.pointerUp(1)
+  expect(editor.store.getState()).toMatchObject({
+    tool: 'hand',
+    draft: null,
+    selectedIds: [],
+    document: { elements: [expect.objectContaining({ type: 'rectangle' })] },
+  })
 })
 
 test('a click that draws nothing keeps the drawing tool', () => {

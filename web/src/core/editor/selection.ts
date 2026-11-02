@@ -15,8 +15,9 @@ function insideBox(point: Point, box: Bounds, reach: number) {
 
 /**
  * The id of the topmost element at `point` (later elements draw on top), or
- * null. A selected element counts anywhere inside its box, so a transparent
- * shape can be dragged by its empty middle once selected.
+ * null. A selected element also counts anywhere inside its box, so a
+ * transparent shape can be dragged by its empty middle once selected; that is
+ * only a fallback, so a shape lying inside it can still be clicked.
  */
 export function topmostHit(
   elements: readonly YodoElement[],
@@ -26,10 +27,13 @@ export function topmostHit(
 ): string | null {
   for (let i = elements.length - 1; i >= 0; i--) {
     const element = elements[i]!
+    if (hitTest(element, point, tolerance)) return element.id
+  }
+  for (let i = elements.length - 1; i >= 0; i--) {
+    const element = elements[i]!
     if (
-      hitTest(element, point, tolerance) ||
-      (selectedIds.has(element.id) &&
-        insideBox(point, elementBounds(element), tolerance))
+      selectedIds.has(element.id) &&
+      insideBox(point, elementBounds(element), tolerance)
     ) {
       return element.id
     }

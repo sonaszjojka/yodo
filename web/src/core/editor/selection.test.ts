@@ -33,6 +33,17 @@ describe('topmostHit', () => {
     expect(topmostHit([back], [30, 50], 2, new Set([back.id]))).toBe(back.id)
   })
 
+  test("a stroke hit beats a selected element's empty box", () => {
+    const big = createShape('rectangle', {
+      x: -50,
+      y: -50,
+      width: 300,
+      height: 300,
+    })
+    // back (0..100) sits inside big, which is selected and drawn later.
+    expect(topmostHit([back, big], [1, 50], 2, new Set([big.id]))).toBe(back.id)
+  })
+
   test('returns null on empty space', () => {
     expect(topmostHit(elements, [500, 500], 2, new Set())).toBeNull()
   })

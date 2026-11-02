@@ -213,23 +213,26 @@ export function createEditor(document: YodoDocument): Editor {
     },
     pointerUp(pointerId) {
       if (!drag || !owns(pointerId)) return
+      const ended = drag
       drag = null
       store.setState((prev) => {
         const { draft } = prev
         if (!draft) return prev
         if (!isVisible(draft)) return { ...prev, draft: null }
-        // The new element is selected and Select becomes active, so it can be
-        // moved right away (as in Excalidraw).
-        return {
+        const committed = {
           ...prev,
           draft: null,
           document: {
             ...prev.document,
             elements: [...prev.document.elements, draft],
           },
-          tool: 'select',
-          selectedIds: [draft.id],
         }
+        // A tool picked mid-drag wins: the shape is still drawn, but the
+        // user's new tool and its cleared selection are kept.
+        if (prev.tool !== ended.tool) return committed
+        // The new element is selected and Select becomes active, so it can be
+        // moved right away (as in Excalidraw).
+        return { ...committed, tool: 'select', selectedIds: [draft.id] }
       })
     },
     pointerCancel(pointerId) {
@@ -262,6 +265,8 @@ export function createEditor(document: YodoDocument): Editor {
         start: Point
         /** The selection the box adds to (kept with Shift, else empty). */
         base: string[]
+        /** Passed the drag threshold; until then no box is shown. */
+        moved: boolean
       }
   let gesture: SelectGesture | null = null
 
@@ -302,17 +307,24 @@ export function createEditor(document: YodoDocument): Editor {
       } else {
         const base = shift ? selectedIds : []
         setSelection(base)
-        gesture = { kind: 'marquee', pointerId, start: point, base }
+        gesture = {
+          kind: 'marquee',
+          pointerId,
+          start: point,
+          base,
+          moved: false,
+        }
       }
     },
     pointerMove(pointerId, point) {
       if (gesture?.pointerId !== pointerId) return
       const { start } = gesture
       const [dx, dy] = [point[0] - start[0], point[1] - start[1]]
+      // Both gestures wait for the threshold, so a jittery click stays a click.
+      const { zoom } = store.getState().viewport
+      if (!gesture.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD / zoom) return
+      gesture = { ...gesture, moved: true }
       if (gesture.kind === 'move') {
-        const { zoom } = store.getState().viewport
-        if (!gesture.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD / zoom) return
-        gesture = { ...gesture, moved: true }
         store.setState((prev) => ({ ...prev, move: { dx, dy } }))
       } else {
         const marquee = rectFromDrag(start, point, false)
@@ -452,17 +464,24 @@ export function createEditor(document: YodoDocument): Editor {
       selectTool.cancel()
     },
     deleteSelected() {
-      selectTool.cancel()
+      // End a select drag without cancel(): cancel restores the selection from
+      // before a box drag, but Delete removes what is highlighted now.
+      gesture = null
       store.setState((prev) => {
-        if (prev.selectedIds.length === 0) return prev
+        // Drop a move preview or box; a no-op Delete with neither is no change.
+        const ended =
+          prev.move || prev.marquee
+            ? { ...prev, move: null, marquee: null }
+            : prev
+        if (ended.selectedIds.length === 0) return ended
         const elements = deleteElements(
-          prev.document.elements,
-          new Set(prev.selectedIds),
+          ended.document.elements,
+          new Set(ended.selectedIds),
         )
         return {
-          ...prev,
+          ...ended,
           selectedIds: [],
-          document: { ...prev.document, elements },
+          document: { ...ended.document, elements },
         }
       })
     },
