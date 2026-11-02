@@ -9,9 +9,9 @@ Rule: every stage ends with a **file of decisions**, not just a conversation. Co
 
 ## Status (2026-11-02)
 Read this section, not the whole file; finished work is in History at the end.
-- **Last done:** roadmap 1.8 (issue #17): pencil tool (P) for freehand strokes, drawn as a smoothed Canvas path (ADR 0024); strokes select and move as one element.
+- **Last done:** roadmap 1.9 (issue #18): text tool (T) and double-click editing in a textarea over the canvas (ADR 0027); text inside rectangles, diamonds and ellipses as a `label` field (ADR 0026); Caveat bundled from Fontsource (ADR 0025).
 - Open items: none.
-- **Next step:** roadmap 1.9 (text, issue #18).
+- **Next step:** roadmap 1.10 (eraser + tool shortcuts, issue #19).
 
 ## Working mode: an educational project
 The goal is both the app and learning how to program with Claude as effectively as possible, so that the knowledge stays with you.
@@ -151,3 +151,4 @@ One dated line per finished stage or task, oldest first. `/ship` appends here.
 - Done (2026-11-02): roadmap 1.6: resize by corner handles and outline-side zones (one or many elements, around the opposite side); Shift keeps proportions; dragging past the opposite side flips; a preview committed on release (one document change); size badge under the selection, drawn in screen px. Review: a side keeps at least 1 unit, handle zones reach at most a quarter inward so small selections still move, a flat line's zero-size axis does not grab, a click on a handle zone still selects, the cursor follows flips. Code review minimum raised to `medium`.
 - Done (2026-11-02): roadmap 1.7: undo/redo as past/future stacks of immutable document snapshots, recorded whenever the document reference changes (ADR 0023), so a drag is one step and pans, zooms and selection are none; 100-step limit; undo/redo drops a drag in progress and prunes the selection; Cmd/Ctrl+Z, Shift+Cmd/Ctrl+Z, Ctrl+Y and ↶/↷ buttons next to zoom in a shared bottom bar. Review: Ctrl+Y redoes with Caps Lock on.
 - Done (2026-11-02): roadmap 1.8: pencil tool (P) records pointer samples, dropping any within one screen pixel of the last, and commits one `pencil` element on release (one undo step); drawn as a constant-width Canvas path curving through sample midpoints, without rough.js (ADR 0024); the pencil stays active after a stroke. Review: every coalesced pointer sample now reaches the editor, so fast strokes keep their shape.
+- Done (2026-11-02): roadmap 1.9: text tool (T) places a text box, typed in a textarea over the canvas that mirrors its font, zoom and position (ADR 0027); double-click edits text or a shape's label, and a click inside a shape with T labels it; a commit is one undo step, empty text is dropped or deleted, a shape grows taller to fit its label (ADR 0026); text resizes evenly with its font; Caveat ships as a Fontsource package and the canvas redraws once it loads (ADR 0025). Review: text under a transparent shape stays editable, a selected element's box no longer blocks a double-click, the textarea keeps its line height on zoom, resized text stays on the anchor, tiny shapes wrap labels at 4 ems, and Escape is left to the IME while composing.
