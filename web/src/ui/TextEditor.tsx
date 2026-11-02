@@ -8,6 +8,7 @@ import type { Editor, EditorState } from '../core/editor/editor.ts'
 import { editBox, type TextEdit } from '../core/editor/text.ts'
 import { worldToScreen } from '../core/geometry/viewport.ts'
 import { FONT_STACKS, LINE_HEIGHT } from '../core/text/layout.ts'
+import { commitsOn } from './textKeys.ts'
 import { useStore } from './useStore.ts'
 
 /**
@@ -87,9 +88,14 @@ function EditingArea({
   }, [selectAll])
 
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    const mod = event.metaKey || event.ctrlKey
-    // Enter adds a line; Escape or Cmd/Ctrl+Enter finish the edit.
-    if (event.key === 'Escape' || (event.key === 'Enter' && mod)) {
+    if (
+      commitsOn({
+        key: event.key,
+        metaKey: event.metaKey,
+        ctrlKey: event.ctrlKey,
+        isComposing: event.nativeEvent.isComposing,
+      })
+    ) {
       event.preventDefault()
       editor.commitText()
     }

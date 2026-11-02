@@ -1,8 +1,9 @@
 import { renderToStaticMarkup } from 'react-dom/server'
-import { expect, test } from 'vitest'
+import { describe, expect, test } from 'vitest'
 import { createDocument } from '../core/document/create.ts'
 import { createEditor } from '../core/editor/editor.ts'
 import { TextEditor } from './TextEditor.tsx'
+import { commitsOn } from './textKeys.ts'
 
 function editorEditingAt(screen: [number, number]) {
   const editor = createEditor(createDocument(), { measure: () => 30 })
@@ -43,4 +44,31 @@ test('scales the font and box with the zoom', () => {
   expect(html).toContain('font:40px/1.25 &quot;Caveat Variable&quot;, cursive')
   expect(html).not.toContain('line-height')
   expect(html).toContain('height:50px')
+})
+
+describe('commitsOn', () => {
+  const key = (
+    k: string,
+    extra: Partial<Parameters<typeof commitsOn>[0]> = {},
+  ) =>
+    commitsOn({
+      key: k,
+      metaKey: false,
+      ctrlKey: false,
+      isComposing: false,
+      ...extra,
+    })
+
+  test('Escape and Cmd/Ctrl+Enter finish the edit; plain Enter does not', () => {
+    expect(key('Escape')).toBe(true)
+    expect(key('Enter', { metaKey: true })).toBe(true)
+    expect(key('Enter', { ctrlKey: true })).toBe(true)
+    expect(key('Enter')).toBe(false)
+    expect(key('a')).toBe(false)
+  })
+
+  test('keys during IME composition belong to the IME', () => {
+    expect(key('Escape', { isComposing: true })).toBe(false)
+    expect(key('Enter', { metaKey: true, isComposing: true })).toBe(false)
+  })
 })
