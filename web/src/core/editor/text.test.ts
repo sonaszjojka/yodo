@@ -416,4 +416,23 @@ describe('review fixes', () => {
       id: text.id,
     })
   })
+
+  test('a selected arrow whose box covers a shape does not block editing its label', () => {
+    const arrow = createLinear('arrow', lineFromDrag([0, 0], [300, 300], false))
+    const rect = createShape('rectangle', {
+      x: 150,
+      y: 0,
+      width: 100,
+      height: 60,
+    })
+    const editor = setup([rect, arrow])
+    click(editor, [100, 100])
+    expect(state(editor).selectedIds).toEqual([arrow.id])
+
+    editor.doubleClick([200, 30])
+    expect(state(editor).editing).toMatchObject({
+      target: 'label',
+      id: rect.id,
+    })
+  })
 })

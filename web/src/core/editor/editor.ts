@@ -608,13 +608,13 @@ export function createEditor(
   /** A text tool press; the edit starts on release (see `pointerUp`). */
   let textPress: { pointerId: number; point: Point } | null = null
 
-  function startEdit(point: Point) {
+  /** What a text click at `point` edits: a text, a shape label, or null for new text. */
+  function textTarget(point: Point) {
     const { document, viewport } = store.getState()
-    const target = textTargetAt(
-      document.elements,
-      point,
-      HIT_TOLERANCE / viewport.zoom,
-    )
+    return textTargetAt(document.elements, point, HIT_TOLERANCE / viewport.zoom)
+  }
+
+  function startEdit(point: Point, target = textTarget(point)) {
     const editing = editFor(target, point)
     store.setState((prev) => ({
       ...prev,
@@ -847,20 +847,23 @@ export function createEditor(
       setViewport((v) => zoomAt(v, anchor, v.zoom * factor)),
     setZoom: (zoom, anchor) => setViewport((v) => zoomAt(v, anchor, zoom)),
     doubleClick(screen) {
-      const { tool, editing, document, viewport, selectedIds } =
-        store.getState()
+      const { tool, editing, document, viewport } = store.getState()
       if (tool !== 'select' || editing || pan || drag || gesture) return
       const point = toWorld(screen)
-      const hitId = topmostHit(
-        document.elements,
-        point,
-        HIT_TOLERANCE / viewport.zoom,
-        new Set(selectedIds),
-      )
-      const hit = document.elements.find((element) => element.id === hitId)
-      // Lines, arrows and strokes have no text yet.
-      if (hit && 'points' in hit) return
-      startEdit(point)
+      // One target for the whole decision, from what is really under the
+      // point (not a selected element's box, which may cover a shape).
+      const target = textTarget(point)
+      if (!target) {
+        const hitId = topmostHit(
+          document.elements,
+          point,
+          HIT_TOLERANCE / viewport.zoom,
+          new Set(),
+        )
+        // Lines, arrows and strokes have no text yet.
+        if (hitId) return
+      }
+      startEdit(point, target)
     },
     setEditingText(text) {
       store.setState((prev) =>
