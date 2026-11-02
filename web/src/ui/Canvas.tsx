@@ -1,7 +1,7 @@
 import rough from 'roughjs'
 import { useEffect, useRef, type PointerEvent } from 'react'
 import type { Point } from '../core/document/types.ts'
-import type { Editor, EditorState } from '../core/editor/editor.ts'
+import type { Editor, EditorState, Tool } from '../core/editor/editor.ts'
 import { wheelZoomFactor } from '../core/geometry/viewport.ts'
 import { canvasSize, renderScene, type Surface } from '../core/render/render.ts'
 
@@ -16,6 +16,16 @@ interface GestureEvent extends UIEvent {
   scale: number
   clientX: number
   clientY: number
+}
+
+/** Single-key tool shortcuts (Excalidraw's letters); the toolbar is roadmap 1.10. */
+const TOOL_KEYS: Partial<Record<string, Tool>> = {
+  h: 'hand',
+  r: 'rectangle',
+  d: 'diamond',
+  o: 'ellipse',
+  l: 'line',
+  a: 'arrow',
 }
 
 function cursorFor({ panning, tool, spaceHeld }: EditorState) {
@@ -117,9 +127,8 @@ export function Canvas({ editor }: { editor: Editor }) {
         event.preventDefault()
         editor.setZoom(1, [surface.width / 2, surface.height / 2])
       } else if (!mod && !event.altKey && !editor.store.getState().panning) {
-        const key = event.key.toLowerCase()
-        if (key === 'h') editor.setTool('hand')
-        else if (key === 'r') editor.setTool('rectangle')
+        const tool = TOOL_KEYS[event.key.toLowerCase()]
+        if (tool) editor.setTool(tool)
       }
     }
 

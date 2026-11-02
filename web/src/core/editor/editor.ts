@@ -1,9 +1,11 @@
-import { createRectangle } from '../document/create.ts'
-import type {
-  Point,
-  RectangleElement,
-  YodoDocument,
-} from '../document/types.ts'
+import {
+  createLinear,
+  createShape,
+  type LinearType,
+  type ShapeType,
+} from '../document/create.ts'
+import type { Point, YodoDocument, YodoElement } from '../document/types.ts'
+import { lineFromDrag } from '../geometry/line.ts'
 import { rectFromDrag } from '../geometry/rect.ts'
 import {
   clampZoom,
@@ -20,7 +22,7 @@ export interface EditorState {
    * The shape being drawn. It stays out of `document.elements` until the drag
    * ends, so committing it is one change (one undo step later, roadmap 1.7).
    */
-  draft: RectangleElement | null
+  draft: YodoElement | null
   /**
    * The camera. Editor state, not part of `document`, so panning is never a
    * document change (ADR 0022); saving copies it into `appState` (1.14).
@@ -33,7 +35,36 @@ export interface EditorState {
   panning: boolean
 }
 
-export type Tool = 'rectangle' | 'hand'
+/** Tools that draw an element by dragging. */
+export type DrawingTool = ShapeType | LinearType
+export type Tool = DrawingTool | 'hand'
+
+function isLinear(tool: DrawingTool): tool is LinearType {
+  return tool === 'line' || tool === 'arrow'
+}
+
+/**
+ * The geometry a drag gives the element: a box for shapes, a start point and
+ * an offset for lines. Shift squares a box or snaps a line's angle.
+ */
+function geometryFromDrag(
+  tool: DrawingTool,
+  start: Point,
+  end: Point,
+  shift: boolean,
+) {
+  return isLinear(tool)
+    ? lineFromDrag(start, end, shift)
+    : rectFromDrag(start, end, shift)
+}
+
+/** A click or a degenerate drag draws nothing. */
+function isVisible(element: YodoElement) {
+  // A line needs length in any direction; a box needs both sides.
+  return element.type === 'line' || element.type === 'arrow'
+    ? Math.hypot(element.width, element.height) >= 1
+    : element.width >= 1 && element.height >= 1
+}
 
 /** Mouse buttons as in `PointerEvent.button`. */
 const PRIMARY_BUTTON = 0
@@ -44,7 +75,7 @@ const MIDDLE_BUTTON = 1
  * screen coordinates before calling it. Only the pointer that started a drag drives it; events from other pointers
  * (a second finger) are ignored.
  */
-export interface RectangleTool {
+export interface DrawTool {
   pointerDown(pointerId: number, point: Point, shift: boolean): void
   pointerMove(pointerId: number, point: Point, shift: boolean): void
   /** Re-applies Shift from the last pointer position, without a move. */
@@ -58,7 +89,8 @@ export interface RectangleTool {
 
 export interface Editor {
   store: Store<EditorState>
-  rectangleTool: RectangleTool
+  /** Draws with the active tool; which element it makes is fixed at pointer down. */
+  drawTool: DrawTool
   // The input router: screen points (CSS px relative to the canvas). A drag
   // pans with the middle button, the hand tool or Space held; otherwise the
   // primary button draws with the active tool.
@@ -101,6 +133,7 @@ export function createEditor(document: YodoDocument): Editor {
   // Transient drag data that nothing renders, so it lives outside the store.
   let drag: {
     pointerId: number
+    tool: DrawingTool
     start: Point
     last: Point
     shift: boolean
@@ -112,18 +145,27 @@ export function createEditor(document: YodoDocument): Editor {
 
   function updateDraft() {
     if (!drag) return
-    const bounds = rectFromDrag(drag.start, drag.last, drag.shift)
+    const geometry = geometryFromDrag(
+      drag.tool,
+      drag.start,
+      drag.last,
+      drag.shift,
+    )
     store.setState((prev) =>
-      prev.draft ? { ...prev, draft: { ...prev.draft, ...bounds } } : prev,
+      prev.draft ? { ...prev, draft: { ...prev.draft, ...geometry } } : prev,
     )
   }
 
-  const rectangleTool: RectangleTool = {
+  const drawTool: DrawTool = {
     pointerDown(pointerId, point, shift) {
       if (drag && !owns(pointerId)) return
-      drag = { pointerId, start: point, last: point, shift }
+      const { tool } = store.getState()
+      if (tool === 'hand') return
+      drag = { pointerId, tool, start: point, last: point, shift }
       // The seed is picked once here and kept for the element's lifetime.
-      const draft = createRectangle(rectFromDrag(point, point, shift))
+      const draft = isLinear(tool)
+        ? createLinear(tool, lineFromDrag(point, point, shift))
+        : createShape(tool, rectFromDrag(point, point, shift))
       store.setState((prev) => ({ ...prev, draft }))
     },
     pointerMove(pointerId, point, shift) {
@@ -142,12 +184,10 @@ export function createEditor(document: YodoDocument): Editor {
       store.setState((prev) => {
         const { draft } = prev
         if (!draft) return prev
-        // A click or a one-axis drag draws nothing.
-        const visible = draft.width >= 1 && draft.height >= 1
         return {
           ...prev,
           draft: null,
-          document: visible
+          document: isVisible(draft)
             ? {
                 ...prev.document,
                 elements: [...prev.document.elements, draft],
@@ -157,7 +197,7 @@ export function createEditor(document: YodoDocument): Editor {
       })
     },
     pointerCancel(pointerId) {
-      if (owns(pointerId)) rectangleTool.cancel()
+      if (owns(pointerId)) drawTool.cancel()
     },
     cancel() {
       if (!drag) return
@@ -166,7 +206,7 @@ export function createEditor(document: YodoDocument): Editor {
     },
   }
 
-  // The pan drag, kept outside the store like the rectangle drag.
+  // The pan drag, kept outside the store like the draw drag.
   let pan: { pointerId: number; last: Point } | null = null
 
   function setViewport(update: (viewport: Viewport) => Viewport) {
@@ -186,7 +226,7 @@ export function createEditor(document: YodoDocument): Editor {
 
   return {
     store,
-    rectangleTool,
+    drawTool,
     pointerDown(pointerId, screen, { button, shift }) {
       // One gesture at a time: ignore new pointers while one is active.
       if (pan || drag) return
@@ -197,8 +237,8 @@ export function createEditor(document: YodoDocument): Editor {
       if (pans) {
         pan = { pointerId, last: screen }
         store.setState((prev) => ({ ...prev, panning: true }))
-      } else if (button === PRIMARY_BUTTON && tool === 'rectangle') {
-        rectangleTool.pointerDown(pointerId, toWorld(screen), shift)
+      } else if (button === PRIMARY_BUTTON && tool !== 'hand') {
+        drawTool.pointerDown(pointerId, toWorld(screen), shift)
       }
     },
     pointerMove(pointerId, screen, shift) {
@@ -208,27 +248,27 @@ export function createEditor(document: YodoDocument): Editor {
         pan = { pointerId, last: screen }
         setViewport((v) => panBy(v, dx, dy))
       } else {
-        rectangleTool.pointerMove(pointerId, toWorld(screen), shift)
+        drawTool.pointerMove(pointerId, toWorld(screen), shift)
       }
     },
     pointerUp(pointerId) {
       if (pan) {
         if (pan.pointerId === pointerId) endPan()
       } else {
-        rectangleTool.pointerUp(pointerId)
+        drawTool.pointerUp(pointerId)
       }
     },
     pointerCancel(pointerId) {
       if (pan) {
         if (pan.pointerId === pointerId) endPan()
       } else {
-        rectangleTool.pointerCancel(pointerId)
+        drawTool.pointerCancel(pointerId)
       }
     },
-    setShift: (shift) => rectangleTool.setShift(shift),
+    setShift: (shift) => drawTool.setShift(shift),
     cancel() {
       if (pan) endPan()
-      rectangleTool.cancel()
+      drawTool.cancel()
     },
     setTool(tool) {
       store.setState((prev) => (prev.tool === tool ? prev : { ...prev, tool }))

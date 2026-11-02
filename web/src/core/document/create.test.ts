@@ -1,5 +1,10 @@
 import { afterEach, expect, test, vi } from 'vitest'
-import { createDocument, createRectangle, randomSeed } from './create.ts'
+import {
+  createDocument,
+  createLinear,
+  createShape,
+  randomSeed,
+} from './create.ts'
 import { loadDocument } from './migrate.ts'
 import { CURRENT_SCHEMA_VERSION } from './types.ts'
 
@@ -61,8 +66,8 @@ test('randomSeed is a positive 31-bit integer, never 0', () => {
   }
 })
 
-test('createRectangle uses the given bounds and seed with default styles', () => {
-  const rect = createRectangle({ x: 1, y: 2, width: 3, height: 4 }, 42)
+test('createShape uses the given bounds and seed with default styles', () => {
+  const rect = createShape('rectangle', { x: 1, y: 2, width: 3, height: 4 }, 42)
 
   expect(rect).toEqual({
     type: 'rectangle',
@@ -83,7 +88,36 @@ test('createRectangle uses the given bounds and seed with default styles', () =>
   })
 })
 
-test('createRectangle picks a random seed when none is given', () => {
-  const rect = createRectangle({ x: 0, y: 0, width: 1, height: 1 })
+test('createShape picks a random seed when none is given', () => {
+  const rect = createShape('rectangle', { x: 0, y: 0, width: 1, height: 1 })
   expect(rect.seed).toBeGreaterThanOrEqual(1)
+})
+
+test.each(['diamond', 'ellipse'] as const)('createShape makes a %s', (type) => {
+  const shape = createShape(type, { x: 0, y: 0, width: 5, height: 6 }, 1)
+  expect(shape).toMatchObject({ type, width: 5, height: 6, seed: 1 })
+})
+
+const GEOMETRY = {
+  x: 1,
+  y: 2,
+  width: 30,
+  height: 40,
+  points: [
+    [0, 0],
+    [-30, 40],
+  ] as [number, number][],
+}
+
+test('createLinear makes a line with the given geometry and seed', () => {
+  const line = createLinear('line', GEOMETRY, 9)
+
+  expect(line).toMatchObject({ type: 'line', ...GEOMETRY, seed: 9, angle: 0 })
+  expect(line).not.toHaveProperty('endArrowhead')
+})
+
+test('createLinear gives an arrow an arrowhead at the end', () => {
+  const arrow = createLinear('arrow', GEOMETRY, 9)
+
+  expect(arrow).toMatchObject({ type: 'arrow', endArrowhead: 'arrow' })
 })

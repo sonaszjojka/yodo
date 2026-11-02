@@ -1,8 +1,12 @@
+import type { LinearGeometry } from '../geometry/line.ts'
 import type { Bounds } from '../geometry/rect.ts'
 import {
   CURRENT_SCHEMA_VERSION,
-  type RectangleElement,
+  type ArrowElement,
+  type BaseElement,
+  type LineElement,
   type YodoDocument,
+  type YodoElement,
 } from './types.ts'
 
 /**
@@ -49,15 +53,10 @@ export function randomSeed(): number {
   return (value! % (2 ** 31 - 1)) + 1
 }
 
-/** A new rectangle with the default style (Ink stroke, docs/ui.md). */
-export function createRectangle(
-  bounds: Bounds,
-  seed = randomSeed(),
-): RectangleElement {
+/** Every field but the geometry, with the default style (Ink stroke, docs/ui.md). */
+function defaults(seed: number): Omit<BaseElement, keyof Bounds> {
   return {
-    type: 'rectangle',
     id: randomId(),
-    ...bounds,
     angle: 0,
     seed,
     strokeColor: '#1E1F22',
@@ -68,4 +67,49 @@ export function createRectangle(
     roughness: 1,
     opacity: 100,
   }
+}
+
+/** Elements defined by their bounding box. */
+export type ShapeType = 'rectangle' | 'diamond' | 'ellipse'
+/** Elements defined by a start point and points relative to it. */
+export type LinearType = 'line' | 'arrow'
+
+/** A new rectangle, diamond or ellipse filling `bounds`. */
+export function createShape<T extends ShapeType>(
+  type: T,
+  bounds: Bounds,
+  seed = randomSeed(),
+): Extract<YodoElement, { type: T }> {
+  // TypeScript cannot narrow a generic `type` to one union member, hence the cast.
+  return { type, ...defaults(seed), ...bounds } as Extract<
+    YodoElement,
+    { type: T }
+  >
+}
+
+/** A new line, or an arrow with an arrowhead at its end. */
+export function createLinear(
+  type: 'line',
+  geometry: LinearGeometry,
+  seed?: number,
+): LineElement
+export function createLinear(
+  type: 'arrow',
+  geometry: LinearGeometry,
+  seed?: number,
+): ArrowElement
+export function createLinear(
+  type: LinearType,
+  geometry: LinearGeometry,
+  seed?: number,
+): LineElement | ArrowElement
+export function createLinear(
+  type: LinearType,
+  geometry: LinearGeometry,
+  seed = randomSeed(),
+): LineElement | ArrowElement {
+  const base = { ...defaults(seed), ...geometry }
+  return type === 'arrow'
+    ? { type, ...base, endArrowhead: 'arrow' }
+    : { type, ...base }
 }

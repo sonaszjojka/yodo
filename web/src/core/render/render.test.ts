@@ -1,6 +1,12 @@
 import { describe, expect, test, vi } from 'vitest'
-import { createRectangle } from '../document/create.ts'
-import { canvasSize, renderScene, type SceneContext } from './render.ts'
+import { createLinear, createShape } from '../document/create.ts'
+import { arrowhead, lineFromDrag } from '../geometry/line.ts'
+import {
+  canvasSize,
+  renderScene,
+  type SceneContext,
+  type SceneRough,
+} from './render.ts'
 
 describe('canvasSize', () => {
   test.each([
@@ -28,10 +34,21 @@ function fakeContext() {
   } satisfies SceneContext
 }
 
+function fakeRough() {
+  return {
+    rectangle: vi.fn(),
+    polygon: vi.fn(),
+    ellipse: vi.fn(),
+    linearPath: vi.fn(),
+  } satisfies SceneRough
+}
+
+const SURFACE = { width: 800, height: 600, dpr: 1 }
+
 describe('renderScene', () => {
   test('scales by the pixel ratio and clears the visible area', () => {
     const ctx = fakeContext()
-    const rough = { rectangle: vi.fn() }
+    const rough = fakeRough()
 
     renderScene(ctx, rough, [], { width: 800, height: 600, dpr: 2 }, IDENTITY)
 
@@ -42,7 +59,7 @@ describe('renderScene', () => {
 
   test('maps world to device pixels through the viewport', () => {
     const ctx = fakeContext()
-    const rough = { rectangle: vi.fn() }
+    const rough = fakeRough()
 
     renderScene(
       ctx,
@@ -60,8 +77,12 @@ describe('renderScene', () => {
 
   test('draws each rectangle with its own seed and style', () => {
     const ctx = fakeContext()
-    const rough = { rectangle: vi.fn() }
-    const rect = createRectangle({ x: 1, y: 2, width: 3, height: 4 }, 42)
+    const rough = fakeRough()
+    const rect = createShape(
+      'rectangle',
+      { x: 1, y: 2, width: 3, height: 4 },
+      42,
+    )
 
     renderScene(
       ctx,
@@ -86,12 +107,13 @@ describe('renderScene', () => {
     const ctx = fakeContext()
     let alphaWhileDrawing = 1
     const rough = {
+      ...fakeRough(),
       rectangle: vi.fn(() => {
         alphaWhileDrawing = ctx.globalAlpha
       }),
     }
     const rect = {
-      ...createRectangle({ x: 0, y: 0, width: 5, height: 5 }, 7),
+      ...createShape('rectangle', { x: 0, y: 0, width: 5, height: 5 }, 7),
       opacity: 50,
       strokeStyle: 'dashed' as const,
       backgroundColor: '#F7E1DE',
@@ -111,5 +133,99 @@ describe('renderScene', () => {
         strokeLineDash: [8, 8],
       }),
     )
+  })
+
+  test('draws a diamond through the midpoints of its box', () => {
+    const rough = fakeRough()
+    const diamond = createShape(
+      'diamond',
+      { x: 0, y: 0, width: 100, height: 60 },
+      3,
+    )
+
+    renderScene(fakeContext(), rough, [diamond], SURFACE, IDENTITY)
+
+    expect(rough.polygon).toHaveBeenCalledWith(
+      [
+        [50, 0],
+        [100, 30],
+        [50, 60],
+        [0, 30],
+      ],
+      expect.objectContaining({ seed: 3 }),
+    )
+  })
+
+  test('draws an ellipse from its centre and size', () => {
+    const rough = fakeRough()
+    const ellipse = createShape(
+      'ellipse',
+      { x: 10, y: 20, width: 100, height: 60 },
+      4,
+    )
+
+    renderScene(fakeContext(), rough, [ellipse], SURFACE, IDENTITY)
+
+    expect(rough.ellipse).toHaveBeenCalledWith(
+      60,
+      50,
+      100,
+      60,
+      expect.objectContaining({ seed: 4 }),
+    )
+  })
+
+  test('draws a line through its absolute points, with no head', () => {
+    const rough = fakeRough()
+    const line = createLinear('line', lineFromDrag([10, 20], [0, 50], false), 5)
+
+    renderScene(fakeContext(), rough, [line], SURFACE, IDENTITY)
+
+    expect(rough.linearPath).toHaveBeenCalledTimes(1)
+    expect(rough.linearPath).toHaveBeenCalledWith(
+      [
+        [10, 20],
+        [0, 50],
+      ],
+      expect.objectContaining({ seed: 5 }),
+    )
+  })
+
+  test('draws an arrow with its head at the end, with the same seed', () => {
+    const rough = fakeRough()
+    const arrow = createLinear(
+      'arrow',
+      lineFromDrag([0, 0], [100, 0], false),
+      6,
+    )
+
+    renderScene(fakeContext(), rough, [arrow], SURFACE, IDENTITY)
+
+    expect(rough.linearPath).toHaveBeenCalledTimes(2)
+    expect(rough.linearPath).toHaveBeenLastCalledWith(
+      arrowhead([0, 0], [100, 0]),
+      expect.objectContaining({ seed: 6 }),
+    )
+  })
+
+  test('a zero-length arrow draws no head', () => {
+    const rough = fakeRough()
+    const arrow = createLinear('arrow', lineFromDrag([5, 5], [5, 5], false), 6)
+
+    renderScene(fakeContext(), rough, [arrow], SURFACE, IDENTITY)
+
+    expect(rough.linearPath).toHaveBeenCalledTimes(1)
+  })
+
+  test('an arrow without an arrowhead draws only its line', () => {
+    const rough = fakeRough()
+    const arrow = {
+      ...createLinear('arrow', lineFromDrag([0, 0], [100, 0], false), 6),
+      endArrowhead: null,
+    }
+
+    renderScene(fakeContext(), rough, [arrow], SURFACE, IDENTITY)
+
+    expect(rough.linearPath).toHaveBeenCalledTimes(1)
   })
 })
