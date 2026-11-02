@@ -3,26 +3,26 @@
 import type { YodoElement } from '../document/types.ts'
 import type { Bounds } from '../geometry/rect.ts'
 import type { EditorState } from './editor.ts'
-import { moveElements } from './selection.ts'
+import { moveElements, resizeElements, selectedOf } from './selection.ts'
 
 export interface Scene {
-  /** Elements in draw order, the move preview and the draft included. */
+  /** Elements in draw order, the move/resize preview and the draft included. */
   elements: YodoElement[]
-  /** The selected elements as shown (moved, if a move is in progress). */
+  /** The selected elements as shown (moved or resized, if a drag is in progress). */
   selected: YodoElement[]
   marquee: Bounds | null
 }
 
 export function sceneOf(state: EditorState): Scene {
-  const { document, draft, move, marquee } = state
+  const { document, draft, move, resize, marquee } = state
   const ids = new Set(state.selectedIds)
-  const shown = move
-    ? moveElements(document.elements, ids, move.dx, move.dy)
-    : document.elements
+  let shown = document.elements
+  if (move) shown = moveElements(shown, ids, move.dx, move.dy)
+  if (resize) shown = resizeElements(shown, ids, resize)
   const elements = draft ? [...shown, draft] : [...shown]
   return {
     elements,
-    selected: elements.filter((element) => ids.has(element.id)),
+    selected: selectedOf(elements, ids),
     marquee,
   }
 }

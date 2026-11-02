@@ -5,6 +5,7 @@ import {
   deleteElements,
   idsInBox,
   moveElements,
+  resizeElements,
   topmostHit,
 } from './selection.ts'
 
@@ -73,5 +74,18 @@ describe('moveElements', () => {
 describe('deleteElements', () => {
   test('removes the given elements and keeps the order of the rest', () => {
     expect(deleteElements(elements, new Set([front.id]))).toEqual([back, line])
+  })
+})
+
+describe('resizeElements', () => {
+  test('scales only the given ids and keeps the others as they were', () => {
+    const resized = resizeElements(elements, new Set([back.id]), {
+      anchor: [0, 0],
+      sx: 2,
+      sy: 0.5,
+    })
+    expect(resized[0]).toMatchObject({ x: 0, y: 0, width: 200, height: 50 })
+    expect(resized[1]).toBe(front)
+    expect(resized[2]).toBe(line)
   })
 })

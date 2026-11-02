@@ -39,6 +39,12 @@ function fakeContext() {
     strokeStyle: '',
     fillStyle: '',
     lineWidth: 1,
+    font: '',
+    textAlign: 'start' as CanvasTextAlign,
+    textBaseline: 'alphabetic' as CanvasTextBaseline,
+    // Every badge text measures 40 px wide.
+    measureText: vi.fn(() => ({ width: 40 }) as TextMetrics),
+    fillText: vi.fn(),
   } satisfies SceneContext
 }
 
@@ -278,6 +284,7 @@ describe('selection overlay', () => {
     renderScene(ctx, fakeRough(), [rect], SURFACE, IDENTITY)
     expect(ctx.rect).not.toHaveBeenCalled()
     expect(ctx.roundRect).not.toHaveBeenCalled()
+    expect(ctx.fillText).not.toHaveBeenCalled()
   })
 
   test('outlines the selection with a gap and puts a handle on each corner', () => {
@@ -289,7 +296,8 @@ describe('selection overlay', () => {
     // Around (10, 20, 100, 50): 3 world units for the 2-wide stroke and its
     // rough wobble (roughness 1 × offset 2), then the 4 px gap.
     expect(ctx.rect).toHaveBeenCalledExactlyOnceWith(3, 13, 114, 64)
-    expect(ctx.roundRect).toHaveBeenCalledTimes(4)
+    // Four handles and the size badge.
+    expect(ctx.roundRect).toHaveBeenCalledTimes(5)
     // Handles are 8 px squares centred on the gapped corners.
     expect(ctx.roundRect).toHaveBeenCalledWith(-1, 9, 8, 8, 2)
     expect(ctx.roundRect).toHaveBeenCalledWith(113, 73, 8, 8, 2)
@@ -329,7 +337,42 @@ describe('selection overlay', () => {
     // Two element outlines and the group box.
     expect(ctx.rect).toHaveBeenCalledTimes(3)
     expect(ctx.rect).toHaveBeenLastCalledWith(3, 13, 254, 64)
-    expect(ctx.roundRect).toHaveBeenCalledTimes(4)
+    // Four handles and one badge for the whole group.
+    expect(ctx.roundRect).toHaveBeenCalledTimes(5)
+    expect(ctx.fillText).toHaveBeenCalledExactlyOnceWith(
+      '240 × 50',
+      expect.any(Number),
+      expect.any(Number),
+    )
+  })
+
+  test('shows the rounded size in a badge centred under the outline', () => {
+    const ctx = fakeContext()
+    const odd = { ...rect, width: 99.6, height: 50.2 }
+    renderScene(ctx, fakeRough(), [odd], SURFACE, IDENTITY, {
+      selected: [odd],
+      marquee: null,
+    })
+    // Outline (3, 13, 113.6, 64.2): centre x 59.8, bottom 77.2; the badge
+    // starts 8 px lower, is 18 px tall and 40 + 2 × 6 px wide.
+    expect(ctx.roundRect).toHaveBeenLastCalledWith(33.8, 85.2, 52, 18, 9)
+    expect(ctx.fillText).toHaveBeenCalledExactlyOnceWith('100 × 50', 59.8, 94.2)
+  })
+
+  test('keeps the badge in screen pixels when zoomed and panned', () => {
+    const ctx = fakeContext()
+    renderScene(
+      ctx,
+      fakeRough(),
+      [rect],
+      { ...SURFACE, dpr: 2 },
+      { x: 10, y: 20, zoom: 2 },
+      { selected: [rect], marquee: null },
+    )
+    // Outline bottom-centre (60, 75) in world is ((60 - 10) × 2, (75 - 20) × 2).
+    expect(ctx.fillText).toHaveBeenCalledExactlyOnceWith('100 × 50', 100, 127)
+    // Drawn with only the pixel ratio applied.
+    expect(ctx.setTransform).toHaveBeenLastCalledWith(2, 0, 0, 2, 0, 0)
   })
 
   test('draws the selection box', () => {

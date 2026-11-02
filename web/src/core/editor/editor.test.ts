@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'vitest'
-import { createDocument, createShape } from '../document/create.ts'
+import {
+  createDocument,
+  createLinear,
+  createShape,
+} from '../document/create.ts'
+import { lineFromDrag } from '../geometry/line.ts'
 import { MAX_ZOOM, MIN_ZOOM } from '../geometry/viewport.ts'
 import { createEditor, type Tool } from './editor.ts'
 
@@ -731,6 +736,221 @@ describe('select tool', () => {
     click(editor, [50, 50])
     editor.setTool('ellipse')
     expect(editor.store.getState().selectedIds).toEqual([])
+  })
+})
+
+// Rectangle a (0, 0, 100, 100) has stroke width 2 and roughness 1, so its
+// outline is 3 + 4 units out: (-7, -7, 114, 114), with the se handle at (107, 107).
+describe('resize', () => {
+  function selectA() {
+    const setupResult = setupSelection()
+    click(setupResult.editor, [50, 50])
+    return setupResult
+  }
+
+  test('dragging a corner previews, then commits one document change', () => {
+    const { editor, b } = selectA()
+    const before = editor.store.getState().document
+
+    editor.pointerDown(1, [107, 107], primary)
+    editor.pointerMove(1, [157, 207], false)
+    expect(editor.store.getState().document).toBe(before)
+    expect(editor.store.getState().resize).toEqual({
+      handle: 'se',
+      anchor: [0, 0],
+      sx: 1.5,
+      sy: 2,
+    })
+    editor.pointerUp(1)
+
+    const { document, resize, selectedIds } = editor.store.getState()
+    expect(resize).toBeNull()
+    expect(document.elements[0]).toMatchObject({ width: 150, height: 200 })
+    expect(document.elements[1]).toBe(b)
+    expect(selectedIds).toHaveLength(1)
+  })
+
+  test('dragging a side resizes instead of moving the element', () => {
+    const { editor } = selectA()
+    drag(editor, [107, 50], [57, 80])
+    expect(editor.store.getState().document.elements[0]).toMatchObject({
+      x: 0,
+      y: 0,
+      width: 50,
+      height: 100,
+    })
+  })
+
+  test('a handle wins over an element lying under it', () => {
+    const a = {
+      ...createShape('rectangle', { x: 0, y: 0, width: 100, height: 100 }),
+      backgroundColor: FILL,
+    }
+    // Drawn on top and covering a's se handle.
+    const c = {
+      ...createShape('rectangle', { x: 104, y: 104, width: 50, height: 50 }),
+      backgroundColor: FILL,
+    }
+    const editor = createEditor({ ...createDocument(), elements: [a, c] })
+    click(editor, [50, 50])
+    drag(editor, [107, 107], [157, 157])
+    const { document, selectedIds } = editor.store.getState()
+    expect(selectedIds).toEqual([a.id])
+    expect(document.elements[0]).toMatchObject({ width: 150, height: 150 })
+    expect(document.elements[1]).toBe(c)
+  })
+
+  test('resizes a multi-selection as one group', () => {
+    const { editor } = selectA()
+    click(editor, [250, 50], true)
+    // The group box is (0, 0, 300, 100); its outline's right side is at 307.
+    drag(editor, [307, 50], [607, 50])
+    expect(
+      editor.store
+        .getState()
+        .document.elements.map(({ x, width }) => [x, width]),
+    ).toEqual([
+      [0, 200],
+      [400, 200],
+    ])
+  })
+
+  test('a press on a handle without a drag changes nothing', () => {
+    const { editor, a } = selectA()
+    click(editor, [107, 107])
+    const { document, resize, selectedIds } = editor.store.getState()
+    expect(resize).toBeNull()
+    expect(document.elements[0]).toBe(a)
+    expect(selectedIds).toEqual([a.id])
+  })
+
+  test('Shift keeps proportions and applies mid-drag without a move', () => {
+    const { editor } = selectA()
+    editor.pointerDown(1, [107, 107], primary)
+    editor.pointerMove(1, [157, 117], false)
+    expect(editor.store.getState().resize).toMatchObject({ sx: 1.5, sy: 1.1 })
+    editor.setShift(true)
+    expect(editor.store.getState().resize).toMatchObject({ sx: 1.5, sy: 1.5 })
+    editor.setShift(false)
+    expect(editor.store.getState().resize).toMatchObject({ sx: 1.5, sy: 1.1 })
+  })
+
+  test('Escape mid-resize puts everything back', () => {
+    const { editor, a } = selectA()
+    editor.pointerDown(1, [107, 107], primary)
+    editor.pointerMove(1, [200, 200], false)
+    editor.cancel()
+    editor.pointerUp(1)
+    const { document, resize, selectedIds } = editor.store.getState()
+    expect(resize).toBeNull()
+    expect(document.elements[0]).toBe(a)
+    expect(selectedIds).toEqual([a.id])
+  })
+
+  test('Delete mid-resize deletes the selection and drops the preview', () => {
+    const { editor, b } = selectA()
+    editor.pointerDown(1, [107, 107], primary)
+    editor.pointerMove(1, [200, 200], false)
+    editor.deleteSelected()
+    editor.pointerUp(1)
+    expect(editor.store.getState()).toMatchObject({
+      resize: null,
+      document: { elements: [b] },
+    })
+  })
+
+  test('hovering a handle of the selection reports it', () => {
+    const { editor } = selectA()
+    editor.pointerMove(1, [107, 107], false)
+    expect(editor.store.getState().hoverHandle).toBe('se')
+    editor.pointerMove(1, [50, 107], false)
+    expect(editor.store.getState().hoverHandle).toBe('s')
+    editor.pointerMove(1, [500, 500], false)
+    expect(editor.store.getState().hoverHandle).toBeNull()
+  })
+
+  test('without a selection there are no handles to hover', () => {
+    const { editor } = setupSelection()
+    editor.pointerMove(1, [107, 107], false)
+    expect(editor.store.getState().hoverHandle).toBeNull()
+  })
+
+  test('a click on a handle selects the element lying under it', () => {
+    const a = {
+      ...createShape('rectangle', { x: 0, y: 0, width: 100, height: 100 }),
+      backgroundColor: FILL,
+    }
+    const c = {
+      ...createShape('rectangle', { x: 104, y: 104, width: 50, height: 50 }),
+      backgroundColor: FILL,
+    }
+    const editor = createEditor({ ...createDocument(), elements: [a, c] })
+    click(editor, [50, 50])
+    click(editor, [107, 107])
+    expect(editor.store.getState().selectedIds).toEqual([c.id])
+  })
+
+  test('Shift+click on a group edge in a side zone toggles that element off', () => {
+    const { editor, a } = selectA()
+    click(editor, [250, 50], true)
+    // 4 from b's right edge: b is hit, and the outline's 'e' side (307) is near.
+    click(editor, [304, 50], true)
+    expect(editor.store.getState().selectedIds).toEqual([a.id])
+  })
+
+  test('a flat line moves when pressed beside it, as it has no height to resize', () => {
+    const line = createLinear('line', lineFromDrag([0, 0], [100, 0], false))
+    const editor = createEditor({ ...createDocument(), elements: [line] })
+    click(editor, [50, 0])
+    // Within hit tolerance of the line and on the outline's top side.
+    editor.pointerMove(1, [50, -5], false)
+    expect(editor.store.getState().hoverHandle).toBeNull()
+    drag(editor, [50, -5], [50, 15])
+    expect(editor.store.getState().document.elements[0]).toMatchObject({
+      x: 0,
+      y: 20,
+    })
+  })
+
+  test('the cursor handle follows a flip, and is re-read from the pointer after', () => {
+    const { editor } = selectA()
+    editor.pointerDown(1, [107, 107], primary)
+    editor.pointerMove(1, [-100, 207], false)
+    // Dragged past the west side: the pointer now pulls the sw corner.
+    expect(editor.store.getState().resize?.handle).toBe('sw')
+    editor.pointerUp(1)
+    // The new box is (-107, 0, 107, 200): the pointer is on its bottom side.
+    expect(editor.store.getState().hoverHandle).toBe('s')
+  })
+
+  test('panning or zooming re-reads the handle under the pointer', () => {
+    const { editor } = selectA()
+    editor.pointerMove(1, [107, 107], false)
+    expect(editor.store.getState().hoverHandle).toBe('se')
+    editor.panBy(100, 100)
+    expect(editor.store.getState().hoverHandle).toBeNull()
+    editor.panBy(-100, -100)
+    expect(editor.store.getState().hoverHandle).toBe('se')
+    editor.zoomAt([0, 0], 2)
+    expect(editor.store.getState().hoverHandle).toBeNull()
+  })
+
+  test('a pan drag re-reads the handle where the pointer ends up', () => {
+    const { editor } = selectA()
+    editor.setSpaceHeld(true)
+    // Grabbed on the se handle: the content moves with the pointer, so the
+    // pointer is still on it, now at (207, 207) on screen.
+    editor.pointerDown(1, [107, 107], primary)
+    editor.pointerMove(1, [207, 207], false)
+    editor.pointerUp(1)
+    expect(editor.store.getState().hoverHandle).toBe('se')
+  })
+
+  test('a selection change forgets the hovered handle', () => {
+    const { editor } = selectA()
+    editor.pointerMove(1, [107, 107], false)
+    editor.cancel()
+    expect(editor.store.getState().hoverHandle).toBeNull()
   })
 })
 

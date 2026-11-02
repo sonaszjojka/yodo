@@ -27,7 +27,7 @@ Format ([conventionalcommits.org](https://www.conventionalcommits.org/)):
   3. Implement in small steps, tests first where practical (ADR 0011).
   4. Verify against the definition of done below.
   5. Claude commits on the branch (the plan approval covers it; `/feature` and `/fix` do this) and ends with the reviewer command for the branch.
-  6. The owner runs `/code-review low <branch>` in a fresh context (`medium` only for risky changes: storage, auth, document format). One round per branch, with no re-review after the fixes: fix correctness bugs there; a cleanup becomes a follow-up issue labelled `review` only if the owner wants it (created with the owner's OK), otherwise it is dropped. Severity-based triage keeps the review loop finite.
+  6. The owner runs `/code-review medium <branch>` in a fresh context (`medium` is the minimum level). One round per branch, with no re-review after the fixes: fix correctness bugs there; a cleanup becomes a follow-up issue labelled `review` only if the owner wants it (created with the owner's OK), otherwise it is dropped. Severity-based triage keeps the review loop finite.
   7. Back in the authoring session, `/retest` re-runs the checks and re-verifies each review fix in the browser; then `/ship`: sync the docs the branch made stale (roadmap tick, plan status, others with the owner's OK) as a commit in the same PR, then push and open a PR (title = the future squash commit, in Conventional Commit format) on the owner's command; the owner reviews the PR, and every PR comment thread is fixed or answered and resolved before merge.
   8. Squash-merge on the owner's command; delete the branch; `/clear`.
 - Worktrees only for genuinely parallel sessions (e.g. web and server at once), each on its own branch.

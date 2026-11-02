@@ -43,6 +43,6 @@ Give the recap: what was done, why that way, what's worth learning. End with the
 
 **👉 Reviewer command: run in a clean session (`/clear` or a new terminal), fix bugs only, one round, then come back**
 ```
-/code-review low <branch>
+/code-review medium <branch>
 ```
-Review rules to repeat in one line under the block: one round per branch, with no re-review after the fixes; fix correctness bugs; a cleanup becomes a `review` issue only if the user wants it, otherwise drop it. Suggest `medium` only for risky changes (storage, auth, document format). When the user comes back after the review, suggest `/retest`, then `/ship` — do not push on your own.
+Review rules to repeat in one line under the block: one round per branch, with no re-review after the fixes; fix correctness bugs; a cleanup becomes a `review` issue only if the user wants it, otherwise drop it. Never suggest a level below `medium`. When the user comes back after the review, suggest `/retest`, then `/ship` — do not push on your own.

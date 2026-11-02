@@ -6,7 +6,19 @@ import {
 } from '../document/create.ts'
 import type { Point, YodoDocument, YodoElement } from '../document/types.ts'
 import { lineFromDrag } from '../geometry/line.ts'
+import {
+  handleAt,
+  selectionFrame,
+  type SelectionFrame,
+} from '../geometry/frame.ts'
 import { rectFromDrag, type Bounds } from '../geometry/rect.ts'
+import {
+  canResize,
+  flippedHandle,
+  resizeTransform,
+  type Handle,
+  type ResizeTransform,
+} from '../geometry/resize.ts'
 import {
   clampZoom,
   panBy,
@@ -19,6 +31,8 @@ import {
   deleteElements,
   idsInBox,
   moveElements,
+  resizeElements,
+  selectedOf,
   topmostHit,
 } from './selection.ts'
 
@@ -47,6 +61,13 @@ export interface EditorState {
    * shifted by this (see `scene.ts`).
    */
   move: { dx: number; dy: number } | null
+  /**
+   * The scale of a resize drag in progress, and the handle dragged (for the
+   * cursor). Previewed like `move`; the document changes when the drag ends.
+   */
+  resize: (ResizeTransform & { handle: Handle }) | null
+  /** The selection handle under the pointer, for the cursor. */
+  hoverHandle: Handle | null
   /** The box of a box-select drag in progress, in world coordinates. */
   marquee: Bounds | null
 }
@@ -160,6 +181,8 @@ export function createEditor(document: YodoDocument): Editor {
     panning: false,
     selectedIds: [],
     move: null,
+    resize: null,
+    hoverHandle: null,
     marquee: null,
   })
 
@@ -245,9 +268,24 @@ export function createEditor(document: YodoDocument): Editor {
     },
   }
 
-  // The select tool's gesture, decided at pointer down: a move of the
-  // selection (pressed on an element) or a box select (pressed on empty space).
+  // The select tool's gesture, decided at pointer down: a resize (pressed on a
+  // handle of the selection), a move of the selection (pressed on an element)
+  // or a box select (pressed on empty space).
   type SelectGesture =
+    | {
+        kind: 'resize'
+        pointerId: number
+        handle: Handle
+        /** The selection's geometry when the drag started. */
+        box: Bounds
+        /** The element under the press, which a click (no drag) selects. */
+        hitId: string | null
+        start: Point
+        /** The latest pointer position, so Shift can re-apply without a move. */
+        last: Point
+        shift: boolean
+        moved: boolean
+      }
     | {
         kind: 'move'
         pointerId: number
@@ -275,8 +313,77 @@ export function createEditor(document: YodoDocument): Editor {
       // Clearing an empty selection is not a change; skip the redraw.
       prev.selectedIds.length === 0 && selectedIds.length === 0
         ? prev
-        : { ...prev, selectedIds },
+        : // The handles moved with the selection; the next move finds them.
+          { ...prev, selectedIds, hoverHandle: null },
     )
+  }
+
+  // The frame only changes with the document, selection or zoom; caching it
+  // keeps idle pointer moves (60-120 a second) from re-scanning every element.
+  let frameCache: {
+    document: YodoDocument
+    selectedIds: string[]
+    zoom: number
+    frame: SelectionFrame | null
+  } | null = null
+
+  /** The current selection's frame (no drag preview applied), or null. */
+  function currentFrame() {
+    const { document, selectedIds, viewport } = store.getState()
+    const { zoom } = viewport
+    const c = frameCache
+    if (
+      c?.document === document &&
+      c.selectedIds === selectedIds &&
+      c.zoom === zoom
+    ) {
+      return c.frame
+    }
+    const frame =
+      selectedIds.length === 0
+        ? null
+        : selectionFrame(
+            selectedOf(document.elements, new Set(selectedIds)),
+            1 / zoom,
+          )
+    frameCache = { document, selectedIds, zoom, frame }
+    return frame
+  }
+
+  /**
+   * The handle of the selection at `point`, with the frame it belongs to. A
+   * handle that only pulls an axis with no size (the top side of a flat line)
+   * would resize nothing, so it is left out and the press can move instead.
+   */
+  function handleUnder(point: Point) {
+    const frame = currentFrame()
+    if (!frame) return null
+    const px = 1 / store.getState().viewport.zoom
+    const handle = handleAt(frame.outline, point, px)
+    return handle && canResize(frame.box, handle)
+      ? { handle, box: frame.box }
+      : null
+  }
+
+  function updateResize(g: Extract<SelectGesture, { kind: 'resize' }>) {
+    const t = resizeTransform(g.box, g.handle, g.start, g.last, g.shift)
+    store.setState((prev) => ({
+      ...prev,
+      // The cursor follows the handle the pointer pulls after a flip.
+      resize: { ...t, handle: flippedHandle(g.handle, t) },
+    }))
+  }
+
+  /**
+   * A click (a press with no drag) on `hitId`: Shift toggles it in or out of
+   * the selection, a plain click selects only it.
+   */
+  function clickSelect(hitId: string, shift: boolean) {
+    const { selectedIds } = store.getState()
+    if (!shift) setSelection([hitId])
+    else if (selectedIds.includes(hitId))
+      setSelection(selectedIds.filter((id) => id !== hitId))
+    else setSelection([...selectedIds, hitId])
   }
 
   const selectTool: PointerTool = {
@@ -289,6 +396,22 @@ export function createEditor(document: YodoDocument): Editor {
         HIT_TOLERANCE / viewport.zoom,
         new Set(selectedIds),
       )
+      // Handles come first: they may lie over another element. Only a drag
+      // resizes; a click there still selects the element under it.
+      const grabbed = handleUnder(point)
+      if (grabbed) {
+        gesture = {
+          kind: 'resize',
+          pointerId,
+          ...grabbed,
+          hitId,
+          start: point,
+          last: point,
+          shift,
+          moved: false,
+        }
+        return
+      }
       if (hitId) {
         const wasSelected = selectedIds.includes(hitId)
         // A press on a selected element keeps the selection, so all of it can
@@ -316,15 +439,18 @@ export function createEditor(document: YodoDocument): Editor {
         }
       }
     },
-    pointerMove(pointerId, point) {
+    pointerMove(pointerId, point, shift) {
       if (gesture?.pointerId !== pointerId) return
       const { start } = gesture
       const [dx, dy] = [point[0] - start[0], point[1] - start[1]]
-      // Both gestures wait for the threshold, so a jittery click stays a click.
+      // Every gesture waits for the threshold, so a jittery click stays a click.
       const { zoom } = store.getState().viewport
       if (!gesture.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD / zoom) return
       gesture = { ...gesture, moved: true }
-      if (gesture.kind === 'move') {
+      if (gesture.kind === 'resize') {
+        gesture = { ...gesture, last: point, shift }
+        updateResize(gesture)
+      } else if (gesture.kind === 'move') {
         store.setState((prev) => ({ ...prev, move: { dx, dy } }))
       } else {
         const marquee = rectFromDrag(start, point, false)
@@ -336,13 +462,34 @@ export function createEditor(document: YodoDocument): Editor {
         })
       }
     },
-    // Shift changes nothing mid-drag yet (no axis lock).
-    setShift() {},
+    // Shift keeps proportions while resizing; a move has no axis lock yet.
+    setShift(shift) {
+      if (gesture?.kind !== 'resize' || gesture.shift === shift) return
+      gesture = { ...gesture, shift }
+      if (gesture.moved) updateResize(gesture)
+    },
     pointerUp(pointerId) {
       if (gesture?.pointerId !== pointerId) return
       const ended = gesture
       gesture = null
-      if (ended.kind === 'marquee') {
+      if (ended.kind === 'resize' && !ended.moved) {
+        if (ended.hitId) clickSelect(ended.hitId, ended.shift)
+      } else if (ended.kind === 'resize') {
+        // The whole drag becomes one document change.
+        store.setState((prev) => {
+          if (!prev.resize) return prev
+          const elements = resizeElements(
+            prev.document.elements,
+            new Set(prev.selectedIds),
+            prev.resize,
+          )
+          return {
+            ...prev,
+            resize: null,
+            document: { ...prev.document, elements },
+          }
+        })
+      } else if (ended.kind === 'marquee') {
         store.setState((prev) => ({ ...prev, marquee: null }))
       } else if (ended.moved) {
         // The whole drag becomes one document change.
@@ -363,13 +510,9 @@ export function createEditor(document: YodoDocument): Editor {
         })
       } else if (ended.wasSelected) {
         // A click on a selected element: Shift removes it, a plain click
-        // narrows the selection down to it.
-        const { selectedIds } = store.getState()
-        setSelection(
-          ended.shift
-            ? selectedIds.filter((id) => id !== ended.hitId)
-            : [ended.hitId],
-        )
+        // narrows the selection down to it. (An unselected one was selected
+        // at pointer down, so it could be dragged.)
+        clickSelect(ended.hitId, ended.shift)
       }
     },
     pointerCancel(pointerId) {
@@ -379,11 +522,11 @@ export function createEditor(document: YodoDocument): Editor {
       if (!gesture) return
       const ended = gesture
       gesture = null
-      store.setState((prev) =>
-        ended.kind === 'move'
-          ? { ...prev, move: null }
-          : { ...prev, marquee: null, selectedIds: ended.base },
-      )
+      store.setState((prev) => {
+        if (ended.kind === 'resize') return { ...prev, resize: null }
+        if (ended.kind === 'move') return { ...prev, move: null }
+        return { ...prev, marquee: null, selectedIds: ended.base }
+      })
     },
   }
 
@@ -393,8 +536,33 @@ export function createEditor(document: YodoDocument): Editor {
   // The pan drag, kept outside the store like the draw drag.
   let pan: { pointerId: number; last: Point } | null = null
 
+  /** The pointer's last screen position, to re-read the handle under it. */
+  let pointerAt: Point | null = null
+
+  function toWorld(screen: Point) {
+    return screenToWorld(store.getState().viewport, screen)
+  }
+
+  /**
+   * Sets `hoverHandle` (the cursor) to the selection handle under the pointer.
+   * Runs on every idle pointer move and after anything that moves the handles
+   * while the pointer stays put: a drag ending, a pan or a zoom.
+   */
+  function refreshHover() {
+    if (pan || drag || gesture) return
+    const { tool } = store.getState()
+    const hover =
+      tool === 'select' && pointerAt
+        ? (handleUnder(toWorld(pointerAt))?.handle ?? null)
+        : null
+    store.setState((prev) =>
+      prev.hoverHandle === hover ? prev : { ...prev, hoverHandle: hover },
+    )
+  }
+
   function setViewport(update: (viewport: Viewport) => Viewport) {
     store.setState((prev) => ({ ...prev, viewport: update(prev.viewport) }))
+    refreshHover()
   }
 
   function endPan() {
@@ -404,10 +572,6 @@ export function createEditor(document: YodoDocument): Editor {
     )
   }
 
-  function toWorld(screen: Point) {
-    return screenToWorld(store.getState().viewport, screen)
-  }
-
   return {
     store,
     drawTool,
@@ -415,6 +579,7 @@ export function createEditor(document: YodoDocument): Editor {
     pointerDown(pointerId, screen, { button, shift }) {
       // One gesture at a time: ignore new pointers while one is active.
       if (pan || drag || gesture) return
+      pointerAt = screen
       const { tool, spaceHeld } = store.getState()
       const pans =
         button === MIDDLE_BUTTON ||
@@ -429,12 +594,21 @@ export function createEditor(document: YodoDocument): Editor {
       }
     },
     pointerMove(pointerId, screen, shift) {
+      if (!pan && !drag && !gesture) {
+        // No drag: track the handle under the pointer for the cursor.
+        pointerAt = screen
+        refreshHover()
+        return
+      }
       if (pan) {
         if (pan.pointerId !== pointerId) return
+        pointerAt = screen
         const [dx, dy] = [screen[0] - pan.last[0], screen[1] - pan.last[1]]
         pan = { pointerId, last: screen }
         setViewport((v) => panBy(v, dx, dy))
       } else {
+        if (owns(pointerId) || gesture?.pointerId === pointerId)
+          pointerAt = screen
         const point = toWorld(screen)
         for (const t of tools) t.pointerMove(pointerId, point, shift)
       }
@@ -445,6 +619,7 @@ export function createEditor(document: YodoDocument): Editor {
       } else {
         for (const t of tools) t.pointerUp(pointerId)
       }
+      refreshHover()
     },
     pointerCancel(pointerId) {
       if (pan) {
@@ -452,8 +627,12 @@ export function createEditor(document: YodoDocument): Editor {
       } else {
         for (const t of tools) t.pointerCancel(pointerId)
       }
+      refreshHover()
     },
-    setShift: (shift) => drawTool.setShift(shift),
+    setShift(shift) {
+      drawTool.setShift(shift)
+      selectTool.setShift(shift)
+    },
     cancel() {
       if (!pan && !drag && !gesture) {
         setSelection([])
@@ -462,16 +641,18 @@ export function createEditor(document: YodoDocument): Editor {
       if (pan) endPan()
       drawTool.cancel()
       selectTool.cancel()
+      refreshHover()
     },
     deleteSelected() {
       // End a select drag without cancel(): cancel restores the selection from
       // before a box drag, but Delete removes what is highlighted now.
       gesture = null
       store.setState((prev) => {
-        // Drop a move preview or box; a no-op Delete with neither is no change.
+        // Drop a move or resize preview or a box; a no-op Delete with none is
+        // no change.
         const ended =
-          prev.move || prev.marquee
-            ? { ...prev, move: null, marquee: null }
+          prev.move || prev.resize || prev.marquee
+            ? { ...prev, move: null, resize: null, marquee: null }
             : prev
         if (ended.selectedIds.length === 0) return ended
         const elements = deleteElements(
@@ -481,6 +662,7 @@ export function createEditor(document: YodoDocument): Editor {
         return {
           ...ended,
           selectedIds: [],
+          hoverHandle: null,
           document: { ...ended.document, elements },
         }
       })
@@ -488,7 +670,12 @@ export function createEditor(document: YodoDocument): Editor {
     setTool(tool) {
       if (store.getState().tool === tool) return
       selectTool.cancel()
-      store.setState((prev) => ({ ...prev, tool, selectedIds: [] }))
+      store.setState((prev) => ({
+        ...prev,
+        tool,
+        selectedIds: [],
+        hoverHandle: null,
+      }))
     },
     setSpaceHeld(spaceHeld) {
       store.setState((prev) =>
