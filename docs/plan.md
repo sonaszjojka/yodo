@@ -9,9 +9,9 @@ Rule: every stage ends with a **file of decisions**, not just a conversation. Co
 
 ## Status (2026-11-02)
 Read this section, not the whole file; finished work is in History at the end.
-- **Last done:** roadmap 1.4 (issue #13): diamond, ellipse, line and arrow tools, plus core hit-testing for every element type.
+- **Last done:** roadmap 1.5 (issue #14): select tool with click, Shift+click and box select; move and Delete; selection outline and handles.
 - Open items: **undo/redo design** (ADR at roadmap task 1.7).
-- **Next step:** roadmap 1.5 (selection, issue #14).
+- **Next step:** roadmap 1.6 (resize, issue #15).
 
 ## Working mode: an educational project
 The goal is both the app and learning how to program with Claude as effectively as possible, so that the knowledge stays with you.
@@ -147,3 +147,4 @@ One dated line per finished stage or task, oldest first. `/ship` appends here.
 - Done (2026-11-01): roadmap 1.2: full-window HiDPI canvas; rough.js rectangle with a seed fixed at pointer-down; Shift squares, live mid-drag; Escape cancels; editor state in a framework-free store (ADR 0021). Review: only the pointer that starts a drag drives it.
 - Done (2026-11-01): roadmap 1.3: pan (hand tool H, Space, middle-drag, wheel) and pinch / Ctrl+wheel zoom around the cursor; zoom control with reset (click, Ctrl/Cmd+0); viewport in editor state (ADR 0022). Review: wheel zoom capped at 1.25× per event, stored zoom clamped on load, zoom gestures caught on `window` so pinching over the UI never zooms the page.
 - Done (2026-11-02): roadmap 1.4: diamond (D), ellipse (O), line (L) and arrow (A) through one draw tool; Shift squares box shapes and snaps lines to 15°; lines keep their start as (x, y) with relative points; core hitTest for every element type (transparent shapes hit only near the outline). Review: lines and arrows with fewer than two points render without throwing.
+- Done (2026-11-02): roadmap 1.5: select tool (V/1, the default) with topmost click, Shift+click toggle and box select of fully enclosed elements; a move is a preview offset committed on release (one document change); Delete/Backspace; drawing selects the new shape and switches to Select; overlay outline clears the stroke's rough wobble and keeps its screen size at any zoom. Review: stroke hits beat a selected shape's empty box, a tool picked mid-draw is kept, Delete mid-box removes what is highlighted, box select waits for the drag threshold.

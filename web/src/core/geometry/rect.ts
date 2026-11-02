@@ -1,4 +1,4 @@
-import type { Point } from '../document/types.ts'
+import type { Point, YodoElement } from '../document/types.ts'
 
 export interface Bounds {
   x: number
@@ -41,4 +41,47 @@ export function diamondPoints({ x, y, width, height }: Bounds): Point[] {
     [x + width / 2, y + height],
     [x, y + height / 2],
   ]
+}
+
+/**
+ * The world-space box an element covers. Lines, arrows and pencil strokes
+ * measure their points, since those can lie left of or above (x, y); for them
+ * `width`/`height` give only the size, not the position.
+ */
+export function elementBounds(element: YodoElement): Bounds {
+  if (!('points' in element) || element.points.length === 0) {
+    const { x, y } = element
+    return 'points' in element
+      ? { x, y, width: 0, height: 0 }
+      : { x, y, width: element.width, height: element.height }
+  }
+  const xs = element.points.map(([dx]) => element.x + dx)
+  const ys = element.points.map(([, dy]) => element.y + dy)
+  const [minX, minY] = [Math.min(...xs), Math.min(...ys)]
+  return {
+    x: minX,
+    y: minY,
+    width: Math.max(...xs) - minX,
+    height: Math.max(...ys) - minY,
+  }
+}
+
+/** The smallest box covering all `boxes`, or null when there are none. */
+export function unionBounds(boxes: readonly Bounds[]): Bounds | null {
+  if (boxes.length === 0) return null
+  const minX = Math.min(...boxes.map((b) => b.x))
+  const minY = Math.min(...boxes.map((b) => b.y))
+  const maxX = Math.max(...boxes.map((b) => b.x + b.width))
+  const maxY = Math.max(...boxes.map((b) => b.y + b.height))
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY }
+}
+
+/** Whether `inner` lies entirely within `outer`; touching edges counts. */
+export function containsBounds(outer: Bounds, inner: Bounds): boolean {
+  return (
+    inner.x >= outer.x &&
+    inner.y >= outer.y &&
+    inner.x + inner.width <= outer.x + outer.width &&
+    inner.y + inner.height <= outer.y + outer.height
+  )
 }
