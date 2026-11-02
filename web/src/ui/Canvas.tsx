@@ -30,6 +30,7 @@ const TOOL_KEYS: Partial<Record<string, Tool>> = {
   o: 'ellipse',
   l: 'line',
   a: 'arrow',
+  p: 'pencil',
 }
 
 /** Opposite handles resize along the same line, so they share a cursor. */

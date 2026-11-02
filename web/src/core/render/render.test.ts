@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from 'vitest'
-import { createLinear, createShape } from '../document/create.ts'
+import { createLinear, createPencil, createShape } from '../document/create.ts'
+import { appendPoint, startStroke } from '../geometry/freehand.ts'
 import { arrowhead, lineFromDrag } from '../geometry/line.ts'
 import {
   canvasSize,
@@ -45,6 +46,12 @@ function fakeContext() {
     // Every badge text measures 40 px wide.
     measureText: vi.fn(() => ({ width: 40 }) as TextMetrics),
     fillText: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
+    quadraticCurveTo: vi.fn(),
+    lineCap: 'butt' as CanvasLineCap,
+    lineJoin: 'miter' as CanvasLineJoin,
+    setLineDash: vi.fn(),
   } satisfies SceneContext
 }
 
@@ -269,6 +276,90 @@ describe('renderScene', () => {
       expect(rough.rectangle).toHaveBeenCalledTimes(1)
     },
   )
+})
+
+describe('pencil strokes (ADR 0024)', () => {
+  /** A stroke from (10, 20) through (20, 20) and (20, 30) to (30, 30). */
+  function stroke() {
+    let geometry = startStroke([10, 20])
+    for (const point of [
+      [20, 20],
+      [20, 30],
+      [30, 30],
+    ] as const) {
+      geometry = appendPoint(geometry, [...point], 1)
+    }
+    return { ...createPencil(geometry, 8), strokeColor: '#3F8F5A' }
+  }
+
+  test('draws a smoothed canvas path through the absolute points, without rough.js', () => {
+    const ctx = fakeContext()
+    const rough = fakeRough()
+    const calls: string[] = []
+    ctx.moveTo.mockImplementation((x, y) => calls.push(`M ${x} ${y}`))
+    ctx.lineTo.mockImplementation((x, y) => calls.push(`L ${x} ${y}`))
+    ctx.quadraticCurveTo.mockImplementation((cx, cy, x, y) =>
+      calls.push(`Q ${cx} ${cy} ${x} ${y}`),
+    )
+    let style = {}
+    ctx.stroke.mockImplementation(() => {
+      style = {
+        strokeStyle: ctx.strokeStyle,
+        lineWidth: ctx.lineWidth,
+        lineCap: ctx.lineCap,
+        lineJoin: ctx.lineJoin,
+      }
+    })
+
+    renderScene(ctx, rough, [stroke()], SURFACE, IDENTITY)
+
+    expect(calls).toEqual([
+      'M 10 20',
+      'Q 20 20 20 25',
+      'Q 20 30 25 30',
+      'L 30 30',
+    ])
+    expect(ctx.stroke).toHaveBeenCalledTimes(1)
+    expect(style).toEqual({
+      strokeStyle: '#3F8F5A',
+      lineWidth: 2,
+      lineCap: 'round',
+      lineJoin: 'round',
+    })
+    expect(ctx.setLineDash).toHaveBeenCalledWith([])
+    expect(rough.linearPath).not.toHaveBeenCalled()
+  })
+
+  test('applies the stroke style as a dash', () => {
+    const ctx = fakeContext()
+
+    renderScene(
+      ctx,
+      fakeRough(),
+      [{ ...stroke(), strokeStyle: 'dashed' }],
+      SURFACE,
+      IDENTITY,
+    )
+
+    expect(ctx.setLineDash).toHaveBeenCalledWith([8, 8])
+  })
+
+  test('a stroke with no points draws nothing and does not throw', () => {
+    const ctx = fakeContext()
+    const next = createShape('rectangle', { x: 0, y: 0, width: 10, height: 10 })
+    const rough = fakeRough()
+
+    renderScene(
+      ctx,
+      rough,
+      [{ ...stroke(), points: [] }, next],
+      SURFACE,
+      IDENTITY,
+    )
+
+    expect(ctx.moveTo).not.toHaveBeenCalled()
+    expect(rough.rectangle).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('selection overlay', () => {

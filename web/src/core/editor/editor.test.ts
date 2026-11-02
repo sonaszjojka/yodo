@@ -494,18 +494,22 @@ test('Shift through the router squares the rectangle', () => {
   })
 })
 
-test.each(['rectangle', 'diamond', 'ellipse', 'line', 'arrow'] as const)(
-  'the router draws with the %s tool',
-  (tool) => {
-    const editor = setupWith(tool)
+test.each([
+  'rectangle',
+  'diamond',
+  'ellipse',
+  'line',
+  'arrow',
+  'pencil',
+] as const)('the router draws with the %s tool', (tool) => {
+  const editor = setupWith(tool)
 
-    drag(editor, [0, 0], [30, 40])
+  drag(editor, [0, 0], [30, 40])
 
-    expect(editor.store.getState().document.elements).toEqual([
-      expect.objectContaining({ type: tool }),
-    ])
-  },
-)
+  expect(editor.store.getState().document.elements).toEqual([
+    expect.objectContaining({ type: tool }),
+  ])
+})
 
 // Selection: the select tool through the router (zoom 1, so screen = world).
 
@@ -1130,5 +1134,131 @@ describe('undo and redo', () => {
     const { document, draft } = editor.store.getState()
     expect(draft).toBeNull()
     expect(document.elements).toEqual([])
+  })
+})
+
+describe('pencil tool', () => {
+  test('a drag commits one stroke through every sample', () => {
+    const { store, drawTool } = setupWith('pencil')
+
+    drawTool.pointerDown(1, [10, 20], false)
+    drawTool.pointerMove(1, [20, 25], false)
+    drawTool.pointerMove(1, [30, 10], false)
+    drawTool.pointerUp(1)
+
+    const { document, draft } = store.getState()
+    expect(draft).toBeNull()
+    expect(document.elements).toEqual([
+      expect.objectContaining({
+        type: 'pencil',
+        x: 10,
+        y: 20,
+        width: 20,
+        height: 15,
+        points: [
+          [0, 0],
+          [10, 5],
+          [20, -10],
+        ],
+      }),
+    ])
+  })
+
+  test('the stroke shows as a draft while it is drawn', () => {
+    const { store, drawTool } = setupWith('pencil')
+
+    drawTool.pointerDown(1, [0, 0], false)
+    drawTool.pointerMove(1, [10, 0], false)
+
+    expect(store.getState().draft).toMatchObject({
+      type: 'pencil',
+      points: [
+        [0, 0],
+        [10, 0],
+      ],
+    })
+    expect(store.getState().document.elements).toEqual([])
+  })
+
+  test('samples closer than one screen pixel are dropped', () => {
+    const editor = setupWith('pencil')
+    editor.setZoom(2, [0, 0])
+
+    editor.pointerDown(1, [0, 0], primary)
+    editor.pointerMove(1, [4, 0], false)
+    // 1.5 screen px on is only 0.75 world units at zoom 2: kept.
+    editor.pointerMove(1, [5.5, 0], false)
+    // 0.5 screen px on: dropped.
+    editor.pointerMove(1, [6, 0], false)
+    editor.pointerUp(1)
+
+    expect(editor.store.getState().document.elements[0]).toMatchObject({
+      points: [
+        [0, 0],
+        [2, 0],
+        [2.75, 0],
+      ],
+    })
+  })
+
+  test('Shift changes nothing', () => {
+    const { store, drawTool } = setupWith('pencil')
+
+    drawTool.pointerDown(1, [0, 0], true)
+    drawTool.pointerMove(1, [10, 30], true)
+    const before = store.getState()
+    drawTool.setShift(false)
+
+    expect(store.getState()).toBe(before)
+  })
+
+  test('a click without a drag adds nothing', () => {
+    const { store, drawTool } = setupWith('pencil')
+
+    drawTool.pointerDown(1, [5, 5], false)
+    drawTool.pointerUp(1)
+
+    expect(store.getState().document.elements).toEqual([])
+  })
+
+  test('the pencil stays active with nothing selected, ready for the next stroke', () => {
+    const { store, drawTool } = setupWith('pencil')
+
+    drawTool.pointerDown(1, [0, 0], false)
+    drawTool.pointerMove(1, [10, 10], false)
+    drawTool.pointerUp(1)
+
+    expect(store.getState()).toMatchObject({ tool: 'pencil', selectedIds: [] })
+  })
+
+  test('a stroke is one undo step', () => {
+    const editor = setupWith('pencil')
+
+    drag(editor, [0, 0], [10, 10])
+    editor.pointerDown(1, [20, 20], primary)
+    editor.pointerMove(1, [30, 20], false)
+    editor.pointerMove(1, [40, 30], false)
+    editor.pointerUp(1)
+    editor.undo()
+
+    expect(editor.store.getState().document.elements).toHaveLength(1)
+  })
+
+  test('a stroke is selected by clicking it and moves as one element', () => {
+    const editor = setupWith('pencil')
+    editor.pointerDown(1, [0, 0], primary)
+    editor.pointerMove(1, [50, 0], false)
+    editor.pointerMove(1, [50, 50], false)
+    editor.pointerUp(1)
+    const [stroke] = editor.store.getState().document.elements
+    editor.setTool('select')
+
+    click(editor, [50, 25])
+    expect(editor.store.getState().selectedIds).toEqual([stroke!.id])
+
+    drag(editor, [50, 25], [60, 45])
+    expect(editor.store.getState().document.elements).toEqual([
+      { ...stroke, x: 10, y: 20 },
+    ])
   })
 })
