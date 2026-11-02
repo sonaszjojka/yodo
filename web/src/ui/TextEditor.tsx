@@ -7,7 +7,7 @@ import {
 import type { Editor, EditorState } from '../core/editor/editor.ts'
 import { editBox, type TextEdit } from '../core/editor/text.ts'
 import { worldToScreen } from '../core/geometry/viewport.ts'
-import { fontOf, LINE_HEIGHT } from '../core/text/layout.ts'
+import { FONT_STACKS, LINE_HEIGHT } from '../core/text/layout.ts'
 import { useStore } from './useStore.ts'
 
 /**
@@ -53,8 +53,9 @@ export function TextEditor({ editor }: { editor: Editor }) {
         top,
         width,
         height: box.height * zoom,
-        font: fontOf(box.fontFamily, box.fontSize * zoom),
-        lineHeight: LINE_HEIGHT,
+        // Line height inside the shorthand: React updates only the style
+        // keys that change, and setting `font` alone resets line-height.
+        font: `${box.fontSize * zoom}px/${LINE_HEIGHT} ${FONT_STACKS[box.fontFamily]}`,
         textAlign: box.textAlign,
         color: box.color,
       }}

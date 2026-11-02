@@ -38,6 +38,9 @@ test('scales the font and box with the zoom', () => {
 
   const html = renderToStaticMarkup(<TextEditor editor={editor} />)
 
-  expect(html).toContain('font:40px &quot;Caveat Variable&quot;, cursive')
+  // Line height inside the shorthand: a separate lineHeight would be reset
+  // by React updating only `font` on the next zoom.
+  expect(html).toContain('font:40px/1.25 &quot;Caveat Variable&quot;, cursive')
+  expect(html).not.toContain('line-height')
   expect(html).toContain('height:50px')
 })
