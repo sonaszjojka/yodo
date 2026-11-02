@@ -4,7 +4,7 @@ import type { RoughCanvas } from 'roughjs/bin/canvas'
 import type { Options } from 'roughjs/bin/core'
 import type { Point, StrokeStyle, YodoElement } from '../document/types.ts'
 import { arrowhead } from '../geometry/line.ts'
-import { GAP, grow, HANDLE_SIZE, selectionFrame } from '../editor/frame.ts'
+import { GAP, grow, HANDLE_SIZE, selectionFrame } from '../geometry/frame.ts'
 import { diamondPoints, type Bounds } from '../geometry/rect.ts'
 import { worldToScreen, type Viewport } from '../geometry/viewport.ts'
 

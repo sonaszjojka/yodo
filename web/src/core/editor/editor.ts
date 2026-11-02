@@ -6,6 +6,11 @@ import {
 } from '../document/create.ts'
 import type { Point, YodoDocument, YodoElement } from '../document/types.ts'
 import { lineFromDrag } from '../geometry/line.ts'
+import {
+  handleAt,
+  selectionFrame,
+  type SelectionFrame,
+} from '../geometry/frame.ts'
 import { rectFromDrag, type Bounds } from '../geometry/rect.ts'
 import {
   canResize,
@@ -22,12 +27,12 @@ import {
   type Viewport,
 } from '../geometry/viewport.ts'
 import { createStore, type Store } from '../store/store.ts'
-import { handleAt, selectionFrame } from './frame.ts'
 import {
   deleteElements,
   idsInBox,
   moveElements,
   resizeElements,
+  selectedOf,
   topmostHit,
 } from './selection.ts'
 
@@ -313,13 +318,36 @@ export function createEditor(document: YodoDocument): Editor {
     )
   }
 
+  // The frame only changes with the document, selection or zoom; caching it
+  // keeps idle pointer moves (60-120 a second) from re-scanning every element.
+  let frameCache: {
+    document: YodoDocument
+    selectedIds: string[]
+    zoom: number
+    frame: SelectionFrame | null
+  } | null = null
+
   /** The current selection's frame (no drag preview applied), or null. */
   function currentFrame() {
     const { document, selectedIds, viewport } = store.getState()
-    if (selectedIds.length === 0) return null
-    const ids = new Set(selectedIds)
-    const selected = document.elements.filter((element) => ids.has(element.id))
-    return selectionFrame(selected, 1 / viewport.zoom)
+    const { zoom } = viewport
+    const c = frameCache
+    if (
+      c?.document === document &&
+      c.selectedIds === selectedIds &&
+      c.zoom === zoom
+    ) {
+      return c.frame
+    }
+    const frame =
+      selectedIds.length === 0
+        ? null
+        : selectionFrame(
+            selectedOf(document.elements, new Set(selectedIds)),
+            1 / zoom,
+          )
+    frameCache = { document, selectedIds, zoom, frame }
+    return frame
   }
 
   /**

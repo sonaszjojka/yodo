@@ -2,8 +2,8 @@
 // handles are. The renderer draws it and the select tool hit-tests it, so
 // both read these sizes from one place.
 import type { Point, YodoElement } from '../document/types.ts'
-import { elementBounds, unionBounds, type Bounds } from '../geometry/rect.ts'
-import type { Handle } from '../geometry/resize.ts'
+import { elementBounds, unionBounds, type Bounds } from './rect.ts'
+import type { Handle } from './resize.ts'
 
 // Sizes from docs/ui.md "Selection", in screen px.
 /** Space between the drawn stroke and the selection outline. */

@@ -3,7 +3,7 @@
 import type { YodoElement } from '../document/types.ts'
 import type { Bounds } from '../geometry/rect.ts'
 import type { EditorState } from './editor.ts'
-import { moveElements, resizeElements } from './selection.ts'
+import { moveElements, resizeElements, selectedOf } from './selection.ts'
 
 export interface Scene {
   /** Elements in draw order, the move/resize preview and the draft included. */
@@ -22,7 +22,7 @@ export function sceneOf(state: EditorState): Scene {
   const elements = draft ? [...shown, draft] : [...shown]
   return {
     elements,
-    selected: elements.filter((element) => ids.has(element.id)),
+    selected: selectedOf(elements, ids),
     marquee,
   }
 }

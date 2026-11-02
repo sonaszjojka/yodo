@@ -81,6 +81,14 @@ export function resizeElements(
   )
 }
 
+/** The elements whose ids are in `ids`, in draw order. */
+export function selectedOf(
+  elements: readonly YodoElement[],
+  ids: ReadonlySet<string>,
+): YodoElement[] {
+  return elements.filter((element) => ids.has(element.id))
+}
+
 export function deleteElements(
   elements: readonly YodoElement[],
   ids: ReadonlySet<string>,
