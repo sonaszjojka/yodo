@@ -76,7 +76,9 @@ function drawElement(rough: SceneRough, element: YodoElement) {
     case 'arrow': {
       const points = element.points.map(([dx, dy]): Point => [x + dx, y + dy])
       rough.linearPath(points, options)
-      const [from, to] = points.slice(-2) as [Point, Point]
+      // Stored documents aren't validated, so fewer than two points can occur.
+      const [from, to] = points.slice(-2)
+      if (!from || !to) return
       const hasLength = from[0] !== to[0] || from[1] !== to[1]
       if (element.type === 'arrow' && element.endArrowhead && hasLength) {
         // Same seed, so the head keeps its wobble from frame to frame too.

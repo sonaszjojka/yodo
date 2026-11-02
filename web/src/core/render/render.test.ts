@@ -228,4 +228,31 @@ describe('renderScene', () => {
 
     expect(rough.linearPath).toHaveBeenCalledTimes(1)
   })
+
+  // Stored documents are not validated, so a line or arrow may arrive with
+  // fewer than two points; it must not stop the rest of the scene drawing.
+  test.each([
+    ['line', [[0, 0]]],
+    ['arrow', [[0, 0]]],
+    ['arrow', []],
+  ] as const)(
+    'a %s with %j as points draws no head and does not throw',
+    (type, points) => {
+      const rough = fakeRough()
+      const broken = {
+        ...createLinear(type, lineFromDrag([0, 0], [100, 0], false), 6),
+        points: points.map(([x, y]) => [x, y] as [number, number]),
+      }
+      const next = createShape(
+        'rectangle',
+        { x: 0, y: 0, width: 10, height: 10 },
+        7,
+      )
+
+      renderScene(fakeContext(), rough, [broken, next], SURFACE, IDENTITY)
+
+      expect(rough.linearPath).toHaveBeenCalledTimes(1)
+      expect(rough.rectangle).toHaveBeenCalledTimes(1)
+    },
+  )
 })
