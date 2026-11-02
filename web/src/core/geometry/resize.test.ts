@@ -188,6 +188,23 @@ describe('scaleElement on text', () => {
     expect(scaled).toMatchObject({ fontSize: text.fontSize })
   })
 
+  test('a side handle keeps the opposite edge fixed and centres the other axis', () => {
+    const wide = { ...text, x: 0, y: 0, width: 100, height: 20 }
+    // The w handle dragged 100 px left: anchor is the right edge's middle.
+    const scaled = scaleElement(wide, { anchor: [100, 10], sx: 2, sy: 1 })
+    const s = Math.SQRT2
+    expect(scaled.x + scaled.width).toBeCloseTo(100)
+    expect(scaled.width).toBeCloseTo(100 * s)
+    expect(scaled.y + scaled.height / 2).toBeCloseTo(10)
+  })
+
+  test('in a group, the edge nearest the anchor follows the group scale', () => {
+    const far = { ...text, x: 100, y: 0, width: 50, height: 20 }
+    const scaled = scaleElement(far, { anchor: [0, 0], sx: 2, sy: 0.5 })
+    expect(scaled.x).toBeCloseTo(200)
+    expect(scaled.y).toBeCloseTo(0)
+  })
+
   test('a label keeps its font size when its shape scales', () => {
     const label = {
       text: 'Hi',

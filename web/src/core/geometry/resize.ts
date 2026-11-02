@@ -104,6 +104,24 @@ export function flippedHandle(handle: Handle, { sx, sy }: ResizeTransform) {
   return HANDLES.find(([, [x, y]]) => x === fx && y === fy)![0]
 }
 
+/**
+ * The start of a span of `size` placed where the mapped span (`start`,
+ * `mapped` long) was, keeping `anchor` at the same fraction of it. The
+ * fraction is clamped, so an anchor outside the span (a group resize) keeps
+ * the nearest edge where the group scale put it.
+ */
+function placeAround(
+  anchor: number,
+  start: number,
+  mapped: number,
+  size: number,
+) {
+  const f =
+    mapped === 0 ? 0 : Math.min(1, Math.max(0, (anchor - start) / mapped))
+  // The point at fraction f of the mapped span stays put.
+  return start + f * mapped - f * size
+}
+
 /** -0 behaves like 0 but shows up in tests and diffs; drop it. */
 function noNegativeZero(value: number) {
   return value + 0
@@ -137,23 +155,22 @@ export function scaleElement(
       ]),
     }
   }
+  const [x2, y2] = map(element.x + element.width, element.y + element.height)
   if (element.type === 'text') {
     // Text never stretches or mirrors: it scales evenly, by the geometric
-    // mean of both axes, and keeps its top-left at the mapped corner nearest
-    // the original one.
+    // mean of both axes, and is placed so the anchor keeps its place in it.
     const s = Math.sqrt(Math.abs(sx * sy))
     const width = element.width * s
     const height = element.height * s
     return {
       ...element,
-      x: sx < 0 ? x - width : x,
-      y: sy < 0 ? y - height : y,
+      x: placeAround(anchor[0], Math.min(x, x2), Math.abs(x2 - x), width),
+      y: placeAround(anchor[1], Math.min(y, y2), Math.abs(y2 - y), height),
       width,
       height,
       fontSize: element.fontSize * s,
     }
   }
-  const [x2, y2] = map(element.x + element.width, element.y + element.height)
   return {
     ...element,
     x: Math.min(x, x2),
