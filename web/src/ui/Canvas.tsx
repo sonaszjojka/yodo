@@ -154,7 +154,11 @@ export function Canvas({ editor }: { editor: Editor }) {
         event.preventDefault()
         if (event.shiftKey) editor.redo()
         else editor.undo()
-      } else if (event.ctrlKey && !event.altKey && event.key === 'y') {
+      } else if (
+        event.ctrlKey &&
+        !event.altKey &&
+        event.key.toLowerCase() === 'y'
+      ) {
         // The Windows redo shortcut.
         event.preventDefault()
         editor.redo()
