@@ -42,3 +42,4 @@ Why Yodo is built the way it is. See [0001](0001-record-architecture-decisions.m
 | [0029](0029-storage-layer-in-web-src-storage.md) | Storage code in its own `web/src/storage` layer | Accepted |
 | [0030](0030-drawings-http-api.md) | Drawings HTTP API: REST routes that mirror `DrawingRepository` | Accepted |
 | [0031](0031-storage-mode-detection-and-server-contract-tests.md) | Pick the storage mode with a health probe; run the contract suite against a real server | Accepted |
+| [0032](0032-auto-save-debounced-serialized.md) | Auto-save: debounced, one save at a time, flushed when the page hides | Accepted |
