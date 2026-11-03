@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -69,11 +70,34 @@ func (a drawingsAPI) get(w http.ResponseWriter, r *http.Request) {
 }
 
 // documentMeta is the part of a document the server reads. Pointers tell a
-// missing field apart from a zero value.
+// missing or null field apart from a zero value.
 type documentMeta struct {
-	ID            *string `json:"id"`
-	Name          *string `json:"name"`
-	SchemaVersion *int64  `json:"schemaVersion"`
+	ID            *string
+	Name          *string
+	SchemaVersion *int64
+}
+
+// parseDocumentMeta reads the top-level id, name and schemaVersion the way
+// the browser's JSON.parse does: keys match exactly and a duplicate key's last
+// value wins. Unmarshalling into a struct would also accept "ID" or "Name"
+// (encoding/json matches field names case-insensitively), so the stored
+// metadata could disagree with the document the client reads back.
+func parseDocumentMeta(body []byte) (documentMeta, error) {
+	// Unmarshal checks that the whole body is valid JSON before decoding, so
+	// what gets stored is always one valid JSON object.
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(body, &fields); err != nil {
+		return documentMeta{}, err
+	}
+	var meta documentMeta
+	for key, dst := range map[string]any{"id": &meta.ID, "name": &meta.Name, "schemaVersion": &meta.SchemaVersion} {
+		if raw, ok := fields[key]; ok {
+			if err := json.Unmarshal(raw, dst); err != nil {
+				return documentMeta{}, fmt.Errorf("%s: %w", key, err)
+			}
+		}
+	}
+	return meta, nil
 }
 
 func (a drawingsAPI) put(w http.ResponseWriter, r *http.Request) {
@@ -86,10 +110,8 @@ func (a drawingsAPI) put(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could not read body", http.StatusBadRequest)
 		return
 	}
-	// Unmarshal checks that the whole body is valid JSON before decoding, so
-	// what gets stored is always one valid JSON object.
-	var meta documentMeta
-	if err := json.Unmarshal(body, &meta); err != nil {
+	meta, err := parseDocumentMeta(body)
+	if err != nil {
 		http.Error(w, "body must be a JSON drawing document: "+err.Error(), http.StatusBadRequest)
 		return
 	}

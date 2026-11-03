@@ -157,6 +157,10 @@ func TestPutRejectsBadBodies(t *testing.T) {
 		{"missing schemaVersion", `{"id":"` + docID + `","name":"Plan"}`},
 		{"schemaVersion zero", `{"id":"` + docID + `","name":"Plan","schemaVersion":0}`},
 		{"schemaVersion not an integer", `{"id":"` + docID + `","name":"Plan","schemaVersion":1.5}`},
+		{"name null", `{"id":"` + docID + `","name":null,"schemaVersion":1}`},
+		// Keys match exactly, as in the browser's JSON.parse: "ID" is not "id".
+		{"keys in another case", `{"ID":"` + docID + `","Name":"Plan","SchemaVersion":1}`},
+		{"real id hidden by a case variant", `{"id":"other-id","name":"Plan","schemaVersion":1,"ID":"` + docID + `"}`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -165,6 +169,18 @@ func TestPutRejectsBadBodies(t *testing.T) {
 			// Nothing was stored.
 			wantStatus(t, api.do(http.MethodGet, "/api/drawings/"+docID, ""), http.StatusNotFound)
 		})
+	}
+}
+
+// With a duplicate key the last one wins, as in JSON.parse, so the metadata
+// the server stores agrees with what the client reads back.
+func TestPutDuplicateKeysLastWins(t *testing.T) {
+	api := newTestAPI(t)
+	body := `{"id":"other-id","name":"First","schemaVersion":1,"id":"` + docID + `","name":"Last"}`
+	rec := api.do(http.MethodPut, "/api/drawings/"+docID, body)
+	wantStatus(t, rec, http.StatusOK)
+	if got := decodeSummary(t, rec).Name; got != "Last" {
+		t.Errorf("name = %q, want %q", got, "Last")
 	}
 }
 
