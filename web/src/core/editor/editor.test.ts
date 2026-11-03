@@ -1333,6 +1333,21 @@ describe('eraser', () => {
     expect(ids(editor)).toEqual([left.id])
   })
 
+  test('a click with a little jitter still erases only the topmost element', () => {
+    // `over` is filled and lies across `left`'s right edge at x = 40.
+    const over = {
+      ...createShape('rectangle', { x: 30, y: 10, width: 20, height: 20 }),
+      backgroundColor: '#E0E9FB',
+    }
+    const editor = eraserOn([left, over])
+
+    editor.pointerDown(1, [40, 20], primary)
+    editor.pointerMove(1, [41, 20], false)
+    editor.pointerUp(1)
+
+    expect(ids(editor)).toEqual([left.id])
+  })
+
   test('a fast move between two samples still erases a thin line', () => {
     const editor = eraserOn()
 

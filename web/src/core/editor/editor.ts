@@ -652,7 +652,12 @@ export function createEditor(
   }
 
   /** The eraser drag: its pointer and last sample, outside the store like `drag`. */
-  let erase: { pointerId: number; last: Point } | null = null
+  let erase: {
+    pointerId: number
+    last: Point
+    /** Passed the drag threshold; until then it is still a click. */
+    moved: boolean
+  } | null = null
 
   /** Adds `ids` to the eraser's marks, keeping document order and no repeats. */
   function markErased(ids: string[]) {
@@ -669,7 +674,7 @@ export function createEditor(
   const eraserTool: PointerTool = {
     pointerDown(pointerId, point) {
       if (erase) return
-      erase = { pointerId, last: point }
+      erase = { pointerId, last: point, moved: false }
       const { document, viewport } = store.getState()
       // A click erases what a click would select: the topmost element only.
       const hitId = topmostHit(
@@ -682,9 +687,18 @@ export function createEditor(
     },
     pointerMove(pointerId, point) {
       if (erase?.pointerId !== pointerId) return
-      const from = erase.last
-      erase = { pointerId, last: point }
       const { document, viewport } = store.getState()
+      const from = erase.last
+      // Like the select tool, wait for the threshold so a jittery click stays
+      // a click: the path marks everything under it, not just the topmost.
+      // `last` stays at the press point until then, so no stretch is skipped.
+      if (
+        !erase.moved &&
+        Math.hypot(point[0] - from[0], point[1] - from[1]) <
+          DRAG_THRESHOLD / viewport.zoom
+      )
+        return
+      erase = { pointerId, last: point, moved: true }
       markErased(
         idsAlongPath(
           document.elements,
