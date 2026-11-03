@@ -23,7 +23,7 @@ Node 24 (`web/.nvmrc`, `nvm use`), Go 1.27. golangci-lint 2.15 is a separate bin
 | Lint | `golangci-lint run` |
 | Format | `golangci-lint fmt` · check: `golangci-lint fmt --diff` (gofmt + goimports) |
 | Generate SQL code | `go tool sqlc generate` (commit the output in `internal/db/`) |
-| Run | `go run ./cmd/yodo` (listens on `YODO_ADDR`, default `127.0.0.1:8080`) |
+| Run | `go run ./cmd/yodo` (listens on `YODO_ADDR`, default `127.0.0.1:8080`; database in `YODO_DATA_DIR`, default `./data`) |
 
 **Docker image** (run from the repo root): `docker build -t yodo .`, then `docker run -p 127.0.0.1:8080:8080 -v yodo-data:/data yodo`. The build copies `web/dist` into `server/internal/webui/dist/` for `go:embed` (ADR 0019).
 
@@ -34,7 +34,7 @@ Before calling a task done, run the test, lint, format-check and type-check comm
 - **Framework-free core.** `web/src/core/` (document model, geometry, hit-testing, undo/redo) must not import React; `web/src/ui/` is the React shell (ADR 0002). Rendering is Canvas 2D + rough.js, with a fixed seed per element (ADR 0004); pencil strokes are a plain smoothed Canvas path instead (ADR 0024).
 - **Storage behind one interface.** All data access goes through `DrawingRepository` in `web/src/storage/` (may import `core/`, never `ui/`; ADR 0029), which has an IndexedDB implementation and an HTTP implementation. One shared contract test suite runs against both (ADR 0005, 0011).
 - **Document format.** Drawings are a versioned JSON document (`schemaVersion` plus migrations). The server stores it as opaque JSON and never parses elements (ADR 0013). A format change needs a version bump and a migration.
-- **Server.** Stdlib `net/http` (ADR 0009); SQLite via the pure-Go modernc driver, sqlc-generated queries from `queries/`, and goose migrations in `migrations/` embedded and applied at startup (ADR 0010). Auth: none in hosted mode; localhost-only plus optional `YODO_PASSWORD` when self-hosted, and every request passes Host/Origin checks against `YODO_ALLOWED_ORIGINS` (ADR 0020).
+- **Server.** Stdlib `net/http` (ADR 0009); SQLite via the pure-Go modernc driver, sqlc-generated queries from `queries/`, and goose migrations in `migrations/` embedded and applied at startup (ADR 0010). The drawings API under `/api/drawings` mirrors `DrawingRepository` (ADR 0030). Auth: none in hosted mode; localhost-only plus optional `YODO_PASSWORD` when self-hosted, and every request passes Host/Origin checks against `YODO_ALLOWED_ORIGINS` (ADR 0020).
 - **Text** is either a free `text` element or a shape's `label` (ADR 0026), edited in a textarea over the canvas (ADR 0027). Layout is a pure core function with an injected `measure`; fonts are Fontsource packages (ADR 0025).
 - **Colours** are stored as light-theme values and adapted when rendering in dark mode (ADR 0015).
 - **CI.** `.github/workflows/ci.yml` runs the same commands as above, filtered by path, and deploys `web/dist` to Pages on merge to `main`. `ci` is the only required check, so a new job must be added to its `needs`. Actions are pinned by commit SHA (ADR 0018).

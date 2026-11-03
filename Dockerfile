@@ -33,7 +33,8 @@ COPY --from=server /out/yodo /usr/local/bin/yodo
 COPY --from=server --chown=65532:65532 /out/data /data
 # 0.0.0.0 is required for Docker port publishing; limit access with
 # -p 127.0.0.1:8080:8080 instead (ADR 0007).
-ENV YODO_ADDR=0.0.0.0:8080
+ENV YODO_ADDR=0.0.0.0:8080 \
+    YODO_DATA_DIR=/data
 EXPOSE 8080
 VOLUME /data
 USER nonroot:nonroot

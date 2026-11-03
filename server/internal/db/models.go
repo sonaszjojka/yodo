@@ -3,3 +3,12 @@
 //   sqlc v1.31.1
 
 package db
+
+type Drawing struct {
+	ID            string
+	Name          string
+	SchemaVersion int64
+	Document      string
+	CreatedAt     int64
+	UpdatedAt     int64
+}
