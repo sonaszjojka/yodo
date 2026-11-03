@@ -5,6 +5,7 @@ import '@fontsource-variable/caveat'
 import { DEFAULT_FONT_SIZE } from './core/document/create.ts'
 import { fontOf } from './core/text/layout.ts'
 import { detectRepository } from './storage/detect.ts'
+import { openLastDrawing } from './storage/startup.ts'
 import './ui/index.css'
 import { App } from './ui/App.tsx'
 
@@ -18,9 +19,11 @@ const { mode, repository } = await detectRepository({
   baseUrl: new URL('./', document.baseURI),
 })
 console.info(`Yodo storage: ${mode}`)
+// The latest drawing until Home exists (roadmap 1.15, ADR 0032).
+const drawing = await openLastDrawing(repository)
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App repository={repository} />
+    <App repository={repository} document={drawing} />
   </StrictMode>,
 )
