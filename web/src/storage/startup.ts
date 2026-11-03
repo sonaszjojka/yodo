@@ -9,11 +9,18 @@ import type { DrawingRepository } from './repository.ts'
 export async function openLastDrawing(
   repository: DrawingRepository,
 ): Promise<YodoDocument> {
-  const summaries = await repository.list()
-  const latest = summaries.reduce<(typeof summaries)[number] | undefined>(
-    (best, s) => (!best || s.updatedAt > best.updatedAt ? s : best),
-    undefined,
-  )
-  // It may have been deleted since the list (another tab); start fresh then.
-  return (latest && (await repository.get(latest.id))) ?? createDocument()
+  try {
+    const summaries = await repository.list()
+    const latest = summaries.reduce<(typeof summaries)[number] | undefined>(
+      (best, s) => (!best || s.updatedAt > best.updatedAt ? s : best),
+      undefined,
+    )
+    // It may have been deleted since the list (another tab); start fresh then.
+    return (latest && (await repository.get(latest.id))) ?? createDocument()
+  } catch (error) {
+    // A failing server or an unreadable drawing must not stop the app from
+    // starting; the stored drawing stays untouched under its own id.
+    console.error('Could not open the last drawing', error)
+    return createDocument()
+  }
 }
