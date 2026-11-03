@@ -188,3 +188,22 @@ test('after stop, changes are not saved', async () => {
 
   expect(save).not.toHaveBeenCalled()
 })
+
+test('after a failed save, undoing back to the saved document shows saved', async () => {
+  const { repo, saves } = deferredRepository()
+  vi.spyOn(console, 'error').mockImplementation(() => {})
+  setUp(repo)
+  const original = editor.store.getState().document
+
+  change('a')
+  await vi.advanceTimersByTimeAsync(DELAY)
+  saves[0]!.reject(new Error('offline'))
+  await vi.advanceTimersByTimeAsync(0)
+  expect(saver.status.getState()).toBe('error')
+
+  editor.store.setState((s) => ({ ...s, document: original }))
+  await vi.advanceTimersByTimeAsync(DELAY)
+
+  expect(saver.status.getState()).toBe('saved')
+  expect(saves).toHaveLength(1)
+})

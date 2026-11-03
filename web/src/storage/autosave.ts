@@ -47,6 +47,9 @@ export function createAutoSaver(
   const dirty = () => editor.getState().document !== saved
 
   function update() {
+    // Back on the stored document (e.g. undo): an earlier failure no longer
+    // applies, and the next change should show as unsaved, not failed.
+    if (!dirty()) failed = false
     status.setState(
       saving ? 'saving' : failed ? 'error' : dirty() ? 'unsaved' : 'saved',
     )
