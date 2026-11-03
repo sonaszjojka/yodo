@@ -18,14 +18,23 @@ export class HttpError extends Error {
 }
 
 /**
- * `JSON.stringify`, but throws on functions and symbols instead of silently
- * turning them into `null` or dropping them. IndexedDB refuses them too
- * (DataCloneError), so a bad save fails the same way in both modes (ADR 0031).
+ * `JSON.stringify`, but throws instead of silently changing the data: on
+ * functions and symbols (IndexedDB refuses them too, with DataCloneError, so a
+ * bad save fails the same way in both modes; ADR 0031), and on non-finite
+ * numbers and undefined array entries, which JSON would turn into `null`.
  */
 export function toStrictJson(value: unknown): string {
-  return JSON.stringify(value, (key, v: unknown) => {
+  return JSON.stringify(value, function (this: unknown, key, v: unknown) {
     if (typeof v === 'function' || typeof v === 'symbol') {
       throw new TypeError(`Cannot serialize a ${typeof v} at "${key}"`)
+    }
+    // JSON writes these as null, so they would load back changed. (An
+    // undefined object property is dropped, which reads back the same.)
+    if (typeof v === 'number' && !Number.isFinite(v)) {
+      throw new TypeError(`Cannot serialize ${v} at "${key}"`)
+    }
+    if (v === undefined && Array.isArray(this)) {
+      throw new TypeError(`Cannot serialize undefined at index ${key}`)
     }
     return v
   })

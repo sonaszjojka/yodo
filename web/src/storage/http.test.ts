@@ -102,7 +102,11 @@ describe('toStrictJson', () => {
     ['a function', { f: () => {} }],
     ['a function in an array', [() => {}]],
     ['a symbol', { s: Symbol('x') }],
-  ])('throws on %s instead of dropping it', (_, value) => {
+    ['NaN', { x: Number.NaN }],
+    ['Infinity', { x: Number.POSITIVE_INFINITY }],
+    ['-Infinity in an array', [Number.NEGATIVE_INFINITY]],
+    ['undefined in an array', [1, undefined]],
+  ])('throws on %s instead of changing it', (_, value) => {
     expect(() => toStrictJson(value)).toThrow(TypeError)
   })
 })
