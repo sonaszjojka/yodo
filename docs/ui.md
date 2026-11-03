@@ -75,7 +75,7 @@ Dark mode is neutral grey; teal only marks what is active. Text colours meet WCA
 
 ## Logo and icons
 - **Logo:** "scribble tile". A rounded teal square (`#0F766E`, radius 11/40) with one white pen stroke, followed by the wordmark **Yodo** in Manrope ExtraBold. In dark mode the tile turns `#4FD1C5` with a `#062420` stroke. The tile alone is the favicon.
-- **UI icons:** **Phosphor** (Regular weight; Fill for active states). Added as a dependency in Part B, with approval.
+- **UI icons:** **Phosphor** (Regular weight; Fill for active states). Added in roadmap 1.10 as `@phosphor-icons/react` (ADR 0028).
 - **Folder icons:** each folder gets a line icon from the same set plus one of the 8 drawing-palette colours, chosen in an icon + colour picker. Default: folder icon, Graphite. No emoji.
 
 ## Not decided here
