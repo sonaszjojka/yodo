@@ -90,11 +90,20 @@ export class IndexedDbDrawingRepository implements DrawingRepository {
       createdAt: existing?.createdAt ?? time,
       updatedAt: time,
     }
-    await Promise.all([
-      drawings.put(summary),
-      tx.objectStore('documents').put(doc),
-      tx.done,
-    ])
+    const pending: Promise<unknown>[] = [tx.done]
+    try {
+      pending.push(drawings.put(summary))
+      pending.push(tx.objectStore('documents').put(doc))
+    } catch (error) {
+      // put() throws synchronously for a value it can't clone. That is not a
+      // failed request, so the transaction would commit the summary alone.
+      tx.abort()
+      // Aborting rejects the queued requests and tx.done with AbortError;
+      // `error` is the real cause, so only it reaches the caller.
+      for (const request of pending) request.catch(() => {})
+      throw error
+    }
+    await Promise.all(pending)
     return summary
   }
 

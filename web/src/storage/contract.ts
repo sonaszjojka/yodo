@@ -101,6 +101,17 @@ export function describeRepositoryContract(
       expect(await repo.get(copy.id)).toEqual(copy)
     })
 
+    test('a save that fails stores nothing', async () => {
+      // A function can't be stored (structured clone throws DataCloneError).
+      const bad = {
+        ...drawing('Bad'),
+        elements: [() => {}],
+      } as unknown as YodoDocument
+      await expect(repo.save(bad)).rejects.toThrow()
+      expect(await repo.list()).toEqual([])
+      expect(await repo.get(bad.id)).toBeUndefined()
+    })
+
     test('loads every element type of a v1 document unchanged', async () => {
       const doc = JSON.parse(v1Fixture) as YodoDocument
       await repo.save(doc)
