@@ -8,19 +8,13 @@ Rule: every stage ends with a **file of decisions**, not just a conversation. Co
 **Language:** from now on all communication, code, docs and other output are in English.
 
 ## Status (2026-11-03)
-Read this section, not the whole file; finished work is in History at the end.
+Read this section, not the whole file; finished work is logged in `docs/history.md`.
 - **Last done:** roadmap 1.10 (issue #19): eraser tool (E), whose drag erases as one undo step; floating tool toolbar with every tool's icon and single-key shortcut; Phosphor icons (ADR 0028).
 - Open items: none.
 - **Next step:** roadmap 1.11 (repository interface + IndexedDB, issue #20).
 
 ## Working mode: an educational project
-The goal is both the app and learning how to program with Claude as effectively as possible, so that the knowledge stays with you.
-- **You decide, I explain.** For every decision (stack, conventions, structure) I show 2–3 options with pros and cons, plus my recommendation and why. You choose.
-- **No silent automation.** I don't commit, create branches, push, install dependencies or change config without asking. I say what I want to do and why, then wait for your go-ahead.
-- **I introduce each Claude Code feature the first time we use it** (plan mode, `/clear`, hooks, skills, worktrees, `/code-review`…): what it does, when it's worth using, when it isn't.
-- **After each task, a short recap:** what I did, why that way, and what's worth learning from it.
-- At any point you can say "just do it" or "show me how to do it by hand".
-- These rules go into memory and into the global CLAUDE.md (Stage 1), so they apply in every session.
+The goal is both the app and learning how to program with Claude as effectively as possible, so that the knowledge stays with you. The rules (you decide and I explain, no silent automation, features introduced on first use, a short recap after each task, "just do it" to skip explanations) live in the global `~/.claude/CLAUDE.md` and the `educational-working-mode` memory, so they apply in every session.
 
 ---
 
@@ -28,7 +22,7 @@ The goal is both the app and learning how to program with Claude as effectively 
 
 ### Stage 0. Switch existing files to English
 - Translate the project memory (`~/.claude/projects/-Users-jonaszsojka-Dev-yodo/memory/yodo-project.md`): replace "Converse in Polish" with "Communicate and write everything in English".
-- Add a feedback memory with the educational working-mode rules above, and link it from `MEMORY.md`.
+- Add a feedback memory with the educational working-mode rules (see Working mode above), and link it from `MEMORY.md`.
 - (This plan file is already in English.)
 
 ### Stage 1. Global CLAUDE.md (~10 min)
@@ -126,30 +120,4 @@ Preparation is finished when these exist: an English project memory plus a worki
 ---
 
 ## History
-One dated line per finished stage or task, oldest first. `/ship` appends here.
-- Done: tooling (git identity, `gh`, SSH); this plan approved; a Polish Claude Code usage guide saved to the user's Obsidian note `Working with Claude - YODO.md`.
-- Done: Stage 0. Project memory is in English and points to this plan; the `educational-working-mode` feedback memory has been added.
-- Done: plan moved from `~/.claude/plans/` to `~/Dev/yodo/docs/plan.md`.
-- Done (2026-10-30): Stage 1. Global `~/.claude/CLAUDE.md` written: English, educational mode (global), concise replies + why, save corrections, ask-before list, secrets guard, small steps. "Verify before done" deliberately left for Stage 6's definition of done.
-- Done (2026-10-30): Stage 2. `docs/product.md` approved: local-first web app (desktop, mouse/trackpad), MVP in milestones M1–M3, done-when criteria per feature, performance target, later/never lists. Version history moved to later.
-- Done (2026-10-30): Stage 3. Decisions are ADRs in `docs/adr/` (index in `docs/adr/README.md`), replacing `decisions.md`. Summary: React+TS+Vite with a framework-free core; Canvas 2D + rough.js; two usage modes (GitHub Pages with IndexedDB, Docker with a Go server + SQLite on disk, already in the MVP; product.md gained "Usage modes"); auth none hosted / localhost + optional `YODO_PASSWORD`; Go stdlib `net/http`; sqlc + modernc SQLite + embedded goose; test pyramid with repository contract tests; one monorepo `sonaszjojka/yodo` (`web/`, `server/`, `e2e/`, `docs/`). Rules "best practices at every stage" and "ADR for every architectural decision" are in the global CLAUDE.md; copy the ADR rule into the project CLAUDE.md in Part B.
-- Done (2026-10-30): Stage 3 review. Fixed: ADR 0008 allowed origins (`YODO_ALLOWED_ORIGINS`) + missing-`Origin` rule; 0007 container listen address; 0001 allows amendments in place; performance benchmark added to product.md. ADR 0013 (versioned document format, opaque JSON on the server) accepted.
-- Done (2026-10-30): Stage 4. UI direction approved in `docs/ui.md` (mockup on a claude.ai design canvas, page "Final"): canvas-first editor with a contextual style bar above the selection plus a movable, resizable style panel on the right; sidebar Home with a "+ New drawing" tile and ⋯ / right-click card menus; Trash, Search, Export, Shortcuts and password screens; teal light theme + neutral Graphite dark theme; drawing palette with dark-adapted colours (ADR 0015); scribble-tile logo; Phosphor icons; folders with icon + colour. Also decided: import `.excalidraw` files via a one-way converter (ADR 0014).
-- Done (2026-10-30): Stage 5. `docs/roadmap.md` approved: walking skeleton first, so M0 = Part B (scaffold, CI, Pages deploy, Docker image, Host/Origin checks), then M1 (draw + save in both modes + Home), M2 (styles, dark mode, images, export/import incl. Excalidraw, password, perf benchmark), M3 (folders, trash, search, attached arrows, v1.0.0).
-- Done (2026-10-30): Stage 6. `docs/conventions.md` approved: Conventional Commits without AI attribution trailers, GitHub flow (branch per task, PR, CI, `/code-review`, squash-merge to protected `main`), definition of done, MIT license. Workflow skills written in `.claude/skills/` (`feature`, `fix`, `commit`, `ship`, `adr`).
-- Done (2026-11-01): Part B step 1 (= roadmap 0.1). Repo `sonaszjojka/yodo` created (public, MIT); `web/` (Vite + React + TS strict, placeholder page with the logo) and `server/` (Go module stub) merged in PR #1. Also decided: TypeScript lint with oxlint (ADR 0016). `main` is protected on GitHub (squash merge only, ruleset "Protect main"), and `/code-review --comment` findings are triaged into fixes, `review` issues or replies (`docs/conventions.md`).
-- Done (2026-11-01): roadmap tasks for M0 and M1 are GitHub Issues #6–#25, grouped in milestones M0–M3 and linked from `docs/roadmap.md`. M2 and M3 issues are created when M1 ends.
-- Done (2026-11-01): Part B step 2 (= roadmap 0.2): Prettier, golangci-lint, Vitest + go test smoke tests, sqlc via `go tool`, Node 24, project CLAUDE.md (ADR 0017). Review now runs on the branch before `/ship`, one `low` round; `/ship` syncs docs into the PR.
-- Done (2026-11-01): Part B step 3 (= roadmap 0.3): one CI workflow with path filters and a `ci` gate job as the required check, Pages deploy on merge, actions pinned by SHA (ADR 0018).
-- Done (2026-11-01): Part B step 4 (= roadmap 0.4): Go server serves the embedded web app and `/api/health`; multi-stage Dockerfile on distroless nonroot; CI builds amd64+arm64 on PRs and pushes `ghcr.io/sonaszjojka/yodo` from `main` (ADR 0019); root README with the `docker run` command.
-- Done (2026-11-01): Part B step 5 (= roadmap 0.5): Host/Origin middleware against CSRF, cross-site WebSocket hijacking and DNS rebinding; `YODO_ALLOWED_ORIGINS` validated at startup; review widened the rule to check `Origin` whenever present and deny unlisted methods (ADR 0020 supersedes 0008). M0 complete.
-- Done (2026-11-01): roadmap 1.1: v1 document and M1 element types in `web/src/core/document/`; `loadDocument` → `migrate` (envelope checks, refuses newer versions) → migration chain. Review added per-step and post-migration validation and an ID fallback for non-secure contexts (ADR 0013 amended).
-- Done (2026-11-01): roadmap 1.2: full-window HiDPI canvas; rough.js rectangle with a seed fixed at pointer-down; Shift squares, live mid-drag; Escape cancels; editor state in a framework-free store (ADR 0021). Review: only the pointer that starts a drag drives it.
-- Done (2026-11-01): roadmap 1.3: pan (hand tool H, Space, middle-drag, wheel) and pinch / Ctrl+wheel zoom around the cursor; zoom control with reset (click, Ctrl/Cmd+0); viewport in editor state (ADR 0022). Review: wheel zoom capped at 1.25× per event, stored zoom clamped on load, zoom gestures caught on `window` so pinching over the UI never zooms the page.
-- Done (2026-11-02): roadmap 1.4: diamond (D), ellipse (O), line (L) and arrow (A) through one draw tool; Shift squares box shapes and snaps lines to 15°; lines keep their start as (x, y) with relative points; core hitTest for every element type (transparent shapes hit only near the outline). Review: lines and arrows with fewer than two points render without throwing.
-- Done (2026-11-02): roadmap 1.5: select tool (V/1, the default) with topmost click, Shift+click toggle and box select of fully enclosed elements; a move is a preview offset committed on release (one document change); Delete/Backspace; drawing selects the new shape and switches to Select; overlay outline clears the stroke's rough wobble and keeps its screen size at any zoom. Review: stroke hits beat a selected shape's empty box, a tool picked mid-draw is kept, Delete mid-box removes what is highlighted, box select waits for the drag threshold.
-- Done (2026-11-02): roadmap 1.6: resize by corner handles and outline-side zones (one or many elements, around the opposite side); Shift keeps proportions; dragging past the opposite side flips; a preview committed on release (one document change); size badge under the selection, drawn in screen px. Review: a side keeps at least 1 unit, handle zones reach at most a quarter inward so small selections still move, a flat line's zero-size axis does not grab, a click on a handle zone still selects, the cursor follows flips. Code review minimum raised to `medium`.
-- Done (2026-11-02): roadmap 1.7: undo/redo as past/future stacks of immutable document snapshots, recorded whenever the document reference changes (ADR 0023), so a drag is one step and pans, zooms and selection are none; 100-step limit; undo/redo drops a drag in progress and prunes the selection; Cmd/Ctrl+Z, Shift+Cmd/Ctrl+Z, Ctrl+Y and ↶/↷ buttons next to zoom in a shared bottom bar. Review: Ctrl+Y redoes with Caps Lock on.
-- Done (2026-11-02): roadmap 1.8: pencil tool (P) records pointer samples, dropping any within one screen pixel of the last, and commits one `pencil` element on release (one undo step); drawn as a constant-width Canvas path curving through sample midpoints, without rough.js (ADR 0024); the pencil stays active after a stroke. Review: every coalesced pointer sample now reaches the editor, so fast strokes keep their shape.
-- Done (2026-11-02): roadmap 1.9: text tool (T) places a text box, typed in a textarea over the canvas that mirrors its font, zoom and position (ADR 0027); double-click edits text or a shape's label, and a click inside a shape with T labels it; a commit is one undo step, empty text is dropped or deleted, a shape grows taller to fit its label (ADR 0026); text resizes evenly with its font; Caveat ships as a Fontsource package and the canvas redraws once it loads (ADR 0025). Review: text under a transparent shape stays editable, a selected element's box no longer blocks a double-click, the textarea keeps its line height on zoom, resized text stays on the anchor, tiny shapes wrap labels at 4 ems, and Escape is left to the IME while composing.
-- Done (2026-11-03): roadmap 1.10: eraser tool (E): a click erases the topmost element, a drag fades everything its path crosses (hit-tested between pointer samples) and deletes it on release as one undo step; Escape, pointer cancel, undo and a tool change drop it; the eraser stays active. Floating top-centre toolbar with every tool, its Phosphor icon (`@phosphor-icons/react`, ADR 0028) and shortcut key, sharing one tool list with the keyboard. Review: a click with a pixel of jitter no longer erases every overlapping element (drag threshold).
+Finished stages and tasks are logged, oldest first, in `docs/history.md`. `/ship` appends there.
