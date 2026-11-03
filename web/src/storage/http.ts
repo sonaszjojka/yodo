@@ -78,6 +78,11 @@ export class HttpDrawingRepository implements DrawingRepository {
   }
 
   #drawingPath(id: string): string {
+    // URL parsing collapses "." and ".." segments, escaped or not, so these
+    // ids would reach another route. App-made ids are UUIDs (ADR 0013).
+    if (id === '.' || id === '..') {
+      throw new TypeError(`A drawing id can't be "${id}" over HTTP`)
+    }
     return `api/drawings/${encodeURIComponent(id)}`
   }
 

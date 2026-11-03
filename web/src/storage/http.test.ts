@@ -41,6 +41,18 @@ describe('HttpDrawingRepository', () => {
     })
   })
 
+  // URL parsing collapses "." and ".." segments (even as %2e), so the request
+  // would reach another route.
+  test.each(['.', '..'])('refuses the id %j without a request', async (id) => {
+    const { fetch, repo } = repoReplying(() => Response.json({}))
+    await expect(repo.get(id)).rejects.toThrow(TypeError)
+    await expect(repo.delete(id)).rejects.toThrow(TypeError)
+    await expect(repo.save({ ...createDocument(), id })).rejects.toThrow(
+      TypeError,
+    )
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
   test('get returns undefined for a 404', async () => {
     const { repo } = repoReplying(
       () => new Response('drawing not found', { status: 404 }),

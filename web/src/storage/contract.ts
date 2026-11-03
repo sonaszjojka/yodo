@@ -117,5 +117,21 @@ export function describeRepositoryContract(
       await repo.save(doc)
       expect(await repo.get(doc.id)).toEqual(doc)
     })
+
+    // Ids are UUIDs when the app creates them, but an imported document
+    // carries its own. A URL must not read them as path segments. ("." and
+    // ".." can't be path segments at all; HttpDrawingRepository refuses them.)
+    test.each(['a/b', '%2E'])(
+      'stores and deletes a drawing with the id %j',
+      async (id) => {
+        const doc = { ...drawing('Odd id'), id }
+        await repo.save(doc)
+        expect(await repo.get(id)).toEqual(doc)
+        expect((await repo.list()).map((s) => s.id)).toEqual([id])
+        await repo.delete(id)
+        expect(await repo.get(id)).toBeUndefined()
+        expect(await repo.list()).toEqual([])
+      },
+    )
   })
 }
