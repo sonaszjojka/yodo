@@ -12,6 +12,7 @@ Node 24 (`web/.nvmrc`, `nvm use`), Go 1.27. golangci-lint 2.15 is a separate bin
 |---|---|
 | Dev server | `npm run dev` |
 | Tests | `npm test` (Vitest, single run) · one file: `npx vitest run src/path/file.test.ts` · one test: `npx vitest run -t "name"` |
+| Server contract tests | `npm run test:server` (needs Go: builds and starts the server, ADR 0031) |
 | Lint | `npm run lint` (oxlint, ADR 0016) |
 | Format | `npm run format` · check: `npm run format:check` (Prettier, no semicolons, single quotes) |
 | Type-check + build | `npm run build` (`tsc -b && vite build`) |
