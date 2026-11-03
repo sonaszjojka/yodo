@@ -40,3 +40,4 @@ Why Yodo is built the way it is. See [0001](0001-record-architecture-decisions.m
 | [0027](0027-edit-text-in-textarea-overlay.md) | Edit text in an HTML textarea over the canvas | Accepted |
 | [0028](0028-ui-icons-phosphor-react.md) | UI icons from the `@phosphor-icons/react` package | Accepted |
 | [0029](0029-storage-layer-in-web-src-storage.md) | Storage code in its own `web/src/storage` layer | Accepted |
+| [0030](0030-drawings-http-api.md) | Drawings HTTP API: REST routes that mirror `DrawingRepository` | Accepted |
