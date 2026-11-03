@@ -9,9 +9,9 @@ Rule: every stage ends with a **file of decisions**, not just a conversation. Co
 
 ## Status (2026-11-03)
 Read this section, not the whole file; finished work is logged in `docs/history.md`.
-- **Last done:** roadmap 1.11 (issue #20): `DrawingRepository` (list, get, save, delete) in the new `web/src/storage/` layer (ADR 0029), with in-memory and IndexedDB (`idb`) implementations passing one shared contract suite on `fake-indexeddb`; not wired into the app yet (1.13).
+- **Last done:** roadmap 1.12 (issue #21): the Go server stores drawings in SQLite (goose migration, sqlc queries, migrations applied at startup) and serves CRUD under `/api/drawings` mirroring `DrawingRepository` (ADR 0030); database in `YODO_DATA_DIR` (`/data` in the image). Not used by the web app yet (1.13).
 - Open items: none.
-- **Next step:** roadmap 1.12 (SQLite + HTTP API, issue #21).
+- **Next step:** roadmap 1.13 (HTTP repository + mode detection, issue #22).
 
 ## Working mode: an educational project
 The goal is both the app and learning how to program with Claude as effectively as possible, so that the knowledge stays with you. The rules (you decide and I explain, no silent automation, features introduced on first use, a short recap after each task, "just do it" to skip explanations) live in the global `~/.claude/CLAUDE.md` and the `educational-working-mode` memory, so they apply in every session.
