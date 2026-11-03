@@ -10,6 +10,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
+    "test:server": "vitest run --config vitest.server.config.ts",
     "preview": "vite preview"
   },
   "engines": {

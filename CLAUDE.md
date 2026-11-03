@@ -12,6 +12,7 @@ Node 24 (`web/.nvmrc`, `nvm use`), Go 1.27. golangci-lint 2.15 is a separate bin
 |---|---|
 | Dev server | `npm run dev` |
 | Tests | `npm test` (Vitest, single run) · one file: `npx vitest run src/path/file.test.ts` · one test: `npx vitest run -t "name"` |
+| Server contract tests | `npm run test:server` (needs Go: builds and starts the server, ADR 0031) |
 | Lint | `npm run lint` (oxlint, ADR 0016) |
 | Format | `npm run format` · check: `npm run format:check` (Prettier, no semicolons, single quotes) |
 | Type-check + build | `npm run build` (`tsc -b && vite build`) |
@@ -30,7 +31,7 @@ Node 24 (`web/.nvmrc`, `nvm use`), Go 1.27. golangci-lint 2.15 is a separate bin
 Before calling a task done, run the test, lint, format-check and type-check commands for every part that changed (definition of done, `docs/conventions.md`).
 
 ## Architecture (see `docs/adr/README.md` for the full index)
-- **Two usage modes, one frontend.** *Hosted* is a static build on GitHub Pages that stores drawings in IndexedDB (ADR 0005). *Self-hosted* is a Docker image where the Go server serves the same build and stores drawings in SQLite (ADR 0006, 0007). The build uses `base: './'` so it works under `/yodo/` and `/`.
+- **Two usage modes, one frontend.** *Hosted* is a static build on GitHub Pages that stores drawings in IndexedDB (ADR 0005). *Self-hosted* is a Docker image where the Go server serves the same build and stores drawings in SQLite (ADR 0006, 0007). The app picks the mode at startup by probing `api/health` (ADR 0031). The build uses `base: './'` so it works under `/yodo/` and `/`.
 - **Framework-free core.** `web/src/core/` (document model, geometry, hit-testing, undo/redo) must not import React; `web/src/ui/` is the React shell (ADR 0002). Rendering is Canvas 2D + rough.js, with a fixed seed per element (ADR 0004); pencil strokes are a plain smoothed Canvas path instead (ADR 0024).
 - **Storage behind one interface.** All data access goes through `DrawingRepository` in `web/src/storage/` (may import `core/`, never `ui/`; ADR 0029), which has an IndexedDB implementation and an HTTP implementation. One shared contract test suite runs against both (ADR 0005, 0011).
 - **Document format.** Drawings are a versioned JSON document (`schemaVersion` plus migrations). The server stores it as opaque JSON and never parses elements (ADR 0013). A format change needs a version bump and a migration.
