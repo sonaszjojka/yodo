@@ -33,6 +33,7 @@ import { createStore, type Store } from '../store/store.ts'
 import { estimateMeasure, type Measure } from '../text/layout.ts'
 import {
   deleteElements,
+  idsAlongPath,
   idsInBox,
   moveElements,
   resizeElements,
@@ -80,14 +81,22 @@ export interface EditorState {
    * and the document changes only when the edit is committed.
    */
   editing: TextEdit | null
+  /**
+   * The ids an eraser drag has passed over, or null with no drag. Like `move`,
+   * a preview: the canvas shows them faded, and the document changes once,
+   * at pointer up, so the whole drag is one undo step.
+   */
+  erasing: string[] | null
 }
 
 /** Tools that draw an element by dragging. */
 export type DrawingTool = ShapeType | LinearType | 'pencil'
-export type Tool = DrawingTool | 'select' | 'hand' | 'text'
+export type Tool = DrawingTool | 'select' | 'hand' | 'text' | 'eraser'
 
 function isDrawingTool(tool: Tool): tool is DrawingTool {
-  return tool !== 'select' && tool !== 'hand' && tool !== 'text'
+  return (
+    tool !== 'select' && tool !== 'hand' && tool !== 'text' && tool !== 'eraser'
+  )
 }
 
 /** How close (screen px) a click must be to an element's stroke to hit it. */
@@ -151,6 +160,8 @@ export interface Editor {
   drawTool: PointerTool
   /** Clicks select, drags on a selection move it, drags on empty space box-select. */
   selectTool: PointerTool
+  /** A click erases the topmost element under it, a drag everything it passes over. */
+  eraserTool: PointerTool
   // The input router: screen points (CSS px relative to the canvas). A drag
   // pans with the middle button, the hand tool or Space held; otherwise the
   // primary button goes to the select tool or draws with the active tool.
@@ -225,6 +236,7 @@ export function createEditor(
     hoverHandle: null,
     marquee: null,
     editing: null,
+    erasing: null,
   })
 
   // Every new document reference is one edit (ADR 0023): drags commit once at
@@ -639,8 +651,91 @@ export function createEditor(
     })
   }
 
-  /** Pointer events go to both tools; each acts only on the pointer it owns. */
-  const tools = [drawTool, selectTool]
+  /** The eraser drag: its pointer and last sample, outside the store like `drag`. */
+  let erase: {
+    pointerId: number
+    last: Point
+    /** Passed the drag threshold; until then it is still a click. */
+    moved: boolean
+  } | null = null
+
+  /** Adds `ids` to the eraser's marks, keeping document order and no repeats. */
+  function markErased(ids: string[]) {
+    store.setState((prev) => {
+      if (!prev.erasing) return prev
+      const marked = new Set(prev.erasing)
+      const added = ids.filter((id) => !marked.has(id))
+      return added.length === 0
+        ? prev
+        : { ...prev, erasing: [...prev.erasing, ...added] }
+    })
+  }
+
+  const eraserTool: PointerTool = {
+    pointerDown(pointerId, point) {
+      if (erase) return
+      erase = { pointerId, last: point, moved: false }
+      const { document, viewport } = store.getState()
+      // A click erases what a click would select: the topmost element only.
+      const hitId = topmostHit(
+        document.elements,
+        point,
+        HIT_TOLERANCE / viewport.zoom,
+        new Set(),
+      )
+      store.setState((prev) => ({ ...prev, erasing: hitId ? [hitId] : [] }))
+    },
+    pointerMove(pointerId, point) {
+      if (erase?.pointerId !== pointerId) return
+      const { document, viewport } = store.getState()
+      const from = erase.last
+      // Like the select tool, wait for the threshold so a jittery click stays
+      // a click: the path marks everything under it, not just the topmost.
+      // `last` stays at the press point until then, so no stretch is skipped.
+      if (
+        !erase.moved &&
+        Math.hypot(point[0] - from[0], point[1] - from[1]) <
+          DRAG_THRESHOLD / viewport.zoom
+      )
+        return
+      erase = { pointerId, last: point, moved: true }
+      markErased(
+        idsAlongPath(
+          document.elements,
+          from,
+          point,
+          HIT_TOLERANCE / viewport.zoom,
+        ),
+      )
+    },
+    // Shift does nothing to the eraser.
+    setShift() {},
+    pointerUp(pointerId) {
+      if (erase?.pointerId !== pointerId) return
+      erase = null
+      store.setState((prev) => {
+        const marked = prev.erasing ?? []
+        if (marked.length === 0) return { ...prev, erasing: null }
+        const elements = deleteElements(prev.document.elements, new Set(marked))
+        return {
+          ...prev,
+          erasing: null,
+          document: { ...prev.document, elements },
+        }
+      })
+    },
+    pointerCancel(pointerId) {
+      if (erase?.pointerId === pointerId) eraserTool.cancel()
+    },
+    cancel() {
+      if (!erase) return
+      erase = null
+      store.setState((prev) => ({ ...prev, erasing: null }))
+    },
+  }
+
+  /** Pointer events go to every tool; each acts only on the pointer it owns. */
+  const tools = [drawTool, selectTool, eraserTool]
 
   // The pan drag, kept outside the store like the draw drag.
   let pan: { pointerId: number; last: Point } | null = null
@@ -658,7 +753,7 @@ export function createEditor(
    * while the pointer stays put: a drag ending, a pan or a zoom.
    */
   function refreshHover() {
-    if (pan || drag || gesture) return
+    if (pan || drag || gesture || erase) return
     const { tool } = store.getState()
     const hover =
       tool === 'select' && pointerAt
@@ -682,6 +777,7 @@ export function createEditor(
     // applying it to the restored one would edit the wrong state.
     drawTool.cancel()
     selectTool.cancel()
+    eraserTool.cancel()
     const target = step(store.getState().document)
     if (target) {
       const exists = new Set(target.elements.map((element) => element.id))
@@ -716,9 +812,10 @@ export function createEditor(
     store,
     drawTool,
     selectTool,
+    eraserTool,
     pointerDown(pointerId, screen, { button, shift }) {
       // One gesture at a time: ignore new pointers while one is active.
-      if (pan || drag || gesture || textPress) return
+      if (pan || drag || gesture || erase || textPress) return
       // A press anywhere on the canvas ends the edit, and does nothing else.
       if (store.getState().editing) {
         commitText()
@@ -736,6 +833,8 @@ export function createEditor(
         selectTool.pointerDown(pointerId, toWorld(screen), shift)
       } else if (button === PRIMARY_BUTTON && isDrawingTool(tool)) {
         drawTool.pointerDown(pointerId, toWorld(screen), shift)
+      } else if (button === PRIMARY_BUTTON && tool === 'eraser') {
+        eraserTool.pointerDown(pointerId, toWorld(screen), shift)
       } else if (button === PRIMARY_BUTTON && tool === 'text') {
         // Start on release: the press's own mousedown would otherwise take
         // focus away from the textarea that the edit shows.
@@ -743,7 +842,7 @@ export function createEditor(
       }
     },
     pointerMove(pointerId, screen, shift) {
-      if (!pan && !drag && !gesture) {
+      if (!pan && !drag && !gesture && !erase) {
         // No drag: track the handle under the pointer for the cursor.
         pointerAt = screen
         refreshHover()
@@ -756,7 +855,11 @@ export function createEditor(
         pan = { pointerId, last: screen }
         setViewport((v) => panBy(v, dx, dy))
       } else {
-        if (owns(pointerId) || gesture?.pointerId === pointerId)
+        if (
+          owns(pointerId) ||
+          gesture?.pointerId === pointerId ||
+          erase?.pointerId === pointerId
+        )
           pointerAt = screen
         const point = toWorld(screen)
         for (const t of tools) t.pointerMove(pointerId, point, shift)
@@ -790,13 +893,14 @@ export function createEditor(
     },
     cancel() {
       textPress = null
-      if (!pan && !drag && !gesture) {
+      if (!pan && !drag && !gesture && !erase) {
         setSelection([])
         return
       }
       if (pan) endPan()
       drawTool.cancel()
       selectTool.cancel()
+      eraserTool.cancel()
       refreshHover()
     },
     deleteSelected() {
@@ -830,6 +934,7 @@ export function createEditor(
       commitText()
       if (store.getState().tool === tool) return
       selectTool.cancel()
+      eraserTool.cancel()
       store.setState((prev) => ({
         ...prev,
         tool,
@@ -848,7 +953,8 @@ export function createEditor(
     setZoom: (zoom, anchor) => setViewport((v) => zoomAt(v, anchor, zoom)),
     doubleClick(screen) {
       const { tool, editing, document, viewport } = store.getState()
-      if (tool !== 'select' || editing || pan || drag || gesture) return
+      if (tool !== 'select' || editing || pan || drag || gesture || erase)
+        return
       const point = toWorld(screen)
       // One target for the whole decision, from what is really under the
       // point (not a selected element's box, which may cover a shape).

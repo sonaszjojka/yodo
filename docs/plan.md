@@ -7,11 +7,11 @@ Rule: every stage ends with a **file of decisions**, not just a conversation. Co
 
 **Language:** from now on all communication, code, docs and other output are in English.
 
-## Status (2026-11-02)
+## Status (2026-11-03)
 Read this section, not the whole file; finished work is in History at the end.
-- **Last done:** roadmap 1.9 (issue #18): text tool (T) and double-click editing in a textarea over the canvas (ADR 0027); text inside rectangles, diamonds and ellipses as a `label` field (ADR 0026); Caveat bundled from Fontsource (ADR 0025).
+- **Last done:** roadmap 1.10 (issue #19): eraser tool (E), whose drag erases as one undo step; floating tool toolbar with every tool's icon and single-key shortcut; Phosphor icons (ADR 0028).
 - Open items: none.
-- **Next step:** roadmap 1.10 (eraser + tool shortcuts, issue #19).
+- **Next step:** roadmap 1.11 (repository interface + IndexedDB, issue #20).
 
 ## Working mode: an educational project
 The goal is both the app and learning how to program with Claude as effectively as possible, so that the knowledge stays with you.
@@ -152,3 +152,4 @@ One dated line per finished stage or task, oldest first. `/ship` appends here.
 - Done (2026-11-02): roadmap 1.7: undo/redo as past/future stacks of immutable document snapshots, recorded whenever the document reference changes (ADR 0023), so a drag is one step and pans, zooms and selection are none; 100-step limit; undo/redo drops a drag in progress and prunes the selection; Cmd/Ctrl+Z, Shift+Cmd/Ctrl+Z, Ctrl+Y and ↶/↷ buttons next to zoom in a shared bottom bar. Review: Ctrl+Y redoes with Caps Lock on.
 - Done (2026-11-02): roadmap 1.8: pencil tool (P) records pointer samples, dropping any within one screen pixel of the last, and commits one `pencil` element on release (one undo step); drawn as a constant-width Canvas path curving through sample midpoints, without rough.js (ADR 0024); the pencil stays active after a stroke. Review: every coalesced pointer sample now reaches the editor, so fast strokes keep their shape.
 - Done (2026-11-02): roadmap 1.9: text tool (T) places a text box, typed in a textarea over the canvas that mirrors its font, zoom and position (ADR 0027); double-click edits text or a shape's label, and a click inside a shape with T labels it; a commit is one undo step, empty text is dropped or deleted, a shape grows taller to fit its label (ADR 0026); text resizes evenly with its font; Caveat ships as a Fontsource package and the canvas redraws once it loads (ADR 0025). Review: text under a transparent shape stays editable, a selected element's box no longer blocks a double-click, the textarea keeps its line height on zoom, resized text stays on the anchor, tiny shapes wrap labels at 4 ems, and Escape is left to the IME while composing.
+- Done (2026-11-03): roadmap 1.10: eraser tool (E): a click erases the topmost element, a drag fades everything its path crosses (hit-tested between pointer samples) and deletes it on release as one undo step; Escape, pointer cancel, undo and a tool change drop it; the eraser stays active. Floating top-centre toolbar with every tool, its Phosphor icon (`@phosphor-icons/react`, ADR 0028) and shortcut key, sharing one tool list with the keyboard. Review: a click with a pixel of jitter no longer erases every overlapping element (drag threshold).

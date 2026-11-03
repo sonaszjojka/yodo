@@ -1262,3 +1262,199 @@ describe('pencil tool', () => {
     ])
   })
 })
+
+describe('eraser', () => {
+  // Filled boxes, so a press anywhere inside hits them.
+  const left = {
+    ...createShape('rectangle', { x: 0, y: 0, width: 40, height: 40 }),
+    backgroundColor: '#E0E9FB',
+  }
+  const right = {
+    ...createShape('rectangle', { x: 100, y: 0, width: 40, height: 40 }),
+    backgroundColor: '#E0E9FB',
+  }
+  const thin = createLinear('line', lineFromDrag([200, 0], [200, 100], false))
+  const hollow = createShape('rectangle', {
+    x: 300,
+    y: 0,
+    width: 100,
+    height: 100,
+  })
+
+  function eraserOn(elements = [left, right, thin, hollow]) {
+    const editor = createEditor({ ...createDocument(), elements })
+    editor.setTool('eraser')
+    return editor
+  }
+
+  function ids(editor: ReturnType<typeof eraserOn>) {
+    return editor.store.getState().document.elements.map((e) => e.id)
+  }
+
+  const primary = { button: 0, shift: false }
+
+  test('a drag erases everything it passes over, at pointer up', () => {
+    const editor = eraserOn()
+
+    editor.pointerDown(1, [20, 20], primary)
+    editor.pointerMove(1, [120, 20], false)
+    // Marked, not gone yet: the document changes once.
+    expect(editor.store.getState().erasing).toEqual([left.id, right.id])
+    expect(ids(editor)).toHaveLength(4)
+    editor.pointerUp(1)
+
+    expect(ids(editor)).toEqual([thin.id, hollow.id])
+    expect(editor.store.getState().erasing).toBeNull()
+  })
+
+  test('one drag is one undo step', () => {
+    const editor = eraserOn()
+    editor.pointerDown(1, [20, 20], primary)
+    editor.pointerMove(1, [60, 20], false)
+    editor.pointerMove(1, [120, 20], false)
+    editor.pointerUp(1)
+
+    editor.undo()
+
+    expect(ids(editor)).toEqual([left.id, right.id, thin.id, hollow.id])
+    expect(editor.history.getState().canUndo).toBe(false)
+  })
+
+  test('a click erases only the topmost element under it', () => {
+    const over = {
+      ...createShape('rectangle', { x: 10, y: 10, width: 10, height: 10 }),
+      backgroundColor: '#E0E9FB',
+    }
+    const editor = eraserOn([left, over])
+
+    editor.pointerDown(1, [15, 15], primary)
+    editor.pointerUp(1)
+
+    expect(ids(editor)).toEqual([left.id])
+  })
+
+  test('a click with a little jitter still erases only the topmost element', () => {
+    // `over` is filled and lies across `left`'s right edge at x = 40.
+    const over = {
+      ...createShape('rectangle', { x: 30, y: 10, width: 20, height: 20 }),
+      backgroundColor: '#E0E9FB',
+    }
+    const editor = eraserOn([left, over])
+
+    editor.pointerDown(1, [40, 20], primary)
+    editor.pointerMove(1, [41, 20], false)
+    editor.pointerUp(1)
+
+    expect(ids(editor)).toEqual([left.id])
+  })
+
+  test('a fast move between two samples still erases a thin line', () => {
+    const editor = eraserOn()
+
+    // Both samples are far from the line at x = 200.
+    editor.pointerDown(1, [160, 50], primary)
+    editor.pointerMove(1, [250, 50], false)
+    editor.pointerUp(1)
+
+    expect(ids(editor)).not.toContain(thin.id)
+  })
+
+  test('passes through the empty middle of an unfilled shape', () => {
+    const editor = eraserOn()
+
+    editor.pointerDown(1, [330, 30], primary)
+    editor.pointerMove(1, [370, 70], false)
+    editor.pointerUp(1)
+
+    expect(ids(editor)).toContain(hollow.id)
+  })
+
+  test('Escape mid-drag erases nothing', () => {
+    const editor = eraserOn()
+
+    editor.pointerDown(1, [20, 20], primary)
+    editor.pointerMove(1, [120, 20], false)
+    editor.cancel()
+    editor.pointerUp(1)
+
+    expect(ids(editor)).toHaveLength(4)
+    expect(editor.store.getState().erasing).toBeNull()
+    expect(editor.history.getState().canUndo).toBe(false)
+  })
+
+  test('a cancelled pointer erases nothing', () => {
+    const editor = eraserOn()
+
+    editor.pointerDown(1, [20, 20], primary)
+    editor.pointerCancel(1)
+    editor.pointerUp(1)
+
+    expect(ids(editor)).toHaveLength(4)
+    expect(editor.store.getState().erasing).toBeNull()
+  })
+
+  test('changing tool mid-drag erases nothing', () => {
+    const editor = eraserOn()
+
+    editor.pointerDown(1, [20, 20], primary)
+    editor.setTool('select')
+    editor.pointerUp(1)
+
+    expect(ids(editor)).toHaveLength(4)
+    expect(editor.store.getState().erasing).toBeNull()
+  })
+
+  test('undo mid-drag drops the marks before going back', () => {
+    const editor = eraserOn()
+    editor.pointerDown(1, [20, 20], primary)
+    editor.pointerUp(1)
+
+    editor.pointerDown(1, [120, 20], primary)
+    editor.undo()
+    editor.pointerUp(1)
+
+    // The first erase is undone; the second drag was dropped.
+    expect(ids(editor)).toEqual([left.id, right.id, thin.id, hollow.id])
+    expect(editor.store.getState().erasing).toBeNull()
+  })
+
+  test('the eraser stays active after erasing', () => {
+    const editor = eraserOn()
+
+    editor.pointerDown(1, [20, 20], primary)
+    editor.pointerUp(1)
+
+    expect(editor.store.getState().tool).toBe('eraser')
+  })
+
+  test('a drag over nothing is no document change', () => {
+    const editor = eraserOn()
+
+    editor.pointerDown(1, [60, 200], primary)
+    editor.pointerMove(1, [90, 220], false)
+    editor.pointerUp(1)
+
+    expect(editor.history.getState().canUndo).toBe(false)
+  })
+
+  test('only the primary button erases', () => {
+    const editor = eraserOn()
+
+    editor.pointerDown(1, [20, 20], { button: 2, shift: false })
+    editor.pointerUp(1)
+
+    expect(ids(editor)).toHaveLength(4)
+  })
+
+  test('a second pointer is ignored while erasing', () => {
+    const editor = eraserOn()
+
+    editor.pointerDown(1, [20, 20], primary)
+    editor.pointerMove(2, [120, 20], false)
+    editor.pointerUp(2)
+    expect(editor.store.getState().erasing).toEqual([left.id])
+    editor.pointerUp(1)
+
+    expect(ids(editor)).toEqual([right.id, thin.id, hollow.id])
+  })
+})

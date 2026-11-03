@@ -42,6 +42,35 @@ export function topmostHit(
   return null
 }
 
+/**
+ * The ids of every element the segment `from`–`to` touches, in document
+ * order (the eraser's path between two pointer samples). The segment is
+ * sampled every `tolerance` world units, so a fast move cannot skip over a
+ * thin line; `from === to` tests the single point.
+ */
+export function idsAlongPath(
+  elements: readonly YodoElement[],
+  from: Point,
+  to: Point,
+  tolerance: number,
+): string[] {
+  const length = Math.hypot(to[0] - from[0], to[1] - from[1])
+  const steps = Math.max(1, Math.ceil(length / tolerance))
+  const samples: Point[] = []
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps
+    samples.push([
+      from[0] + (to[0] - from[0]) * t,
+      from[1] + (to[1] - from[1]) * t,
+    ])
+  }
+  return elements
+    .filter((element) =>
+      samples.some((point) => hitTest(element, point, tolerance)),
+    )
+    .map((element) => element.id)
+}
+
 /** The ids of the elements lying fully inside `box`, in document order. */
 export function idsInBox(
   elements: readonly YodoElement[],

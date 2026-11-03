@@ -5,6 +5,7 @@ import { Canvas } from './Canvas.tsx'
 import { HistoryControl } from './HistoryControl.tsx'
 import { createCanvasMeasure } from './measure.ts'
 import { TextEditor } from './TextEditor.tsx'
+import { Toolbar } from './Toolbar.tsx'
 import { ZoomControl } from './ZoomControl.tsx'
 
 // The editor on a fresh, unsaved drawing; Home and saving arrive in M1 (1.14, 1.15).
@@ -17,6 +18,7 @@ export function App() {
     <>
       <Canvas editor={editor} />
       <TextEditor editor={editor} />
+      <Toolbar editor={editor} />
       <div className="bottom-bar">
         <HistoryControl editor={editor} />
         <ZoomControl editor={editor} />
