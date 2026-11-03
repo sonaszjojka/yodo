@@ -9,9 +9,9 @@ Rule: every stage ends with a **file of decisions**, not just a conversation. Co
 
 ## Status (2026-11-03)
 Read this section, not the whole file; finished work is logged in `docs/history.md`.
-- **Last done:** roadmap 1.13 (issue #22): `HttpDrawingRepository` passes the shared contract suite against the real Go server (`npm run test:server`, its own CI job), and the app picks it at startup when `api/health` answers `{"status":"ok"}`, otherwise IndexedDB (ADR 0031). `App` receives the repository but doesn't use it yet (1.14).
-- Open items: none.
-- **Next step:** roadmap 1.14 (auto-save, issue #23).
+- **Last done:** roadmap 1.14 (issue #23): auto-save (ADR 0032). The document saves a second after the last change, one save at a time, with the viewport copied into `appState`; hiding or closing the tab flushes it. Save status is in the bottom bar, and startup opens the most recently saved drawing in both modes.
+- Open items: `review` issues from the 1.14 review; the startup-fallback one (silent new drawing on a load error) belongs to 1.15.
+- **Next step:** roadmap 1.15 (Home screen, issue #24).
 
 ## Working mode: an educational project
 The goal is both the app and learning how to program with Claude as effectively as possible, so that the knowledge stays with you. The rules (you decide and I explain, no silent automation, features introduced on first use, a short recap after each task, "just do it" to skip explanations) live in the global `~/.claude/CLAUDE.md` and the `educational-working-mode` memory, so they apply in every session.
