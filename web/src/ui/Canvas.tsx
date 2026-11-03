@@ -1,12 +1,13 @@
 import rough from 'roughjs'
 import { useEffect, useRef, type MouseEvent, type PointerEvent } from 'react'
 import type { Point } from '../core/document/types.ts'
-import type { Editor, EditorState, Tool } from '../core/editor/editor.ts'
+import type { Editor, EditorState } from '../core/editor/editor.ts'
 import { sceneOf } from '../core/editor/scene.ts'
 import type { Handle } from '../core/geometry/resize.ts'
 import { wheelZoomFactor } from '../core/geometry/viewport.ts'
 import { canvasSize, renderScene, type Surface } from '../core/render/render.ts'
 import { pointerSamples } from './pointerSamples.ts'
+import { TOOL_KEYS } from './tools.ts'
 
 /** `WheelEvent.deltaMode` 1 counts lines (some mice); convert to pixels. */
 const LINE_HEIGHT = 16
@@ -19,20 +20,6 @@ interface GestureEvent extends UIEvent {
   scale: number
   clientX: number
   clientY: number
-}
-
-/** Single-key tool shortcuts (Excalidraw's letters); the toolbar is roadmap 1.10. */
-const TOOL_KEYS: Partial<Record<string, Tool>> = {
-  v: 'select',
-  '1': 'select',
-  h: 'hand',
-  r: 'rectangle',
-  d: 'diamond',
-  o: 'ellipse',
-  l: 'line',
-  a: 'arrow',
-  p: 'pencil',
-  t: 'text',
 }
 
 /** Opposite handles resize along the same line, so they share a cursor. */
@@ -171,7 +158,7 @@ export function Canvas({ editor }: { editor: Editor }) {
         event.preventDefault()
         editor.setZoom(1, [surface.width / 2, surface.height / 2])
       } else if (!mod && !event.altKey && !editor.store.getState().panning) {
-        const tool = TOOL_KEYS[event.key.toLowerCase()]
+        const tool = TOOL_KEYS.get(event.key.toLowerCase())
         if (tool) editor.setTool(tool)
       }
     }
