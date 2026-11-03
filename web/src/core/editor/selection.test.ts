@@ -3,6 +3,7 @@ import { createLinear, createShape } from '../document/create.ts'
 import { lineFromDrag } from '../geometry/line.ts'
 import {
   deleteElements,
+  idsAlongPath,
   idsInBox,
   moveElements,
   resizeElements,
@@ -87,5 +88,27 @@ describe('resizeElements', () => {
     expect(resized[0]).toMatchObject({ x: 0, y: 0, width: 200, height: 50 })
     expect(resized[1]).toBe(front)
     expect(resized[2]).toBe(line)
+  })
+})
+
+describe('idsAlongPath', () => {
+  test('a press with no movement finds everything under the point', () => {
+    // (75, 50) is inside filled front and away from back's outline.
+    expect(idsAlongPath(elements, [75, 50], [75, 50], 2)).toEqual([front.id])
+    // (100, 50) is on back's right edge and inside filled front.
+    expect(idsAlongPath(elements, [100, 50], [100, 50], 2)).toEqual([
+      back.id,
+      front.id,
+    ])
+  })
+
+  test('finds a thin line crossed between the two points', () => {
+    // Both ends are far from the line from (250, 250) to (300, 300); only
+    // the segment between them crosses it.
+    expect(idsAlongPath([line], [240, 300], [300, 240], 2)).toEqual([line.id])
+  })
+
+  test('passes through the empty middle of an unfilled shape', () => {
+    expect(idsAlongPath([back], [20, 40], [60, 60], 2)).toEqual([])
   })
 })

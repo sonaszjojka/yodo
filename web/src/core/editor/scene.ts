@@ -32,10 +32,23 @@ function withoutEdited(
   })
 }
 
+/** How much of its opacity an element the eraser marked keeps until pointer up. */
+export const ERASING_OPACITY = 0.3
+
+/** Fades the elements in `ids`; the others keep their identity. */
+function faded(elements: YodoElement[], ids: ReadonlySet<string>) {
+  return elements.map((element) =>
+    ids.has(element.id)
+      ? { ...element, opacity: element.opacity * ERASING_OPACITY }
+      : element,
+  )
+}
+
 export function sceneOf(state: EditorState): Scene {
-  const { document, draft, move, resize, marquee } = state
+  const { document, draft, move, resize, marquee, erasing } = state
   const ids = new Set(state.selectedIds)
   let shown = withoutEdited(document.elements, state.editing)
+  if (erasing) shown = faded(shown, new Set(erasing))
   if (move) shown = moveElements(shown, ids, move.dx, move.dy)
   if (resize) shown = resizeElements(shown, ids, resize)
   const elements = draft ? [...shown, draft] : [...shown]

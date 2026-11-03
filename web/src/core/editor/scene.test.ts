@@ -70,3 +70,9 @@ test('draws a shape whose label is being edited without its label', () => {
   expect(shown).not.toHaveProperty('label')
   expect(shown).toMatchObject({ id: a.id, x: a.x })
 })
+
+test('shows the elements the eraser marked faded', () => {
+  const scene = sceneOf(stateWith({ erasing: [b.id] }))
+  expect(scene.elements[0]).toBe(a)
+  expect(scene.elements[1]).toMatchObject({ id: b.id, opacity: 30 })
+})
