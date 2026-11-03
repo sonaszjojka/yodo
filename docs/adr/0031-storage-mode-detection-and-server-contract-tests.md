@@ -19,7 +19,9 @@ Three facts constrain the choice:
 - The tests empty the store through the API before each test. Their `fetch` adds the `Origin` header a browser would send.
 - CI runs it in its own `web-server` job with Node and Go, listed in the `ci` gate's `needs` ([0018](0018-ci-github-actions-gate-job.md)). `npm test` stays Go-free and fast.
 
-**Strict serialization.** `HttpDrawingRepository` serializes with a `JSON.stringify` replacer that throws on functions and symbols. `JSON.stringify` would otherwise turn them into `null` or drop them silently, while IndexedDB throws `DataCloneError`. The contract's "a save that fails stores nothing" test therefore holds in both modes.
+**Strict serialization.** `HttpDrawingRepository` serializes with a `JSON.stringify` replacer that throws on functions and symbols. `JSON.stringify` would otherwise turn them into `null` or drop them silently, while IndexedDB throws `DataCloneError`. The contract's "a save that fails stores nothing" test therefore holds in both modes. The replacer also throws on non-finite numbers and `undefined` array entries, which JSON would store as `null`: such a save fails instead of changing the drawing, although IndexedDB would store them.
+
+**Ids that can't be a path segment.** The URL standard collapses a `.` or `..` path segment (escaped as `%2e` or not), so `HttpDrawingRepository` refuses those ids with a `TypeError` before sending a request. Ids the app creates are UUIDs ([0013](0013-drawing-document-format-and-versioning.md)).
 
 ## Alternatives considered
 - **Detect with `res.ok` only.** Simpler, but the Vite dev server's `200` fallback would wrongly pick HTTP mode.
