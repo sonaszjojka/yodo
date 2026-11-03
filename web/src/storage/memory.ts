@@ -19,18 +19,20 @@ export class InMemoryDrawingRepository implements DrawingRepository {
     this.#now = now
   }
 
-  list(): Promise<DrawingSummary[]> {
-    return Promise.resolve([...this.#summaries.values()].map((s) => ({ ...s })))
+  // async so that a throw (e.g. structuredClone's DataCloneError) rejects the
+  // promise, as the interface promises, instead of escaping synchronously.
+  async list(): Promise<DrawingSummary[]> {
+    return [...this.#summaries.values()].map((s) => ({ ...s }))
   }
 
-  get(id: string): Promise<YodoDocument | undefined> {
+  async get(id: string): Promise<YodoDocument | undefined> {
     const doc = this.#documents.get(id)
     // Cloned, like IndexedDB's structured clone, so callers can't change the
     // stored copy; migrated like every other source (ADR 0013).
-    return Promise.resolve(doc && migrate(structuredClone(doc)))
+    return doc && migrate(structuredClone(doc))
   }
 
-  save(doc: YodoDocument): Promise<DrawingSummary> {
+  async save(doc: YodoDocument): Promise<DrawingSummary> {
     const time = this.#now()
     const summary: DrawingSummary = {
       id: doc.id,
@@ -40,12 +42,11 @@ export class InMemoryDrawingRepository implements DrawingRepository {
     }
     this.#documents.set(doc.id, structuredClone(doc))
     this.#summaries.set(doc.id, summary)
-    return Promise.resolve({ ...summary })
+    return { ...summary }
   }
 
-  delete(id: string): Promise<void> {
+  async delete(id: string): Promise<void> {
     this.#documents.delete(id)
     this.#summaries.delete(id)
-    return Promise.resolve()
   }
 }
