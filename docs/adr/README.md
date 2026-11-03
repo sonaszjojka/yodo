@@ -39,3 +39,4 @@ Why Yodo is built the way it is. See [0001](0001-record-architecture-decisions.m
 | [0026](0026-shape-text-as-label-field.md) | Text inside a shape is a `label` field on the shape | Accepted |
 | [0027](0027-edit-text-in-textarea-overlay.md) | Edit text in an HTML textarea over the canvas | Accepted |
 | [0028](0028-ui-icons-phosphor-react.md) | UI icons from the `@phosphor-icons/react` package | Accepted |
+| [0029](0029-storage-layer-in-web-src-storage.md) | Storage code in its own `web/src/storage` layer | Accepted |

@@ -18,7 +18,8 @@ Ask once for the docs sync, the push and the PR together (step 1b), to save a ro
 ## 1b. Sync docs (before pushing, so they land in the same PR)
 - Sweep for data, requirements or decisions this branch made stale:
   - `docs/roadmap.md`: tick the task row (`✓`, as 0.1 shows).
-  - `docs/plan.md`: add a dated "Done" line to History, and update Status ("Last done" and "Next step" with the next task and its issue).
+  - `docs/plan.md`: update Status ("Last done" and "Next step" with the next task and its issue).
+  - `docs/history.md`: add a dated "Done" line for the task (append at the end).
   - Also `docs/adr/README.md`, `docs/product.md`, `docs/ui.md`, `docs/conventions.md`, README, CLAUDE.md and project memory.
 - Note issues the branch also resolves (beyond the task's own), to list as `Closes #n` in the PR body.
 - In **one message**, list each stale item (file, what's outdated, proposed fix; or say nothing is stale) plus the proposed PR title and a one-line body outline, and ask one question: apply the sync, push and open the PR? Leave superseded ADRs as history.
