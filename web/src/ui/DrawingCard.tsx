@@ -5,6 +5,7 @@ import type {
   DrawingSummary,
 } from '../storage/repository.ts'
 import { formatEdited } from './formatEdited.ts'
+import { isOutside } from './outsidePress.ts'
 import { navigate, routeHash } from './route.ts'
 import { Thumbnail } from './Thumbnail.tsx'
 
@@ -30,15 +31,16 @@ export function DrawingCard({
   const [menuOpen, setMenuOpen] = useState(false)
   const [renaming, setRenaming] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const moreRef = useRef<HTMLButtonElement>(null)
   const route = { name: 'drawing', id } as const
 
   useEffect(() => {
     if (!menuOpen) return
     const menu = menuRef.current!
     menu.querySelector<HTMLElement>('[role="menuitem"]')?.focus()
-    // Any press outside the menu closes it.
+    // Any press outside the menu and its ⋯ toggle closes it.
     const onPointerDown = (event: PointerEvent) => {
-      if (!menu.contains(event.target as Node)) setMenuOpen(false)
+      if (isOutside(event.target, menu, moreRef.current)) setMenuOpen(false)
     }
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
@@ -79,6 +81,7 @@ export function DrawingCard({
         </a>
       )}
       <button
+        ref={moreRef}
         type="button"
         className="drawing-card-more"
         aria-label={`More actions for ${name}`}
