@@ -1,6 +1,7 @@
 // Text editing in the editor (ADR 0026, 0027): placing, editing and labelling.
 import { describe, expect, test } from 'vitest'
 import {
+  BUILT_IN_STYLE,
   createDocument,
   createLinear,
   createShape,
@@ -20,6 +21,14 @@ import { editBox } from './text.ts'
 function setup(elements: YodoElement[] = []) {
   return createEditor({ ...createDocument(), elements })
 }
+
+const MONO_DEFAULTS = {
+  ...BUILT_IN_STYLE,
+  strokeColor: '#C2453D',
+  fontFamily: 'mono',
+  fontSize: 28,
+  textAlign: 'right',
+} as const
 
 /** A primary-button press and release at a screen point (identity viewport). */
 function click(editor: Editor, point: Point) {
@@ -456,5 +465,64 @@ describe('review fixes', () => {
     expect(elements(editor)[0]).toMatchObject({
       height: heightForLabel('diamond', LINE),
     })
+  })
+})
+
+describe('defaults for new text (ADR 0036)', () => {
+  test('a new text takes the default colour, font, size and alignment', () => {
+    const editor = createEditor(createDocument(), { defaults: MONO_DEFAULTS })
+    editor.setTool('text')
+    click(editor, [100, 100])
+    type(editor, 'Hi')
+    editor.commitText()
+
+    expect(elements(editor)[0]).toMatchObject({
+      strokeColor: '#C2453D',
+      fontFamily: 'mono',
+      fontSize: 28,
+      textAlign: 'right',
+    })
+  })
+
+  test('a new label takes the default font and size, centred', () => {
+    const shape = createShape('rectangle', {
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+    })
+    const editor = createEditor(
+      { ...createDocument(), elements: [shape] },
+      { defaults: MONO_DEFAULTS },
+    )
+    editor.doubleClick([100, 50])
+    type(editor, 'Label')
+    editor.commitText()
+
+    expect((elements(editor)[0] as typeof shape).label).toEqual({
+      text: 'Label',
+      fontFamily: 'mono',
+      fontSize: 28,
+      textAlign: 'center',
+    })
+  })
+
+  test('the textarea of a new label shows the default font and size', () => {
+    const shape = createShape('rectangle', {
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+    })
+    const editor = createEditor(
+      { ...createDocument(), elements: [shape] },
+      { defaults: MONO_DEFAULTS },
+    )
+    editor.doubleClick([100, 50])
+    const { document, editing } = state(editor)
+
+    expect(
+      editBox(document, editing!, estimateMeasure, MONO_DEFAULTS),
+    ).toMatchObject({ fontFamily: 'mono', fontSize: 28, textAlign: 'center' })
   })
 })

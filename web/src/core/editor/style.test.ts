@@ -10,7 +10,8 @@ import {
 } from '../document/create.ts'
 import type { TextElement, YodoElement } from '../document/types.ts'
 import { estimateMeasure, layoutText } from '../text/layout.ts'
-import { applyStyle, commonStyle, stylesOf } from './style.ts'
+import { BUILT_IN_STYLE } from '../document/create.ts'
+import { applyDefaults, applyStyle, commonStyle, stylesOf } from './style.ts'
 
 const rect = createShape('rectangle', { x: 0, y: 0, width: 100, height: 50 })
 const line = createLinear('line', {
@@ -54,21 +55,37 @@ describe('stylesOf', () => {
     expect(stylesOf(rect)).toEqual([
       'strokeColor',
       'backgroundColor',
+      'fillStyle',
       'strokeWidth',
+      'strokeStyle',
       'roughness',
+      'opacity',
     ])
   })
 
   test('lines have no fill; pencil has no fill and no look', () => {
-    expect(stylesOf(line)).toEqual(['strokeColor', 'strokeWidth', 'roughness'])
-    expect(stylesOf(pencil)).toEqual(['strokeColor', 'strokeWidth'])
+    expect(stylesOf(line)).toEqual([
+      'strokeColor',
+      'strokeWidth',
+      'strokeStyle',
+      'roughness',
+      'opacity',
+    ])
+    expect(stylesOf(pencil)).toEqual([
+      'strokeColor',
+      'strokeWidth',
+      'strokeStyle',
+      'opacity',
+    ])
   })
 
-  test('text takes colour, font and size only', () => {
+  test('text takes colour, font, size, alignment and opacity', () => {
     expect(stylesOf(text('Hi'))).toEqual([
       'strokeColor',
       'fontFamily',
       'fontSize',
+      'textAlign',
+      'opacity',
     ])
   })
 })
@@ -142,5 +159,54 @@ describe('applyStyle', () => {
 
     expect(big).toMatchObject({ x: 10, y: 20, fontSize: 36, width, height })
     expect(big.width).toBeGreaterThan(small.width)
+  })
+})
+
+describe('the panel styles (roadmap 2.2a)', () => {
+  test('fill style, stroke style and opacity change a shape', () => {
+    const after = applyStyle(
+      doc([rect]),
+      [rect.id],
+      { fillStyle: 'solid', strokeStyle: 'dotted', opacity: 40 },
+      estimateMeasure,
+    )
+    expect(after.elements[0]).toMatchObject({
+      fillStyle: 'solid',
+      strokeStyle: 'dotted',
+      opacity: 40,
+    })
+  })
+
+  test('an alignment change keeps the text box', () => {
+    const before = text('Hello\nworld')
+    const after = applyStyle(
+      doc([before]),
+      [before.id],
+      { textAlign: 'center' },
+      estimateMeasure,
+    ).elements[0] as TextElement
+    expect(after).toEqual({ ...before, textAlign: 'center' })
+  })
+
+  test('alignment does not fit a shape', () => {
+    const before = doc([rect])
+    expect(
+      applyStyle(before, [rect.id], { textAlign: 'right' }, estimateMeasure),
+    ).toBe(before)
+  })
+})
+
+describe('applyDefaults', () => {
+  test('sets every given style', () => {
+    expect(
+      applyDefaults(BUILT_IN_STYLE, { strokeWidth: 4, fontFamily: 'mono' }),
+    ).toEqual({ ...BUILT_IN_STYLE, strokeWidth: 4, fontFamily: 'mono' })
+  })
+
+  test('returns the same defaults when nothing changes', () => {
+    expect(applyDefaults(BUILT_IN_STYLE, { strokeWidth: 2 })).toBe(
+      BUILT_IN_STYLE,
+    )
+    expect(applyDefaults(BUILT_IN_STYLE, {})).toBe(BUILT_IN_STYLE)
   })
 })

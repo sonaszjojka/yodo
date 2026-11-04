@@ -1,6 +1,12 @@
 // Pure helpers for editing text (ADR 0026, 0027): what a click edits, what a
 // commit does to the document, and where the editing textarea goes.
-import { createText, DEFAULT_LABEL } from '../document/create.ts'
+import {
+  BUILT_IN_STYLE,
+  createText,
+  DEFAULT_LABEL,
+  labelIn,
+  type ElementStyle,
+} from '../document/create.ts'
 import type {
   DiamondElement,
   EllipseElement,
@@ -76,9 +82,10 @@ export function textTargetAt(
 export function editFor(
   target: TextElement | LabelledShape | null,
   point: Point,
+  style: ElementStyle = BUILT_IN_STYLE,
 ): TextEdit {
   if (!target) {
-    const element = createText(point)
+    const element = createText(point, undefined, style)
     // Centre the first line on the click, where the caret appears.
     const half = (element.fontSize * LINE_HEIGHT) / 2
     return {
@@ -116,12 +123,13 @@ function withLabel(
   shape: LabelledShape,
   text: string,
   measure: Measure,
+  style: ElementStyle,
 ): LabelledShape {
   if (isBlank(text)) {
     const { label: _removed, ...rest } = shape
     return rest
   }
-  const label = { ...(shape.label ?? DEFAULT_LABEL), text }
+  const label = { ...(shape.label ?? labelIn(style)), text }
   const { height: textHeight } = layoutText(
     text,
     label.fontFamily,
@@ -142,6 +150,8 @@ export function commitEdit(
   document: YodoDocument,
   edit: TextEdit,
   measure: Measure,
+  /** The defaults a new label takes its font and size from (ADR 0036). */
+  style: ElementStyle = BUILT_IN_STYLE,
 ): { document: YodoDocument; selectId: string | null } {
   const { elements } = document
   if (edit.target === 'new') {
@@ -175,7 +185,7 @@ export function commitEdit(
     current.type === 'text'
       ? withText(current, edit.text, measure)
       : isLabelled(current)
-        ? withLabel(current, edit.text, measure)
+        ? withLabel(current, edit.text, measure, style)
         : current
   const next = [...elements]
   next[index] = updated
@@ -197,6 +207,8 @@ export function editBox(
   document: YodoDocument,
   edit: TextEdit,
   measure: Measure,
+  /** The defaults a new label will take (see `commitEdit`). */
+  style: ElementStyle = BUILT_IN_STYLE,
 ): EditBox | null {
   const element =
     edit.target === 'new'
@@ -219,7 +231,7 @@ export function editBox(
     }
   }
   if (!isLabelled(element)) return null
-  const { fontFamily, fontSize, textAlign } = element.label ?? DEFAULT_LABEL
+  const { fontFamily, fontSize, textAlign } = element.label ?? labelIn(style)
   const box = labelBox(element, fontSize * MIN_LABEL_EMS)
   const layout = layoutText(edit.text, fontFamily, fontSize, measure, box.width)
   return {

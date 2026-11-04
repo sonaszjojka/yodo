@@ -1,0 +1,176 @@
+import { renderToStaticMarkup } from 'react-dom/server'
+import { describe, expect, test } from 'vitest'
+import {
+  BUILT_IN_STYLE,
+  createDocument,
+  createShape,
+  createText,
+} from '../core/document/create.ts'
+import type { YodoElement } from '../core/document/types.ts'
+import { createEditor } from '../core/editor/editor.ts'
+import { createStore } from '../core/store/store.ts'
+import type { PanelLayout } from '../storage/preferences.ts'
+import { StyleBar } from './StyleBar.tsx'
+import { StylePanel, StylePanelToggle } from './StylePanel.tsx'
+
+function editorWith(elements: YodoElement[], selected = elements) {
+  const editor = createEditor({ ...createDocument(), elements })
+  editor.store.setState((prev) => ({
+    ...prev,
+    selectedIds: selected.map((element) => element.id),
+  }))
+  return editor
+}
+
+const openPanel = () => createStore<PanelLayout>({ open: true, place: null })
+
+const rect = createShape('rectangle', {
+  x: 300,
+  y: 300,
+  width: 100,
+  height: 100,
+})
+const text = {
+  ...createText([300, 500], 1),
+  text: 'Hi',
+  width: 22,
+  height: 25,
+}
+
+function render(editor: ReturnType<typeof editorWith>, panel = openPanel()) {
+  return renderToStaticMarkup(<StylePanel editor={editor} panel={panel} />)
+}
+
+/** The section titles, in order. */
+function sections(html: string) {
+  return [...html.matchAll(/<h3[^>]*>([^<]+)</g)].map((m) => m[1])
+}
+
+/** The accessible label of every pressed option. */
+function pressed(html: string) {
+  return [
+    ...html.matchAll(
+      /<button[^>]*aria-label="([^"]+)"[^>]*aria-pressed="true"/g,
+    ),
+  ].map((m) => m[1])
+}
+
+describe('StylePanel', () => {
+  test('renders nothing when closed', () => {
+    const panel = createStore<PanelLayout>({ open: false, place: null })
+    expect(render(editorWith([rect]), panel)).toBe('')
+  })
+
+  test('renders nothing while a drag previews a move', () => {
+    const editor = editorWith([rect])
+    editor.store.setState((prev) => ({ ...prev, move: { dx: 5, dy: 0 } }))
+    expect(render(editor)).toBe('')
+  })
+
+  test('a shape gets every shape section and Delete', () => {
+    const html = render(editorWith([rect]))
+    expect(html).toContain('>Style</h2>')
+    expect(sections(html)).toEqual([
+      'Stroke',
+      'Background',
+      'Fill style',
+      'Stroke width',
+      'Stroke style',
+      'Look',
+      'Opacity',
+    ])
+    expect(pressed(html)).toEqual([
+      'Ink',
+      'None',
+      'Hatched',
+      'Bold',
+      'Solid',
+      'Hand-drawn',
+    ])
+    expect(html).toContain('Delete')
+  })
+
+  test('a text gets colour, font with previews, size, exact size, alignment, opacity', () => {
+    const html = render(editorWith([text]))
+    expect(sections(html)).toEqual([
+      'Stroke',
+      'Font',
+      'Size',
+      'Alignment',
+      'Opacity',
+    ])
+    expect(html).toMatch(
+      /<span class="panel-font" style="font-family:[^"]*Caveat/,
+    )
+    expect(html).toMatch(/<input[^>]*type="number"[^>]*value="20"/)
+    expect(pressed(html)).toContain('Left')
+  })
+
+  test('different values show as mixed', () => {
+    const red = { ...rect, id: 'red', strokeColor: '#C2453D', opacity: 50 }
+    const html = render(editorWith([rect, red]))
+    expect(html).toMatch(/Stroke<span class="panel-section-value">Mixed/)
+    expect(html).toMatch(/Opacity<span class="panel-section-value">Mixed/)
+    expect(pressed(html)).not.toContain('Ink')
+  })
+
+  test('with nothing selected it edits the defaults and says so', () => {
+    const editor = editorWith([rect], [])
+    editor.setStyle({ strokeStyle: 'dashed' })
+    const html = render(editor)
+
+    expect(html).toContain('Defaults for new elements')
+    expect(html).toContain('these apply to what you draw next')
+    expect(sections(html)).toEqual([
+      'Stroke',
+      'Background',
+      'Fill style',
+      'Stroke width',
+      'Stroke style',
+      'Look',
+      'Font',
+      'Size',
+      'Alignment',
+      'Opacity',
+    ])
+    expect(pressed(html)).toContain('Dashed')
+    expect(html).not.toContain('Delete')
+  })
+
+  test('agrees with the bar after a change from either', () => {
+    const editor = editorWith([rect])
+    editor.setStyle({ strokeColor: '#C2453D', strokeWidth: 4 })
+
+    const bar = renderToStaticMarkup(<StyleBar editor={editor} />)
+    const panel = render(editor)
+    expect(bar).toContain('aria-label="Stroke: Brick"')
+    expect(bar).toContain('aria-label="Width: Extra bold"')
+    expect(pressed(panel)).toEqual(
+      expect.arrayContaining(['Brick', 'Extra bold']),
+    )
+    expect(editor.store.getState().defaults).toBe(BUILT_IN_STYLE)
+  })
+
+  test('the snap-back button shows only once moved', () => {
+    expect(render(editorWith([rect]))).not.toContain('Snap back')
+    const moved = createStore<PanelLayout>({
+      open: true,
+      place: { x: 40, y: 100, width: 300, height: 400 },
+    })
+    const html = render(editorWith([rect]), moved)
+    expect(html).toContain('Snap back')
+    expect(html).toContain('left:40px;top:100px;width:300px;height:400px')
+  })
+})
+
+describe('StylePanelToggle', () => {
+  test('shows whether the panel is open', () => {
+    const closed = createStore<PanelLayout>({ open: false, place: null })
+    expect(renderToStaticMarkup(<StylePanelToggle panel={closed} />)).toContain(
+      'aria-pressed="false"',
+    )
+    expect(
+      renderToStaticMarkup(<StylePanelToggle panel={openPanel()} />),
+    ).toContain('aria-pressed="true"')
+  })
+})

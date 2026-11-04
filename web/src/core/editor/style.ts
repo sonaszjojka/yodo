@@ -1,51 +1,50 @@
-// The styles the contextual bar edits (roadmap 2.1, docs/ui.md): which fit
-// which element, what a selection has in common, and applying a change as
-// one new document (one undo step, ADR 0023).
-import type {
-  BaseElement,
-  TextElement,
-  YodoDocument,
-  YodoElement,
-} from '../document/types.ts'
+// The styles the contextual bar and the style panel edit (roadmap 2.1, 2.2a,
+// docs/ui.md): which fit which element, what a selection has in common, and
+// applying a change as one new document (one undo step, ADR 0023) or to the
+// defaults for new elements (ADR 0036).
+import type { ElementStyle } from '../document/create.ts'
+import type { YodoDocument, YodoElement } from '../document/types.ts'
 import type { Measure } from '../text/layout.ts'
 import { withText } from './text.ts'
 
-export type StyleKey =
-  | 'strokeColor'
-  | 'backgroundColor'
-  | 'strokeWidth'
-  | 'roughness'
-  | 'fontFamily'
-  | 'fontSize'
+export type StyleKey = keyof ElementStyle
 
-export type StylePatch = Partial<
-  Pick<
-    BaseElement,
-    'strokeColor' | 'backgroundColor' | 'strokeWidth' | 'roughness'
-  > &
-    Pick<TextElement, 'fontFamily' | 'fontSize'>
->
+export type StylePatch = Partial<ElementStyle>
 
 type StyleValue<K extends StyleKey> = Required<StylePatch>[K]
 
 /** Per style: the value every element it fits shares, or 'mixed'. Absent when none fits. */
 export type CommonStyle = { [K in StyleKey]?: StyleValue<K> | 'mixed' }
 
-/** The styles that change how `element` looks, in the bar's order. */
+/** The styles that change how `element` looks, in the panel's order. */
 export function stylesOf(element: YodoElement): StyleKey[] {
   switch (element.type) {
     case 'rectangle':
     case 'diamond':
     case 'ellipse':
-      return ['strokeColor', 'backgroundColor', 'strokeWidth', 'roughness']
+      return [
+        'strokeColor',
+        'backgroundColor',
+        'fillStyle',
+        'strokeWidth',
+        'strokeStyle',
+        'roughness',
+        'opacity',
+      ]
     case 'line':
     case 'arrow':
-      return ['strokeColor', 'strokeWidth', 'roughness']
+      return [
+        'strokeColor',
+        'strokeWidth',
+        'strokeStyle',
+        'roughness',
+        'opacity',
+      ]
     // A plain smoothed path (ADR 0024): rough.js roughness has no effect.
     case 'pencil':
-      return ['strokeColor', 'strokeWidth']
+      return ['strokeColor', 'strokeWidth', 'strokeStyle', 'opacity']
     case 'text':
-      return ['strokeColor', 'fontFamily', 'fontSize']
+      return ['strokeColor', 'fontFamily', 'fontSize', 'textAlign', 'opacity']
   }
 }
 
@@ -80,7 +79,8 @@ function styled(
   }
   if (Object.keys(changes).length === 0) return element
   const next = { ...element, ...changes } as YodoElement
-  // A new font or size changes the text's box; its top-left stays put.
+  // A new font or size changes the text's box; its top-left stays put. An
+  // alignment change only moves the lines inside the box.
   return next.type === 'text' &&
     ('fontFamily' in changes || 'fontSize' in changes)
     ? withText(next, next.text, measure)
@@ -106,4 +106,19 @@ export function applyStyle(
     return next
   })
   return changed ? { ...document, elements } : document
+}
+
+/** `defaults` with `patch` applied, or itself if nothing changes (ADR 0036). */
+export function applyDefaults(
+  defaults: ElementStyle,
+  patch: StylePatch,
+): ElementStyle {
+  const keys = Object.keys(patch) as StyleKey[]
+  const changed = keys.some(
+    (key) => patch[key] !== undefined && patch[key] !== defaults[key],
+  )
+  if (!changed) return defaults
+  const next: Record<string, unknown> = { ...defaults }
+  for (const key of keys) if (patch[key] !== undefined) next[key] = patch[key]
+  return next as ElementStyle
 }

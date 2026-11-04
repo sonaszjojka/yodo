@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import {
+  BUILT_IN_STYLE,
   createDocument,
   createLinear,
   createShape,
@@ -1481,5 +1482,53 @@ describe('style', () => {
     editor.setStyle({ strokeWidth: 2 })
 
     expect(editor.history.getState().canUndo).toBe(false)
+  })
+})
+
+describe('defaults for new elements (ADR 0036)', () => {
+  test('start as the given defaults, or the built-in style', () => {
+    const custom = { ...BUILT_IN_STYLE, strokeWidth: 4 }
+    expect(createEditor(createDocument()).store.getState().defaults).toBe(
+      BUILT_IN_STYLE,
+    )
+    expect(
+      createEditor(createDocument(), { defaults: custom }).store.getState()
+        .defaults,
+    ).toBe(custom)
+  })
+
+  test('setStyle with nothing selected changes the defaults, not the document', () => {
+    const { editor } = setupSelection()
+    const before = editor.store.getState().document
+
+    editor.setStyle({ strokeColor: '#C2453D', fontSize: 36 })
+
+    const state = editor.store.getState()
+    expect(state.document).toBe(before)
+    expect(state.defaults).toMatchObject({
+      strokeColor: '#C2453D',
+      fontSize: 36,
+    })
+    expect(editor.history.getState().canUndo).toBe(false)
+  })
+
+  test('setStyle on a selection leaves the defaults alone', () => {
+    const { editor } = setupSelection()
+    click(editor, [50, 50])
+    editor.setStyle({ strokeWidth: 4 })
+    expect(editor.store.getState().defaults).toBe(BUILT_IN_STYLE)
+  })
+
+  test('a drawn element takes the defaults', () => {
+    const editor = setup()
+    editor.setStyle({ strokeStyle: 'dashed', opacity: 60, roughness: 0 })
+    editor.setTool('rectangle')
+    drag(editor, [0, 0], [50, 50])
+
+    expect(editor.store.getState().document.elements[0]).toMatchObject({
+      strokeStyle: 'dashed',
+      opacity: 60,
+      roughness: 0,
+    })
   })
 })

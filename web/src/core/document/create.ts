@@ -57,19 +57,55 @@ export function randomSeed(): number {
   return (value! % (2 ** 31 - 1)) + 1
 }
 
-/** Every field but the geometry, with the default style (Ink stroke, docs/ui.md). */
-function defaults(seed: number): Omit<BaseElement, keyof Bounds> {
+/** The default text size: M in the S/M/L/XL steps of `docs/ui.md`. */
+export const DEFAULT_FONT_SIZE = 20
+
+/**
+ * The style a new element gets: the editor's defaults (ADR 0036). The text
+ * fields apply to new text, and font and size to new shape labels.
+ */
+export type ElementStyle = Pick<
+  BaseElement,
+  | 'strokeColor'
+  | 'backgroundColor'
+  | 'fillStyle'
+  | 'strokeWidth'
+  | 'strokeStyle'
+  | 'roughness'
+  | 'opacity'
+> &
+  Pick<TextElement, 'fontFamily' | 'fontSize' | 'textAlign'>
+
+/** The style before any defaults are changed (Ink stroke, docs/ui.md). */
+export const BUILT_IN_STYLE: ElementStyle = {
+  strokeColor: '#1E1F22',
+  backgroundColor: 'transparent',
+  fillStyle: 'hachure',
+  strokeWidth: 2,
+  strokeStyle: 'solid',
+  roughness: 1,
+  opacity: 100,
+  fontFamily: 'hand',
+  fontSize: DEFAULT_FONT_SIZE,
+  textAlign: 'left',
+}
+
+/** Every field but the geometry, in `style` (its text fields left out). */
+function defaults(
+  seed: number,
+  style: ElementStyle,
+): Omit<BaseElement, keyof Bounds> {
   return {
     id: randomId(),
     angle: 0,
     seed,
-    strokeColor: '#1E1F22',
-    backgroundColor: 'transparent',
-    fillStyle: 'hachure',
-    strokeWidth: 2,
-    strokeStyle: 'solid',
-    roughness: 1,
-    opacity: 100,
+    strokeColor: style.strokeColor,
+    backgroundColor: style.backgroundColor,
+    fillStyle: style.fillStyle,
+    strokeWidth: style.strokeWidth,
+    strokeStyle: style.strokeStyle,
+    roughness: style.roughness,
+    opacity: style.opacity,
   }
 }
 
@@ -83,9 +119,10 @@ export function createShape<T extends ShapeType>(
   type: T,
   bounds: Bounds,
   seed = randomSeed(),
+  style = BUILT_IN_STYLE,
 ): Extract<YodoElement, { type: T }> {
   // TypeScript cannot narrow a generic `type` to one union member, hence the cast.
-  return { type, ...defaults(seed), ...bounds } as Extract<
+  return { type, ...defaults(seed, style), ...bounds } as Extract<
     YodoElement,
     { type: T }
   >
@@ -96,23 +133,27 @@ export function createLinear(
   type: 'line',
   geometry: LinearGeometry,
   seed?: number,
+  style?: ElementStyle,
 ): LineElement
 export function createLinear(
   type: 'arrow',
   geometry: LinearGeometry,
   seed?: number,
+  style?: ElementStyle,
 ): ArrowElement
 export function createLinear(
   type: LinearType,
   geometry: LinearGeometry,
   seed?: number,
+  style?: ElementStyle,
 ): LineElement | ArrowElement
 export function createLinear(
   type: LinearType,
   geometry: LinearGeometry,
   seed = randomSeed(),
+  style = BUILT_IN_STYLE,
 ): LineElement | ArrowElement {
-  const base = { ...defaults(seed), ...geometry }
+  const base = { ...defaults(seed, style), ...geometry }
   return type === 'arrow'
     ? { type, ...base, endArrowhead: 'arrow' }
     : { type, ...base }
@@ -122,36 +163,43 @@ export function createLinear(
 export function createPencil(
   geometry: LinearGeometry,
   seed = randomSeed(),
+  style = BUILT_IN_STYLE,
 ): PencilElement {
-  return { type: 'pencil', ...defaults(seed), ...geometry }
+  return { type: 'pencil', ...defaults(seed, style), ...geometry }
 }
-
-/** The default text size: M in the S/M/L/XL steps of `docs/ui.md`. */
-export const DEFAULT_FONT_SIZE = 20
 
 /**
  * A new, empty text with its top-left at `at`. Its size is set from its text
  * when the edit is committed (ADR 0027).
  */
-export function createText(at: Point, seed = randomSeed()): TextElement {
+export function createText(
+  at: Point,
+  seed = randomSeed(),
+  style = BUILT_IN_STYLE,
+): TextElement {
   return {
     type: 'text',
-    ...defaults(seed),
+    ...defaults(seed, style),
     x: at[0],
     y: at[1],
     width: 0,
     height: 0,
     text: '',
-    fontFamily: 'hand',
-    fontSize: DEFAULT_FONT_SIZE,
-    textAlign: 'left',
+    fontFamily: style.fontFamily,
+    fontSize: style.fontSize,
+    textAlign: style.textAlign,
   }
 }
 
 /** The style of a new shape label (ADR 0026); its text is filled in when editing. */
-export const DEFAULT_LABEL: TextLabel = {
-  text: '',
-  fontFamily: 'hand',
-  fontSize: DEFAULT_FONT_SIZE,
-  textAlign: 'center',
+export const DEFAULT_LABEL: TextLabel = labelIn(BUILT_IN_STYLE)
+
+/** A new, empty label in the font and size of `style`, always centred. */
+export function labelIn(style: ElementStyle): TextLabel {
+  return {
+    text: '',
+    fontFamily: style.fontFamily,
+    fontSize: style.fontSize,
+    textAlign: 'center',
+  }
 }
