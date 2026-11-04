@@ -10,7 +10,8 @@ import { useRoute } from './route.ts'
 export function Root({ repository }: { repository: DrawingRepository }) {
   const route = useRoute()
   // The closing editor's last save. React runs the old screen's cleanup before
-  // the new screen's effects, so Home's first list() can wait for it.
+  // the new screen's effects, so the next screen's first read can wait for it:
+  // Home's list(), or the editor's get() after Back then Forward.
   const closing = useRef<Promise<void>>(Promise.resolve())
   const waitForEditor = useCallback(() => closing.current, [])
   const onClose = useCallback((saved: Promise<void>) => {
@@ -24,6 +25,7 @@ export function Root({ repository }: { repository: DrawingRepository }) {
       key={route.id}
       repository={repository}
       id={route.id}
+      waitForEditor={waitForEditor}
       onClose={onClose}
     />
   )
@@ -32,17 +34,25 @@ export function Root({ repository }: { repository: DrawingRepository }) {
 interface DrawingScreenProps {
   repository: DrawingRepository
   id: string
+  /** The previous editor's last save, which the load must not overtake. */
+  waitForEditor(): Promise<void>
   onClose(saved: Promise<void>): void
 }
 
 /** Loads the drawing, then opens the editor on it; never a blank fallback. */
-function DrawingScreen({ repository, id, onClose }: DrawingScreenProps) {
+function DrawingScreen({
+  repository,
+  id,
+  waitForEditor,
+  onClose,
+}: DrawingScreenProps) {
   const [result, setResult] = useState<LoadResult>()
   const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     let cancelled = false
-    void loadDrawing(repository, id).then((loaded) => {
+    const after = waitForEditor()
+    void loadDrawing(repository, id, { after }).then((loaded) => {
       if (loaded.status === 'error') {
         console.error('Could not open the drawing', loaded.error)
       }
@@ -51,7 +61,7 @@ function DrawingScreen({ repository, id, onClose }: DrawingScreenProps) {
     return () => {
       cancelled = true
     }
-  }, [repository, id, attempt])
+  }, [repository, id, waitForEditor, attempt])
 
   if (!result) {
     return (

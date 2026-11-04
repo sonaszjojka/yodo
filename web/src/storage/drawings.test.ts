@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 import { createDocument } from '../core/document/create.ts'
 import {
   createDrawing,
@@ -41,6 +41,23 @@ describe('loadDrawing', () => {
     })
     expect(await repository.list()).toEqual([])
   })
+})
+
+test('loadDrawing waits for an earlier save before reading', async () => {
+  const repository = new InMemoryDrawingRepository()
+  const doc = createDocument('stored')
+  await repository.save(doc)
+  const get = vi.spyOn(repository, 'get')
+  let finishSave!: () => void
+  const saving = new Promise<void>((resolve) => (finishSave = resolve))
+
+  const loading = loadDrawing(repository, doc.id, { after: saving })
+  await Promise.resolve()
+  expect(get).not.toHaveBeenCalled()
+
+  finishSave()
+  expect(await loading).toMatchObject({ status: 'loaded' })
+  expect(get).toHaveBeenCalledOnce()
 })
 
 describe('createDrawing', () => {

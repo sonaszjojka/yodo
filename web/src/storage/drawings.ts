@@ -10,6 +10,14 @@ export type LoadResult =
   | { status: 'not-found' }
   | { status: 'error'; error: unknown }
 
+export interface LoadOptions {
+  /**
+   * A save to wait for first, e.g. the editor that just closed: over HTTP a
+   * read could otherwise overtake it and return the older document.
+   */
+  after?: Promise<void>
+}
+
 /**
  * Opens one drawing for the editor. A failure is reported, never replaced by
  * a new drawing, so nothing gets saved over or around the stored one (#67).
@@ -17,8 +25,10 @@ export type LoadResult =
 export async function loadDrawing(
   repository: DrawingRepository,
   id: string,
+  { after }: LoadOptions = {},
 ): Promise<LoadResult> {
   try {
+    await after
     const document = await repository.get(id)
     return document ? { status: 'loaded', document } : { status: 'not-found' }
   } catch (error) {
