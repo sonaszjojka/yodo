@@ -43,3 +43,31 @@ export function barPosition(
 export function barWidth(count: number) {
   return count * BUTTON + (count - 1) * 2 + 2 * 4 + 2
 }
+
+/** Screen px between a control and its open popover. */
+const POPOVER_GAP = 10
+/** Bar border + padding around each control. */
+const INSET = 1 + 4
+
+/** A popover's size for `count` options, at most four per row. */
+function popoverSize(count: number): Size {
+  const columns = Math.min(4, count)
+  const rows = Math.ceil(count / columns)
+  const span = (n: number) => n * BUTTON + (n - 1) * 2 + 2 * 4 + 2
+  return { width: span(columns), height: span(rows) }
+}
+
+/**
+ * Where a control's popover goes, relative to that control: below the
+ * bar, or above it when the window ends first.
+ */
+export function popoverOffset(
+  bar: { left: number; top: number },
+  count: number,
+  window: Size,
+): { left: number; top: number } {
+  const { height } = popoverSize(count)
+  const below = BUTTON + POPOVER_GAP
+  const fitsBelow = bar.top + INSET + below + height <= window.height - GAP
+  return { left: -INSET, top: fitsBelow ? below : -height - POPOVER_GAP }
+}

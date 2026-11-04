@@ -17,7 +17,13 @@ import {
 import { selectionFrame } from '../core/geometry/frame.ts'
 import { worldToScreen } from '../core/geometry/viewport.ts'
 import { FONT_STACKS } from '../core/text/layout.ts'
-import { BUTTON, barPosition, barWidth, type Size } from './barPosition.ts'
+import {
+  BUTTON,
+  barPosition,
+  barWidth,
+  popoverOffset,
+  type Size,
+} from './barPosition.ts'
 import { isOutside } from './outsidePress.ts'
 import {
   FILLS,
@@ -249,6 +255,7 @@ export function StyleBar({ editor }: { editor: Editor }) {
                 aria-label={control.name}
                 // Up to four per row: two looks fit one row, eight colours two.
                 style={{
+                  ...popoverOffset({ left, top }, control.options.length, size),
                   gridTemplateColumns: `repeat(${Math.min(4, control.options.length)}, ${BUTTON}px)`,
                 }}
               >

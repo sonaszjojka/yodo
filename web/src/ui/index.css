@@ -515,11 +515,9 @@ a.drawing-card-body:focus-visible,
   position: relative;
 }
 
-/* One control's options, under its button. */
+/* One control's options; StyleBar places it (barPosition.ts). */
 .style-popover {
   position: absolute;
-  top: calc(100% + 10px);
-  left: -5px;
   z-index: 1;
   display: grid;
   gap: 2px;

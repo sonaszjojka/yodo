@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest'
 import { createDocument, createShape } from '../core/document/create.ts'
 import type { YodoElement } from '../core/document/types.ts'
 import { createEditor } from '../core/editor/editor.ts'
-import { barPosition } from './barPosition.ts'
+import { barPosition, popoverOffset } from './barPosition.ts'
 import { StyleBar } from './StyleBar.tsx'
 
 /** An editor with `elements`, Select active and the elements at `selected` selected. */
@@ -101,5 +101,19 @@ describe('barPosition', () => {
     expect(barPosition(outline, 200, window).left).toBe(8)
     const right = { x: 990, y: 300, width: 100, height: 100 }
     expect(barPosition(right, 200, window).left).toBe(1000 - 8 - 200)
+  })
+})
+
+describe('popoverOffset', () => {
+  const window = { width: 1000, height: 800 }
+
+  test('opens below the bar when it fits', () => {
+    // 8 colours: 4 × 2, so 4·40 + 3·2 + 10 = 176 wide, 2·40 + 2 + 10 = 92 tall.
+    expect(popoverOffset({ left: 100, top: 300 }, 8, window).top).toBe(50)
+  })
+
+  test('opens above the bar near the bottom of the window', () => {
+    const top = 800 - 8 - 50
+    expect(popoverOffset({ left: 100, top }, 8, window).top).toBe(-92 - 10)
   })
 })
