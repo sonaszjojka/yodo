@@ -9,6 +9,7 @@ import { createCanvasMeasure } from './measure.ts'
 import { SaveStatus } from './SaveStatus.tsx'
 import { TextEditor } from './TextEditor.tsx'
 import { Toolbar } from './Toolbar.tsx'
+import { TopBar } from './TopBar.tsx'
 import { ZoomControl } from './ZoomControl.tsx'
 
 export interface AppProps {
@@ -16,10 +17,13 @@ export interface AppProps {
   repository: DrawingRepository
   /** The drawing to open, loaded before the first render. */
   document: YodoDocument
+  /** Gets the last save when the editor closes, e.g. to wait for it on Home. */
+  onClose?(saved: Promise<void>): void
 }
 
 // The editor on one drawing, auto-saved through the repository (ADR 0032).
-export function App({ repository, document }: AppProps) {
+// Leaving it (Back, or any route change) flushes the pending save.
+export function App({ repository, document, onClose }: AppProps) {
   // Lazy initialisers create these once, not on every render. Creating the
   // saver has no side effects; it starts watching in the effect below.
   const [editor] = useState(() =>
@@ -41,13 +45,14 @@ export function App({ repository, document }: AppProps) {
       window.document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('pagehide', flush)
       stop()
-      flush()
+      onClose?.(saver.flush())
     }
-  }, [saver])
+  }, [saver, onClose])
 
   return (
     <>
       <Canvas editor={editor} />
+      <TopBar editor={editor} />
       <TextEditor editor={editor} />
       <Toolbar editor={editor} />
       <div className="bottom-bar">
