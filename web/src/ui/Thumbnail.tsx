@@ -4,6 +4,7 @@ import { elementBounds, unionBounds } from '../core/geometry/rect.ts'
 import { fitViewport } from '../core/geometry/viewport.ts'
 import { canvasSize, renderScene } from '../core/render/render.ts'
 import type { DrawingRepository } from '../storage/repository.ts'
+import { thumbnailDocument } from './thumbnailDocument.ts'
 
 /** Space around the drawing inside the thumbnail, in CSS pixels. */
 const PADDING = 12
@@ -30,7 +31,7 @@ export function Thumbnail({ repository, id, updatedAt }: ThumbnailProps) {
     let cancelled = false
 
     async function draw() {
-      const doc = await repository.get(id)
+      const doc = await thumbnailDocument(repository, id, document.fonts.ready)
       if (cancelled) return
       const bounds = doc && unionBounds(doc.elements.map(elementBounds))
       if (!doc || !bounds) return setState('empty')
