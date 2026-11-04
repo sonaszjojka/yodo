@@ -11,7 +11,13 @@ import {
 import type { TextElement, YodoElement } from '../document/types.ts'
 import { estimateMeasure, layoutText } from '../text/layout.ts'
 import { BUILT_IN_STYLE } from '../document/create.ts'
-import { applyDefaults, applyStyle, commonStyle, stylesOf } from './style.ts'
+import {
+  applyDefaults,
+  applyStyle,
+  commonStyle,
+  sharedStyle,
+  stylesOf,
+} from './style.ts'
 
 const rect = createShape('rectangle', { x: 0, y: 0, width: 100, height: 50 })
 const line = createLinear('line', {
@@ -59,8 +65,15 @@ describe('stylesOf', () => {
       'strokeWidth',
       'strokeStyle',
       'roughness',
+      'roundness',
       'opacity',
     ])
+  })
+
+  test('diamonds have corners; ellipses do not', () => {
+    const box = { x: 0, y: 0, width: 10, height: 10 }
+    expect(stylesOf(createShape('diamond', box))).toContain('roundness')
+    expect(stylesOf(createShape('ellipse', box))).not.toContain('roundness')
   })
 
   test('lines have no fill; pencil has no fill and no look', () => {
@@ -208,5 +221,48 @@ describe('applyDefaults', () => {
       BUILT_IN_STYLE,
     )
     expect(applyDefaults(BUILT_IN_STYLE, {})).toBe(BUILT_IN_STYLE)
+  })
+})
+
+describe('roundness (corners)', () => {
+  const { roundness: _, ...old } = rect
+
+  test('a shape without the field (an older document) reads as sharp', () => {
+    expect(commonStyle([old as YodoElement]).roundness).toBe('sharp')
+    expect(commonStyle([old as YodoElement, rect]).roundness).toBe('sharp')
+  })
+
+  test('setting sharp on an old shape is no change', () => {
+    const document = doc([old as YodoElement])
+    expect(
+      applyStyle(document, [rect.id], { roundness: 'sharp' }, estimateMeasure),
+    ).toBe(document)
+  })
+
+  test('round applies to rectangles only, not to a line', () => {
+    const document = doc([rect, line])
+    const result = applyStyle(
+      document,
+      [rect.id, line.id],
+      { roundness: 'round' },
+      estimateMeasure,
+    )
+    expect(result.elements[0]).toMatchObject({ roundness: 'round' })
+    expect(result.elements[1]).toBe(line)
+  })
+})
+
+describe('sharedStyle', () => {
+  test('keeps the shared styles and drops the mixed ones', () => {
+    const style = sharedStyle([
+      rect,
+      { ...rect, id: 'b', strokeColor: '#C2453D' },
+    ])
+    expect(style).not.toHaveProperty('strokeColor')
+    expect(style).toMatchObject({ strokeWidth: 2, roundness: 'sharp' })
+  })
+
+  test('nothing selected shares nothing', () => {
+    expect(sharedStyle([])).toEqual({})
   })
 })

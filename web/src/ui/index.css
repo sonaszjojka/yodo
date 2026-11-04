@@ -494,6 +494,29 @@ a.drawing-card-body:focus-visible,
   outline: none;
 }
 
+/* The style bar's "more" menu; StyleBar places it (menuOffset, barPosition.ts). */
+.style-menu {
+  right: auto;
+  bottom: auto;
+  width: 180px;
+  box-sizing: border-box;
+}
+
+.style-menu [role='menuitem'] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.style-menu [role='menuitem']:disabled {
+  color: var(--muted-text);
+  cursor: default;
+}
+
+.style-menu [role='menuitem']:disabled:hover {
+  background: transparent;
+}
+
 /* The contextual style bar above the selection (docs/ui.md, Editing styles). */
 .style-bar {
   position: fixed;
@@ -707,6 +730,24 @@ a.drawing-card-body:focus-visible,
 .panel-range {
   width: 100%;
   accent-color: var(--accent);
+}
+
+.panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.panel-action {
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.panel-action:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .panel-delete {

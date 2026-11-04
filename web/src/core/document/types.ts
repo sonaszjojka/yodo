@@ -8,6 +8,8 @@ export type StrokeStyle = 'solid' | 'dashed' | 'dotted'
 export type FillStyle = 'hachure' | 'cross-hatch' | 'solid'
 export type FontFamily = 'hand' | 'sans' | 'mono'
 export type TextAlign = 'left' | 'center' | 'right'
+/** Corners of a rectangle or diamond (roadmap 2.2b). */
+export type Roundness = 'sharp' | 'round'
 
 /** A point relative to its element's (x, y). */
 export type Point = [x: number, y: number]
@@ -46,12 +48,21 @@ export interface TextLabel {
   textAlign: TextAlign
 }
 
-export interface RectangleElement extends BaseElement {
+/**
+ * Format note (ADR 0013): `roundness` was added in roadmap 2.2b as an optional
+ * field, so schemaVersion stays 1 and no migration exists. Absent means
+ * 'sharp', which is how every earlier document looks.
+ */
+interface Cornered {
+  roundness?: Roundness
+}
+
+export interface RectangleElement extends BaseElement, Cornered {
   type: 'rectangle'
   label?: TextLabel
 }
 
-export interface DiamondElement extends BaseElement {
+export interface DiamondElement extends BaseElement, Cornered {
   type: 'diamond'
   label?: TextLabel
 }

@@ -3,8 +3,10 @@ import { createLinear, createShape } from '../document/create.ts'
 import type { Point } from '../document/types.ts'
 import {
   containsBounds,
+  cornerRadius,
   elementBounds,
   rectFromDrag,
+  roundedPolygonPath,
   unionBounds,
   type Bounds,
 } from './rect.ts'
@@ -106,5 +108,54 @@ describe('containsBounds', () => {
     ['fully outside', { x: 200, y: 200, width: 5, height: 5 }, false],
   ])('%s', (_, inner, expected) => {
     expect(containsBounds(outer, inner)).toBe(expected)
+  })
+})
+
+describe('cornerRadius', () => {
+  test.each([
+    [{ width: 40, height: 100 }, 10],
+    [{ width: 100, height: 100 }, 25],
+    [{ width: 400, height: 200 }, 32],
+    [{ width: 0, height: 50 }, 0],
+  ])('is a quarter of the shorter side, at most 32: %j', (size, radius) => {
+    expect(cornerRadius({ x: 0, y: 0, ...size })).toBe(radius)
+  })
+
+  test('a negative size (a drag in progress) still gives a positive radius', () => {
+    expect(cornerRadius({ x: 0, y: 0, width: -40, height: 100 })).toBe(10)
+  })
+})
+
+describe('roundedPolygonPath', () => {
+  const square: Point[] = [
+    [0, 0],
+    [100, 0],
+    [100, 100],
+    [0, 100],
+  ]
+
+  test('cuts each corner by the radius and curves through the vertex', () => {
+    expect(roundedPolygonPath(square, 10)).toBe(
+      'M 10 0 L 90 0 Q 100 0 100 10 L 100 90 Q 100 100 90 100 ' +
+        'L 10 100 Q 0 100 0 90 L 0 10 Q 0 0 10 0 Z',
+    )
+  })
+
+  test('limits the radius to half of the shorter edge', () => {
+    const thin: Point[] = [
+      [0, 0],
+      [100, 0],
+      [100, 10],
+      [0, 10],
+    ]
+    // Radius 5, not 30: the short edges are 10 long.
+    expect(roundedPolygonPath(thin, 30)).toMatch(/^M 5 0 L 95 0 Q 100 0 100 5 /)
+  })
+
+  test('a radius of 0 gives the sharp polygon', () => {
+    expect(roundedPolygonPath(square, 0)).toBe(
+      'M 0 0 L 100 0 Q 100 0 100 0 L 100 100 Q 100 100 100 100 ' +
+        'L 0 100 Q 0 100 0 100 L 0 0 Q 0 0 0 0 Z',
+    )
   })
 })

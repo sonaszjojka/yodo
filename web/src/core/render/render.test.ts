@@ -67,6 +67,7 @@ function fakeRough() {
     polygon: vi.fn(),
     ellipse: vi.fn(),
     linearPath: vi.fn(),
+    path: vi.fn(),
   } satisfies SceneRough
 }
 
@@ -181,6 +182,42 @@ describe('renderScene', () => {
       ],
       expect.objectContaining({ seed: 3 }),
     )
+  })
+
+  test.each(['rectangle', 'diamond'] as const)(
+    'draws a round %s as a rounded path with its seed',
+    (type) => {
+      const rough = fakeRough()
+      const shape = {
+        ...createShape(type, { x: 0, y: 0, width: 100, height: 60 }, 5),
+        roundness: 'round' as const,
+      }
+
+      renderScene(fakeContext(), rough, [shape], SURFACE, IDENTITY)
+
+      expect(rough.rectangle).not.toHaveBeenCalled()
+      expect(rough.polygon).not.toHaveBeenCalled()
+      // Radius: a quarter of the shorter side (60 / 4 = 15).
+      const start = type === 'rectangle' ? 'M 15 0 ' : 'M '
+      expect(rough.path).toHaveBeenCalledWith(
+        expect.stringContaining(start),
+        expect.objectContaining({ seed: 5 }),
+      )
+    },
+  )
+
+  test('a shape without roundness (an older document) is drawn sharp', () => {
+    const rough = fakeRough()
+    const { roundness: _, ...old } = createShape(
+      'rectangle',
+      { x: 0, y: 0, width: 10, height: 10 },
+      6,
+    )
+
+    renderScene(fakeContext(), rough, [old], SURFACE, IDENTITY)
+
+    expect(rough.rectangle).toHaveBeenCalled()
+    expect(rough.path).not.toHaveBeenCalled()
   })
 
   test('draws an ellipse from its centre and size', () => {

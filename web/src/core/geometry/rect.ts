@@ -43,6 +43,107 @@ export function diamondPoints({ x, y, width, height }: Bounds): Point[] {
   ]
 }
 
+/** The largest corner radius of a round shape, in world units. */
+export const MAX_CORNER_RADIUS = 32
+
+/**
+ * How round a `roundness: 'round'` shape's corners are: a quarter of its
+ * shorter side, so small shapes stay shapes, up to `MAX_CORNER_RADIUS`.
+ */
+export function cornerRadius({ width, height }: Bounds): number {
+  return Math.min(
+    MAX_CORNER_RADIUS,
+    Math.min(Math.abs(width), Math.abs(height)) / 4,
+  )
+}
+
+/** The point `distance` along the segment from `from` towards `to`. */
+function toward(from: Point, to: Point, distance: number): Point {
+  const length = Math.hypot(to[0] - from[0], to[1] - from[1])
+  if (length === 0) return from
+  const t = distance / length
+  return [from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t]
+}
+
+/** One rounded vertex: its curve runs from `start` to `end`, pulled towards `vertex`. */
+interface RoundCorner {
+  start: Point
+  vertex: Point
+  end: Point
+}
+
+/**
+ * The corners of the polygon rounded by `radius`, limited to half the
+ * shortest edge so curves never overlap.
+ */
+function roundCorners(points: readonly Point[], radius: number): RoundCorner[] {
+  const n = points.length
+  let shortest = Infinity
+  for (let i = 0; i < n; i++) {
+    const [a, b] = [points[i]!, points[(i + 1) % n]!]
+    shortest = Math.min(shortest, Math.hypot(b[0] - a[0], b[1] - a[1]))
+  }
+  const r = Math.max(0, Math.min(radius, shortest / 2))
+  return points.map((vertex, i) => ({
+    start: toward(vertex, points[(i - 1 + n) % n]!, r),
+    vertex,
+    end: toward(vertex, points[(i + 1) % n]!, r),
+  }))
+}
+
+/**
+ * An SVG path for the closed polygon with each vertex replaced by a
+ * quadratic curve that starts and ends `radius` along its two edges (round
+ * corners, roadmap 2.2b).
+ */
+export function roundedPolygonPath(
+  points: readonly Point[],
+  radius: number,
+): string {
+  const corners = roundCorners(points, radius)
+  const curve = ({ start, vertex, end }: RoundCorner) =>
+    `L ${start[0]} ${start[1]} Q ${vertex[0]} ${vertex[1]} ${end[0]} ${end[1]}`
+  // Start just after the first vertex; its own curve closes the path.
+  const [first, ...rest] = corners
+  const parts = [`M ${first!.end[0]} ${first!.end[1]}`]
+  for (const corner of rest) parts.push(curve(corner))
+  parts.push(curve(first!), 'Z')
+  return parts.join(' ')
+}
+
+/**
+ * The outline `roundedPolygonPath` draws, as a polygon with each curve
+ * sampled at `steps` segments: what hit-testing aims at.
+ */
+export function roundedPolygonOutline(
+  points: readonly Point[],
+  radius: number,
+  steps = 8,
+): Point[] {
+  const outline: Point[] = []
+  for (const { start, vertex, end } of roundCorners(points, radius)) {
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps
+      const [a, b, c] = [(1 - t) ** 2, 2 * (1 - t) * t, t ** 2]
+      outline.push([
+        a * start[0] + b * vertex[0] + c * end[0],
+        a * start[1] + b * vertex[1] + c * end[1],
+      ])
+    }
+  }
+  return outline
+}
+
+/** The four corners of a box, clockwise from the top-left. */
+export function boxCorners({ x, y, width, height }: Bounds): Point[] {
+  return [
+    [x, y],
+    [x + width, y],
+    [x + width, y + height],
+    [x, y + height],
+  ]
+}
+
 /**
  * The world-space box an element covers. Lines, arrows and pencil strokes
  * measure their points, since those can lie left of or above (x, y); for them

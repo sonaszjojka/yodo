@@ -124,3 +124,34 @@ export function deleteElements(
 ): YodoElement[] {
   return elements.filter((element) => !ids.has(element.id))
 }
+
+/** How far a duplicate lands from its original, right and down (world units). */
+export const DUPLICATE_OFFSET = 10
+
+/**
+ * Copies of the elements in `ids`, each with a new id from `createId` and
+ * placed right above its original, `DUPLICATE_OFFSET` away. Copies keep the
+ * seed, so they look the same (ADR 0004). Returns the copies' ids in order.
+ */
+export function duplicateElements(
+  elements: YodoElement[],
+  ids: ReadonlySet<string>,
+  createId: () => string,
+): { elements: YodoElement[]; ids: string[] } {
+  if (!elements.some((element) => ids.has(element.id))) {
+    return { elements, ids: [] }
+  }
+  const copies: string[] = []
+  const result = elements.flatMap((element) => {
+    if (!ids.has(element.id)) return [element]
+    const copy = {
+      ...element,
+      id: createId(),
+      x: element.x + DUPLICATE_OFFSET,
+      y: element.y + DUPLICATE_OFFSET,
+    }
+    copies.push(copy.id)
+    return [element, copy]
+  })
+  return { elements: result, ids: copies }
+}

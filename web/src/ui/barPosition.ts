@@ -68,7 +68,27 @@ export function popoverOffset(
   count: number,
   window: Size,
 ): { left: number; top: number } {
-  const { width, height } = popoverSize(count)
+  return offsetFor(bar, index, popoverSize(count), window)
+}
+
+/** The "more" menu's size (`.style-menu` in index.css): 5 rows of 36 px. */
+export const MENU_SIZE: Size = { width: 180, height: 5 * 36 + 2 * 4 + 2 }
+
+/** Where the "more" menu of the control at `index` goes, like a popover. */
+export function menuOffset(
+  bar: { left: number; top: number },
+  index: number,
+  window: Size,
+): { left: number; top: number } {
+  return offsetFor(bar, index, MENU_SIZE, window)
+}
+
+function offsetFor(
+  bar: { left: number; top: number },
+  index: number,
+  { width, height }: Size,
+  window: Size,
+): { left: number; top: number } {
   const control = bar.left + INSET + index * (BUTTON + 2)
   const left = Math.max(
     Math.min(control - INSET, window.width - GAP - width),

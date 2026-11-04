@@ -211,3 +211,37 @@ describe('labelled shapes (ADR 0026)', () => {
     expect(hits(ellipse, [2, 2])).toBe(false)
   })
 })
+
+describe('round corners (roadmap 2.2b)', () => {
+  const box = { x: 0, y: 0, width: 200, height: 200 }
+  // Radius 32: the corner curve passes through (8, 8), the tip is empty.
+  const rect = {
+    ...createShape('rectangle', box),
+    roundness: 'round' as const,
+  }
+  // Tip at (100, 0); its curve passes through about (100, 11.3).
+  const diamond = {
+    ...createShape('diamond', box),
+    roundness: 'round' as const,
+  }
+
+  test('a round rectangle hits on its drawn corner curve', () => {
+    expect(hits(rect, [8, 8])).toBe(true)
+    expect(hits(rect, [100, 0])).toBe(true)
+  })
+
+  test('the empty corner tip outside the curve misses', () => {
+    expect(hits(rect, [0, 0])).toBe(false)
+    expect(hits(filled(rect), [1, 1])).toBe(false)
+  })
+
+  test('a transparent round rectangle still passes clicks through its middle', () => {
+    expect(hits(rect, [100, 100])).toBe(false)
+    expect(hits(filled(rect), [100, 100])).toBe(true)
+  })
+
+  test('a round diamond hits on its rounded tip, not the sharp one', () => {
+    expect(hits(diamond, [100, 11])).toBe(true)
+    expect(hits(diamond, [100, 0])).toBe(false)
+  })
+})

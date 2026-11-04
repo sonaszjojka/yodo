@@ -3,6 +3,7 @@
 import type {
   FillStyle,
   FontFamily,
+  Roundness,
   StrokeStyle,
   TextAlign,
 } from '../core/document/types.ts'
@@ -44,6 +45,12 @@ export const WIDTHS: Option<number>[] = [
 export const LOOKS: Option<number>[] = [
   { value: 1, label: 'Hand-drawn' },
   { value: 0, label: 'Clean' },
+]
+
+/** Corners of rectangles and diamonds (roadmap 2.2b). */
+export const CORNERS: Option<Roundness>[] = [
+  { value: 'sharp', label: 'Sharp' },
+  { value: 'round', label: 'Round' },
 ]
 
 export const FONTS: Option<FontFamily>[] = [

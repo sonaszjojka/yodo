@@ -66,6 +66,7 @@ const STYLE_CHECKS: {
   strokeWidth: (v) => isNumber(v) && v > 0,
   strokeStyle: (v) => v === 'solid' || v === 'dashed' || v === 'dotted',
   roughness: (v) => isNumber(v) && v >= 0,
+  roundness: (v) => v === 'sharp' || v === 'round',
   opacity: (v) => isNumber(v) && v >= 0 && v <= 100,
   fontFamily: (v) => v === 'hand' || v === 'sans' || v === 'mono',
   fontSize: (v) => isNumber(v) && v > 0,
