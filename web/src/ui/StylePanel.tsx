@@ -313,6 +313,11 @@ function ExactSize({
         onBlur={(event) => apply(event.currentTarget)}
         onKeyDown={(event) => {
           if (event.key === 'Enter') apply(event.currentTarget)
+          // Escape cancels: restore the value before the panel blurs the
+          // field, so the blur has nothing to apply.
+          if (event.key === 'Escape') {
+            event.currentTarget.value = value === 'mixed' ? '' : String(value)
+          }
         }}
       />
       px
