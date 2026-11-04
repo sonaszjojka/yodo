@@ -7,11 +7,11 @@ Rule: every stage ends with a **file of decisions**, not just a conversation. Co
 
 **Language:** from now on all communication, code, docs and other output are in English.
 
-## Status (2026-11-03)
+## Status (2026-11-04)
 Read this section, not the whole file; finished work is logged in `docs/history.md`.
-- **Last done:** roadmap 1.14 (issue #23): auto-save (ADR 0032). The document saves a second after the last change, one save at a time, with the viewport copied into `appState`; hiding or closing the tab flushes it. Save status is in the bottom bar, and startup opens the most recently saved drawing in both modes.
-- Open items: `review` issues from the 1.14 review; the startup-fallback one (silent new drawing on a load error) belongs to 1.15.
-- **Next step:** roadmap 1.15 (Home screen, issue #24).
+- **Last done:** roadmap 1.15 (issue #24): Home screen. Cards with lazily rendered thumbnails (ADR 0034), name and last edited, a "+ New drawing" tile, Open and Rename, three sort orders. Hash routes `#/` and `#/d/:id` (ADR 0033): startup follows the URL, and a drawing that fails to load shows an error screen instead of a blank fallback (closes #67).
+- Open items: `review` issues from the 1.14 and 1.15 reviews.
+- **Next step:** roadmap 1.16 (M1 e2e, issue #25).
 
 ## Working mode: an educational project
 The goal is both the app and learning how to program with Claude as effectively as possible, so that the knowledge stays with you. The rules (you decide and I explain, no silent automation, features introduced on first use, a short recap after each task, "just do it" to skip explanations) live in the global `~/.claude/CLAUDE.md` and the `educational-working-mode` memory, so they apply in every session.
