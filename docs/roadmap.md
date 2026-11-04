@@ -40,7 +40,8 @@ Goal: open Yodo, draw basic shapes, close the browser, come back to the same dra
 | # | Task | Done when… |
 |---|---|---|
 | 2.1 | Contextual style bar ✓ (PR [#95](https://github.com/sonaszjojka/yodo/pull/95)) ([#77](https://github.com/sonaszjojka/yodo/issues/77)) | Stroke, fill, width, look (hand-drawn/clean) above the selection, per `docs/ui.md`; for text, font and size S/M/L/XL. |
-| 2.2 | Style panel ([#78](https://github.com/sonaszjojka/yodo/issues/78)) | Movable, resizable panel with the full section list; edits defaults when nothing is selected; agrees with the bar. |
+| 2.2a | Style panel ([#78](https://github.com/sonaszjojka/yodo/issues/78)) | Movable, resizable panel (toggle, "All styles", snap back) with the sections on existing fields: stroke, background, fill style, width, stroke style, look, opacity, delete; text font previews, size steps + exact px, alignment. Edits the defaults when nothing is selected (ADR 0036); agrees with the bar. |
+| 2.2b | Style panel: remaining sections | Corners (new `roundness` field), layers (front/back), copy/paste style, use as default; the bar's "more" menu. |
 | 2.3 | Dark mode ([#79](https://github.com/sonaszjojka/yodo/issues/79)) | UI + canvas themes; choice remembered; drawing colours dark-adapted at render time (ADR 0015). |
 | 2.4 | Sticky notes ([#80](https://github.com/sonaszjojka/yodo/issues/80)) | Coloured note with text: place, move, resize, edit. |
 | 2.5 | Copy / paste / duplicate ([#81](https://github.com/sonaszjojka/yodo/issues/81)) | Elements copy and paste within and between drawings; duplicate; select all. |
