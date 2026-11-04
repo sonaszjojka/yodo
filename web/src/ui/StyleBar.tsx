@@ -34,6 +34,7 @@ import {
   menuOffset,
   popoverOffset,
 } from './barPosition.ts'
+import { nextMenuIndex } from './menuKeys.ts'
 import { isOutside } from './outsidePress.ts'
 import {
   FILLS,
@@ -148,29 +149,6 @@ const CONTROLS = [
     ),
   } satisfies Control<'fontSize'>,
 ] as Control<StyleKey>[]
-
-/**
- * Where focus goes in a menu of `count` items on `key` (WAI-ARIA menu:
- * arrows wrap, Home and End jump), or null for other keys.
- */
-export function nextMenuIndex(
-  key: string,
-  index: number,
-  count: number,
-): number | null {
-  switch (key) {
-    case 'ArrowDown':
-      return (index + 1) % count
-    case 'ArrowUp':
-      return (index - 1 + count) % count
-    case 'Home':
-      return 0
-    case 'End':
-      return count - 1
-    default:
-      return null
-  }
-}
 
 /** Keys the canvas handles on the window; inside the menu they act on its items. */
 const MENU_KEYS = new Set([' ', 'Delete', 'Backspace'])
