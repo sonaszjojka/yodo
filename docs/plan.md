@@ -9,9 +9,9 @@ Rule: every stage ends with a **file of decisions**, not just a conversation. Co
 
 ## Status (2026-11-04)
 Read this section, not the whole file; finished work is logged in `docs/history.md`.
-- **Last done:** roadmap 1.16 (issue #25): M1 e2e (ADR 0035). A Playwright package in `e2e/` draws, reloads and reopens a drawing from Home in hosted (`vite preview` under `/yodo/`, IndexedDB) and self-hosted mode (the built Go server), in Chromium, Firefox and WebKit, and checks each mode's own storage; a new `e2e` CI job is in the `ci` gate. M1 is complete.
+- **Last done:** roadmap 2.1 (issue #77): contextual style bar. Above the selection: stroke, fill, width and look for shapes and lines, font and size for text; each change is one undo step. The Sans and Mono canvas fonts (Manrope, JetBrains Mono) are now bundled (ADR 0025). M2 and M3 issues exist (#77–#94).
 - Open items: `review` issues from the 1.14, 1.15 and 1.16 reviews.
-- **Next step:** create the M2 and M3 GitHub issues and milestones (roadmap header: created when M1 ends), then roadmap 2.1 (contextual style bar).
+- **Next step:** roadmap 2.2 (issue #78): style panel.
 
 ## Working mode: an educational project
 The goal is both the app and learning how to program with Claude as effectively as possible, so that the knowledge stays with you. The rules (you decide and I explain, no silent automation, features introduced on first use, a short recap after each task, "just do it" to skip explanations) live in the global `~/.claude/CLAUDE.md` and the `educational-working-mode` memory, so they apply in every session.
