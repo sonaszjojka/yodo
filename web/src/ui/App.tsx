@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { YodoDocument } from '../core/document/types.ts'
 import { createEditor } from '../core/editor/editor.ts'
-import { createAutoSaver } from '../storage/autosave.ts'
+import { createAutoSaver, finalSave } from '../storage/autosave.ts'
 import type { DrawingRepository } from '../storage/repository.ts'
 import { Canvas } from './Canvas.tsx'
 import { HistoryControl } from './HistoryControl.tsx'
@@ -9,6 +9,7 @@ import { createCanvasMeasure } from './measure.ts'
 import { SaveStatus } from './SaveStatus.tsx'
 import { TextEditor } from './TextEditor.tsx'
 import { Toolbar } from './Toolbar.tsx'
+import { TopBar } from './TopBar.tsx'
 import { ZoomControl } from './ZoomControl.tsx'
 
 export interface AppProps {
@@ -16,10 +17,13 @@ export interface AppProps {
   repository: DrawingRepository
   /** The drawing to open, loaded before the first render. */
   document: YodoDocument
+  /** Gets the last save (true if it succeeded) when the editor closes. */
+  onClose?(saved: Promise<boolean>): void
 }
 
 // The editor on one drawing, auto-saved through the repository (ADR 0032).
-export function App({ repository, document }: AppProps) {
+// Leaving it (Back, or any route change) flushes the pending save.
+export function App({ repository, document, onClose }: AppProps) {
   // Lazy initialisers create these once, not on every render. Creating the
   // saver has no side effects; it starts watching in the effect below.
   const [editor] = useState(() =>
@@ -41,13 +45,14 @@ export function App({ repository, document }: AppProps) {
       window.document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('pagehide', flush)
       stop()
-      flush()
+      onClose?.(finalSave(saver))
     }
-  }, [saver])
+  }, [saver, onClose])
 
   return (
     <>
       <Canvas editor={editor} />
+      <TopBar editor={editor} />
       <TextEditor editor={editor} />
       <Toolbar editor={editor} />
       <div className="bottom-bar">

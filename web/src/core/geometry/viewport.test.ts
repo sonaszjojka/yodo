@@ -3,6 +3,7 @@ import {
   MAX_ZOOM,
   MIN_ZOOM,
   clampZoom,
+  fitViewport,
   panBy,
   screenToWorld,
   wheelZoomFactor,
@@ -94,5 +95,40 @@ describe('wheelZoomFactor', () => {
 
   test('small trackpad-pinch deltas are not slowed down by the cap', () => {
     expect(wheelZoomFactor(-5)).toBeCloseTo(Math.exp(0.05))
+  })
+})
+
+describe('fitViewport', () => {
+  const size = { width: 200, height: 100 }
+
+  test('zooms out a large box to fit inside the padding, centred', () => {
+    // 400 × 100 into 180 × 80 (10 px padding): width limits, zoom 0.45.
+    const v = fitViewport({ x: 0, y: 0, width: 400, height: 100 }, size, 10)
+
+    expect(v.zoom).toBeCloseTo(0.45)
+    // The box centre (200, 50) lands on the surface centre (100, 50).
+    expect(worldToScreen(v, [200, 50])[0]).toBeCloseTo(100)
+    expect(worldToScreen(v, [200, 50])[1]).toBeCloseTo(50)
+  })
+
+  test('never zooms in past maxZoom, so a small drawing keeps its size', () => {
+    const v = fitViewport({ x: 50, y: 50, width: 20, height: 10 }, size, 10)
+
+    expect(v.zoom).toBe(1)
+    expect(worldToScreen(v, [60, 55])).toEqual([100, 50])
+  })
+
+  test('a zero-size box (a single point) is centred at maxZoom', () => {
+    const v = fitViewport({ x: 5, y: 5, width: 0, height: 0 }, size, 10)
+
+    expect(v.zoom).toBe(1)
+    expect(worldToScreen(v, [5, 5])).toEqual([100, 50])
+  })
+
+  test('fits a huge box below MIN_ZOOM, so it is never cropped', () => {
+    const v = fitViewport({ x: 0, y: 0, width: 1e5, height: 1e5 }, size, 10)
+
+    expect(v.zoom).toBeCloseTo(80 / 1e5)
+    expect(v.zoom).toBeLessThan(MIN_ZOOM)
   })
 })

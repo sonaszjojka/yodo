@@ -190,3 +190,306 @@ body {
 .save-status-error {
   color: var(--danger);
 }
+
+/* Editor top-left: back to Home + drawing name (docs/ui.md, Editor). */
+.top-bar {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 12px 2px 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-float);
+}
+
+.top-bar .tool-button {
+  width: 40px;
+  height: 40px;
+}
+
+.drawing-name {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Plain buttons outside the canvas (Home, message screens). */
+.button,
+.button-primary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.button-primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.button:hover {
+  background: var(--raised);
+}
+
+.button:focus-visible,
+.button-primary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Full-page message: opening, not found, load error (ADR 0033). */
+.screen-message {
+  max-width: 440px;
+  margin: 20vh auto 0;
+  padding: 0 16px;
+  color: var(--muted-text);
+  text-align: center;
+}
+
+.screen-message h1 {
+  margin: 0 0 8px;
+  color: var(--text);
+  font-size: 22px;
+}
+
+.screen-message-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+/* Home (docs/ui.md, Home). */
+.home-header {
+  padding: 20px 32px 0;
+}
+
+.home-header .logo {
+  font-size: 24px;
+}
+
+.home-main {
+  padding: 16px 32px 48px;
+}
+
+.home-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.home-title-row h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.home-sort {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted-text);
+  font-size: 14px;
+}
+
+.home-sort select {
+  min-height: 40px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.home-notice,
+.home-error {
+  color: var(--danger);
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.new-drawing-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.new-drawing-tile:hover:enabled {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.new-drawing-tile:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.drawing-card {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.drawing-card:hover {
+  box-shadow: var(--shadow-float);
+}
+
+.drawing-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 8px 12px;
+  border-radius: 12px;
+  color: inherit;
+  text-decoration: none;
+}
+
+a.drawing-card-body:focus-visible,
+.new-drawing-tile:focus-visible,
+.drawing-card-more:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.drawing-card-name {
+  /* Room on the right for the ⋯ button. */
+  padding: 6px 40px 0 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+.drawing-card-rename {
+  margin: 2px 40px 0 0;
+  padding: 3px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 700;
+}
+
+.drawing-card-edited {
+  padding: 0 4px;
+  color: var(--muted-text);
+  font-size: 13px;
+}
+
+.drawing-card-more {
+  position: absolute;
+  right: 6px;
+  bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted-text);
+  cursor: pointer;
+}
+
+.drawing-card-more:hover {
+  background: var(--raised);
+  color: var(--text);
+}
+
+.thumbnail {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  border-radius: 8px;
+  background: var(--page);
+  overflow: hidden;
+}
+
+.thumbnail-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.thumbnail-note {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted-text);
+  font-size: 13px;
+}
+
+/* A small popup menu (card ⋯ and right-click). */
+.menu {
+  position: absolute;
+  right: 6px;
+  bottom: 54px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-float);
+}
+
+.menu [role='menuitem'] {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu [role='menuitem']:hover,
+.menu [role='menuitem']:focus-visible {
+  background: var(--raised);
+  outline: none;
+}

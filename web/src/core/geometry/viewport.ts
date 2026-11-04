@@ -4,6 +4,7 @@
 //   world  = screen / zoom + (x, y)
 // Screen points are CSS pixels relative to the canvas.
 import type { AppState, Point } from '../document/types.ts'
+import type { Bounds } from './rect.ts'
 
 export type Viewport = AppState['viewport']
 
@@ -48,4 +49,36 @@ const MAX_WHEEL_STEP = 1.25
 export function wheelZoomFactor(deltaY: number): number {
   const factor = Math.exp(-deltaY * 0.01)
   return Math.min(MAX_WHEEL_STEP, Math.max(1 / MAX_WHEEL_STEP, factor))
+}
+
+/**
+ * The viewport that shows all of `bounds` centred on a surface of `size` (CSS
+ * pixels), with `padding` on every side, for thumbnails (ADR 0034). It never
+ * zooms in past `maxZoom`, so a small drawing isn't blown up. Unlike the
+ * editor it ignores MIN_ZOOM: a huge drawing still fits instead of cropping.
+ */
+export function fitViewport(
+  bounds: Bounds,
+  size: { width: number; height: number },
+  padding: number,
+  maxZoom = 1,
+): Viewport {
+  const inner = {
+    width: Math.max(1, size.width - 2 * padding),
+    height: Math.max(1, size.height - 2 * padding),
+  }
+  const zoom = Math.min(
+    maxZoom,
+    bounds.width > 0 ? inner.width / bounds.width : maxZoom,
+    bounds.height > 0 ? inner.height / bounds.height : maxZoom,
+  )
+  const centre: Point = [
+    bounds.x + bounds.width / 2,
+    bounds.y + bounds.height / 2,
+  ]
+  return {
+    zoom,
+    x: centre[0] - size.width / 2 / zoom,
+    y: centre[1] - size.height / 2 / zoom,
+  }
 }
