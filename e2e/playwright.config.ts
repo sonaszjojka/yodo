@@ -46,6 +46,9 @@ export default defineConfig<ModeOptions>({
       command: `node scripts/serve-server.ts ${SELF_HOSTED_PORT}`,
       url: `${modes['self-hosted']}api/health`,
       reuseExistingServer: false,
+      // The default is SIGKILL, which skips serve-server's clean-up and
+      // leaves the temporary database directory behind.
+      gracefulShutdown: { signal: 'SIGTERM', timeout: 5000 },
     },
   ],
 })
