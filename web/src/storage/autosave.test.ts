@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { createDocument } from '../core/document/create.ts'
 import type { YodoDocument } from '../core/document/types.ts'
 import { createEditor, type Editor } from '../core/editor/editor.ts'
-import { createAutoSaver, type AutoSaver } from './autosave.ts'
+import { createAutoSaver, finalSave, type AutoSaver } from './autosave.ts'
 import { InMemoryDrawingRepository } from './memory.ts'
 import type { DrawingRepository } from './repository.ts'
 
@@ -206,4 +206,25 @@ test('after a failed save, undoing back to the saved document shows saved', asyn
 
   expect(saver.status.getState()).toBe('saved')
   expect(saves).toHaveLength(1)
+})
+
+test('finalSave resolves true once the pending change is saved', async () => {
+  setUp()
+  change('kept')
+
+  expect(await finalSave(saver)).toBe(true)
+  expect(
+    (await repository.get(editor.store.getState().document.id))?.name,
+  ).toBe('kept')
+})
+
+test('finalSave resolves false when the last save fails, so the loss can be shown', async () => {
+  const failing = new InMemoryDrawingRepository()
+  failing.save = () => Promise.reject(new Error('offline'))
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+  setUp(failing)
+  change('lost')
+
+  expect(await finalSave(saver)).toBe(false)
+  error.mockRestore()
 })

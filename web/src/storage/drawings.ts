@@ -15,7 +15,7 @@ export interface LoadOptions {
    * A save to wait for first, e.g. the editor that just closed: over HTTP a
    * read could otherwise overtake it and return the older document.
    */
-  after?: Promise<void>
+  after?: Promise<unknown>
 }
 
 /**

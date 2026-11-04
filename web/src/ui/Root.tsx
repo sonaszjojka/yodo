@@ -12,14 +12,21 @@ export function Root({ repository }: { repository: DrawingRepository }) {
   // The closing editor's last save. React runs the old screen's cleanup before
   // the new screen's effects, so the next screen's first read can wait for it:
   // Home's list(), or the editor's get() after Back then Forward.
-  const closing = useRef<Promise<void>>(Promise.resolve())
+  const closing = useRef<Promise<boolean>>(Promise.resolve(true))
   const waitForEditor = useCallback(() => closing.current, [])
-  const onClose = useCallback((saved: Promise<void>) => {
+  // Kept here, not on Home, so it survives Home remounting.
+  const [lastSaveFailed, setLastSaveFailed] = useState(false)
+  const onClose = useCallback((saved: Promise<boolean>) => {
     closing.current = saved
+    void saved.then((ok) => setLastSaveFailed(!ok))
   }, [])
 
   return route.name === 'home' ? (
-    <Home repository={repository} waitForEditor={waitForEditor} />
+    <Home
+      repository={repository}
+      waitForEditor={waitForEditor}
+      lastSaveFailed={lastSaveFailed}
+    />
   ) : (
     <DrawingScreen
       key={route.id}
@@ -35,8 +42,8 @@ interface DrawingScreenProps {
   repository: DrawingRepository
   id: string
   /** The previous editor's last save, which the load must not overtake. */
-  waitForEditor(): Promise<void>
-  onClose(saved: Promise<void>): void
+  waitForEditor(): Promise<boolean>
+  onClose(saved: Promise<boolean>): void
 }
 
 /** Loads the drawing, then opens the editor on it; never a blank fallback. */

@@ -22,11 +22,17 @@ export type HomeList =
 export interface HomeProps {
   repository: DrawingRepository
   /** Resolves once the editor that just closed has saved (see Root). */
-  waitForEditor(): Promise<void>
+  waitForEditor(): Promise<unknown>
+  /** The editor that closed last failed to save its final changes. */
+  lastSaveFailed?: boolean
 }
 
 /** The Home screen (`docs/ui.md`, Home): every drawing as a card. */
-export function Home({ repository, waitForEditor }: HomeProps) {
+export function Home({
+  repository,
+  waitForEditor,
+  lastSaveFailed = false,
+}: HomeProps) {
   const [list, setList] = useState<HomeList>({ status: 'loading' })
   const [attempt, setAttempt] = useState(0)
   const [sort, setSort] = useState<DrawingSort>('recent')
@@ -102,7 +108,12 @@ export function Home({ repository, waitForEditor }: HomeProps) {
         setList({ status: 'loading' })
         setAttempt((n) => n + 1)
       }}
-      notice={notice}
+      notice={
+        notice ??
+        (lastSaveFailed
+          ? 'Your last changes to a drawing couldn’t be saved.'
+          : undefined)
+      }
       now={now}
     />
   )

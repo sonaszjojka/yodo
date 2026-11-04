@@ -112,3 +112,13 @@ export function createAutoSaver(
     flush,
   }
 }
+
+/**
+ * Flushes a closing editor's save and resolves whether it succeeded. The
+ * status store goes away with the editor, so the next screen needs the
+ * outcome to show that the last changes were lost.
+ */
+export async function finalSave(saver: AutoSaver): Promise<boolean> {
+  await saver.flush()
+  return saver.status.getState() !== 'error'
+}

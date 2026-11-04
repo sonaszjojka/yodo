@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { YodoDocument } from '../core/document/types.ts'
 import { createEditor } from '../core/editor/editor.ts'
-import { createAutoSaver } from '../storage/autosave.ts'
+import { createAutoSaver, finalSave } from '../storage/autosave.ts'
 import type { DrawingRepository } from '../storage/repository.ts'
 import { Canvas } from './Canvas.tsx'
 import { HistoryControl } from './HistoryControl.tsx'
@@ -17,8 +17,8 @@ export interface AppProps {
   repository: DrawingRepository
   /** The drawing to open, loaded before the first render. */
   document: YodoDocument
-  /** Gets the last save when the editor closes, e.g. to wait for it on Home. */
-  onClose?(saved: Promise<void>): void
+  /** Gets the last save (true if it succeeded) when the editor closes. */
+  onClose?(saved: Promise<boolean>): void
 }
 
 // The editor on one drawing, auto-saved through the repository (ADR 0032).
@@ -45,7 +45,7 @@ export function App({ repository, document, onClose }: AppProps) {
       window.document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('pagehide', flush)
       stop()
-      onClose?.(saver.flush())
+      onClose?.(finalSave(saver))
     }
   }, [saver, onClose])
 
