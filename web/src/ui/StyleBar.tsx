@@ -149,6 +149,55 @@ const CONTROLS = [
   } satisfies Control<'fontSize'>,
 ] as Control<StyleKey>[]
 
+/**
+ * Where focus goes in a menu of `count` items on `key` (WAI-ARIA menu:
+ * arrows wrap, Home and End jump), or null for other keys.
+ */
+export function nextMenuIndex(
+  key: string,
+  index: number,
+  count: number,
+): number | null {
+  switch (key) {
+    case 'ArrowDown':
+      return (index + 1) % count
+    case 'ArrowUp':
+      return (index - 1 + count) % count
+    case 'Home':
+      return 0
+    case 'End':
+      return count - 1
+    default:
+      return null
+  }
+}
+
+/** Keys the canvas handles on the window; inside the menu they act on its items. */
+const MENU_KEYS = new Set([' ', 'Delete', 'Backspace'])
+
+function onMenuKey(event: KeyboardEvent<HTMLDivElement>) {
+  // Space activates the focused item instead of panning, and Delete or
+  // Backspace don't delete the selection behind the menu.
+  if (MENU_KEYS.has(event.key)) {
+    event.stopPropagation()
+    return
+  }
+  if (event.type !== 'keydown') return
+  const items = [
+    ...event.currentTarget.querySelectorAll<HTMLElement>(
+      '[role="menuitem"]:not(:disabled)',
+    ),
+  ]
+  const next = nextMenuIndex(
+    event.key,
+    items.indexOf(window.document.activeElement as HTMLElement),
+    items.length,
+  )
+  if (next === null) return
+  event.preventDefault()
+  items[next]?.focus()
+}
+
 export interface MoreMenuProps {
   editor: Editor
   /** Whether a style has been copied, so "Paste style" can apply. */
@@ -179,6 +228,8 @@ export function MoreMenu({ editor, canPaste, onDone, style }: MoreMenuProps) {
   return (
     <div
       className="menu style-menu"
+      onKeyDown={onMenuKey}
+      onKeyUp={onMenuKey}
       role="menu"
       aria-label="More"
       style={style}
@@ -261,7 +312,7 @@ export function StyleBar({ editor, onAllStyles }: StyleBarProps) {
       if (isOutside(event.target, ref.current)) setOpen(null)
     }
     window.document.addEventListener('pointerdown', onPointerDown)
-    // The menu takes focus, like the Home card menu, so arrows and Tab start there.
+    // The menu takes focus, like the Home card menu, so arrows start there.
     if (openKey === 'more') {
       ref.current
         ?.querySelector<HTMLElement>('[role="menuitem"]:not(:disabled)')
