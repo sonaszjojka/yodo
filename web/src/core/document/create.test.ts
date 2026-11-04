@@ -5,8 +5,10 @@ import {
   createPencil,
   createShape,
   createText,
+  BUILT_IN_STYLE,
   DEFAULT_FONT_SIZE,
   randomSeed,
+  type ElementStyle,
 } from './create.ts'
 import { loadDocument } from './migrate.ts'
 import { CURRENT_SCHEMA_VERSION } from './types.ts'
@@ -163,6 +165,74 @@ describe('createText', () => {
       fontSize: DEFAULT_FONT_SIZE,
       textAlign: 'left',
       strokeColor: '#1E1F22',
+    })
+  })
+})
+
+describe('a given style (the editor defaults, ADR 0036)', () => {
+  const style: ElementStyle = {
+    ...BUILT_IN_STYLE,
+    strokeColor: '#C2453D',
+    backgroundColor: '#E0E9FB',
+    fillStyle: 'solid',
+    strokeWidth: 4,
+    strokeStyle: 'dashed',
+    roughness: 0,
+    opacity: 50,
+    fontFamily: 'mono',
+    fontSize: 36,
+    textAlign: 'right',
+  }
+  const box = { x: 0, y: 0, width: 10, height: 10 }
+  const elementStyle = {
+    strokeColor: '#C2453D',
+    backgroundColor: '#E0E9FB',
+    fillStyle: 'solid',
+    strokeWidth: 4,
+    strokeStyle: 'dashed',
+    roughness: 0,
+    opacity: 50,
+  }
+
+  test('BUILT_IN_STYLE is the style elements had before defaults existed', () => {
+    expect(BUILT_IN_STYLE).toEqual({
+      strokeColor: '#1E1F22',
+      backgroundColor: 'transparent',
+      fillStyle: 'hachure',
+      strokeWidth: 2,
+      strokeStyle: 'solid',
+      roughness: 1,
+      opacity: 100,
+      fontFamily: 'hand',
+      fontSize: DEFAULT_FONT_SIZE,
+      textAlign: 'left',
+    })
+  })
+
+  test('shapes, lines and strokes take its element styles, no text fields', () => {
+    const geometry = {
+      ...box,
+      points: [
+        [0, 0],
+        [10, 10],
+      ] as [number, number][],
+    }
+    for (const element of [
+      createShape('ellipse', box, 1, style),
+      createLinear('arrow', geometry, 1, style),
+      createPencil(geometry, 1, style),
+    ]) {
+      expect(element).toMatchObject(elementStyle)
+      expect('fontFamily' in element).toBe(false)
+    }
+  })
+
+  test('text takes its font, size and alignment too', () => {
+    expect(createText([0, 0], 1, style)).toMatchObject({
+      ...elementStyle,
+      fontFamily: 'mono',
+      fontSize: 36,
+      textAlign: 'right',
     })
   })
 })

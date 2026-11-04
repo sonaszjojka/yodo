@@ -1,13 +1,21 @@
 import { useEffect, useState } from 'react'
 import type { YodoDocument } from '../core/document/types.ts'
 import { createEditor } from '../core/editor/editor.ts'
+import { createStore } from '../core/store/store.ts'
 import { createAutoSaver, finalSave } from '../storage/autosave.ts'
+import {
+  loadPanelLayout,
+  loadStyleDefaults,
+  savePanelLayout,
+  saveStyleDefaults,
+} from '../storage/preferences.ts'
 import type { DrawingRepository } from '../storage/repository.ts'
 import { Canvas } from './Canvas.tsx'
 import { HistoryControl } from './HistoryControl.tsx'
 import { createCanvasMeasure } from './measure.ts'
 import { SaveStatus } from './SaveStatus.tsx'
 import { StyleBar } from './StyleBar.tsx'
+import { StylePanel, StylePanelToggle } from './StylePanel.tsx'
 import { TextEditor } from './TextEditor.tsx'
 import { Toolbar } from './Toolbar.tsx'
 import { TopBar } from './TopBar.tsx'
@@ -28,9 +36,29 @@ export function App({ repository, document, onClose }: AppProps) {
   // Lazy initialisers create these once, not on every render. Creating the
   // saver has no side effects; it starts watching in the effect below.
   const [editor] = useState(() =>
-    createEditor(document, { measure: createCanvasMeasure() }),
+    createEditor(document, {
+      measure: createCanvasMeasure(),
+      defaults: loadStyleDefaults(),
+    }),
   )
   const [saver] = useState(() => createAutoSaver(editor.store, repository))
+  const [panel] = useState(() => createStore(loadPanelLayout()))
+
+  // Per-browser preferences (ADR 0036): stored whenever they change.
+  useEffect(() => {
+    let defaults = editor.store.getState().defaults
+    const stopDefaults = editor.store.subscribe(() => {
+      const next = editor.store.getState().defaults
+      if (next === defaults) return
+      defaults = next
+      saveStyleDefaults(next)
+    })
+    const stopPanel = panel.subscribe(() => savePanelLayout(panel.getState()))
+    return () => {
+      stopDefaults()
+      stopPanel()
+    }
+  }, [editor, panel])
 
   useEffect(() => {
     const stop = saver.start()
@@ -55,7 +83,16 @@ export function App({ repository, document, onClose }: AppProps) {
       <Canvas editor={editor} />
       <TopBar editor={editor} />
       <TextEditor editor={editor} />
-      <StyleBar editor={editor} />
+      <StyleBar
+        editor={editor}
+        onAllStyles={() =>
+          panel.setState((prev) => (prev.open ? prev : { ...prev, open: true }))
+        }
+      />
+      <StylePanel editor={editor} panel={panel} />
+      <div className="top-right">
+        <StylePanelToggle panel={panel} />
+      </div>
       <Toolbar editor={editor} />
       <div className="bottom-bar">
         <HistoryControl editor={editor} />

@@ -55,6 +55,7 @@ describe('StyleBar', () => {
       'Fill: None',
       'Width: Bold',
       'Look: Hand-drawn',
+      'All styles',
     ])
   })
 
@@ -68,7 +69,12 @@ describe('StyleBar', () => {
       textAlign: 'left' as const,
     }
     const html = renderToStaticMarkup(<StyleBar editor={editorWith([text])} />)
-    expect(controls(html)).toEqual(['Stroke: Ink', 'Font: Mono', 'Size: XL'])
+    expect(controls(html)).toEqual([
+      'Stroke: Ink',
+      'Font: Mono',
+      'Size: XL',
+      'All styles',
+    ])
   })
 
   test('different values show as mixed', () => {
@@ -126,5 +132,19 @@ describe('popoverOffset', () => {
     const bar = { left: 1000 - 8 - 134, top: 300 }
     const control = bar.left + 5 + 2 * 42
     expect(popoverOffset(bar, 2, 4, window).left).toBe(1000 - 8 - 176 - control)
+  })
+
+  test('an exact size from the panel shows its number', () => {
+    const text = {
+      ...createShape('rectangle', { x: 0, y: 200, width: 50, height: 25 }),
+      type: 'text' as const,
+      text: 'Hi',
+      fontFamily: 'hand' as const,
+      fontSize: 44,
+      textAlign: 'left' as const,
+    }
+    const html = renderToStaticMarkup(<StyleBar editor={editorWith([text])} />)
+    expect(html).toContain('aria-label="Size: Custom"')
+    expect(html).toMatch(/<span class="style-text"[^>]*>44<\/span>/)
   })
 })

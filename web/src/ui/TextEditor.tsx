@@ -19,6 +19,7 @@ const CARET_ROOM = 2
 
 const selectEditing = (state: EditorState) => state.editing
 const selectDocument = (state: EditorState) => state.document
+const selectDefaults = (state: EditorState) => state.defaults
 const selectViewport = (state: EditorState) => state.viewport
 
 /** Identifies one edit, so a new edit remounts the textarea (focus, select). */
@@ -35,8 +36,9 @@ export function TextEditor({ editor }: { editor: Editor }) {
   const editing = useStore(editor.store, selectEditing)
   const doc = useStore(editor.store, selectDocument)
   const viewport = useStore(editor.store, selectViewport)
+  const defaults = useStore(editor.store, selectDefaults)
   if (!editing) return null
-  const box = editBox(doc, editing, editor.measure)
+  const box = editBox(doc, editing, editor.measure, defaults)
   if (!box) return null
 
   const { zoom } = viewport

@@ -9,9 +9,9 @@ Rule: every stage ends with a **file of decisions**, not just a conversation. Co
 
 ## Status (2026-11-04)
 Read this section, not the whole file; finished work is logged in `docs/history.md`.
-- **Last done:** roadmap 2.1 (issue #77): contextual style bar. Above the selection: stroke, fill, width and look for shapes and lines, font and size for text; each change is one undo step. The Sans and Mono canvas fonts (Manrope, JetBrains Mono) are now bundled (ADR 0025). M2 and M3 issues exist (#77–#94).
-- Open items: `review` issues from the 1.14, 1.15 and 1.16 reviews.
-- **Next step:** roadmap 2.2 (issue #78): style panel.
+- **Last done:** roadmap 2.2a (issue #78): style panel. A movable, resizable panel (Styles toggle, "All styles" in the bar, snap back) with every section on existing fields; with nothing selected it edits the defaults for new elements, which, like the panel's place, are per-browser preferences in `localStorage` (ADR 0036). Roadmap 2.2 was split; corners, layers, copy/paste style and "use as default" moved to 2.2b (#96).
+- Open items: `review` issues from the 1.14, 1.15, 1.16 and 2.2a reviews.
+- **Next step:** roadmap 2.2b (issue #96): style panel, remaining sections.
 
 ## Working mode: an educational project
 The goal is both the app and learning how to program with Claude as effectively as possible, so that the knowledge stays with you. The rules (you decide and I explain, no silent automation, features introduced on first use, a short recap after each task, "just do it" to skip explanations) live in the global `~/.claude/CLAUDE.md` and the `educational-working-mode` memory, so they apply in every session.

@@ -1,6 +1,11 @@
 // The values the style bar offers (docs/ui.md). Colours are the stored
 // light-theme values; dark mode adapts them when rendering (ADR 0015).
-import type { FontFamily } from '../core/document/types.ts'
+import type {
+  FillStyle,
+  FontFamily,
+  StrokeStyle,
+  TextAlign,
+} from '../core/document/types.ts'
 
 export interface Option<T> {
   value: T
@@ -46,6 +51,29 @@ export const FONTS: Option<FontFamily>[] = [
   { value: 'sans', label: 'Sans' },
   { value: 'mono', label: 'Mono' },
 ]
+
+/** rough.js fill patterns, shown when a shape has a fill. */
+export const FILL_STYLES: Option<FillStyle>[] = [
+  { value: 'hachure', label: 'Hatched' },
+  { value: 'cross-hatch', label: 'Cross-hatched' },
+  { value: 'solid', label: 'Solid' },
+]
+
+export const STROKE_STYLES: Option<StrokeStyle>[] = [
+  { value: 'solid', label: 'Solid' },
+  { value: 'dashed', label: 'Dashed' },
+  { value: 'dotted', label: 'Dotted' },
+]
+
+export const ALIGNMENTS: Option<TextAlign>[] = [
+  { value: 'left', label: 'Left' },
+  { value: 'center', label: 'Centre' },
+  { value: 'right', label: 'Right' },
+]
+
+/** The exact font sizes the panel accepts, in px. */
+export const MIN_FONT_SIZE = 8
+export const MAX_FONT_SIZE = 200
 
 /** The S/M/L/XL steps; M is `DEFAULT_FONT_SIZE`. */
 export const SIZES: Option<number>[] = [

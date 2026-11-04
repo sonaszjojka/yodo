@@ -1,9 +1,8 @@
-import { LineSegment, Scribble } from '@phosphor-icons/react'
+import { LineSegment, Scribble, SlidersHorizontal } from '@phosphor-icons/react'
 import {
   useEffect,
   useRef,
   useState,
-  useSyncExternalStore,
   type KeyboardEvent,
   type ReactNode,
 } from 'react'
@@ -17,13 +16,7 @@ import {
 import { selectionFrame } from '../core/geometry/frame.ts'
 import { worldToScreen } from '../core/geometry/viewport.ts'
 import { FONT_STACKS } from '../core/text/layout.ts'
-import {
-  BUTTON,
-  barPosition,
-  barWidth,
-  popoverOffset,
-  type Size,
-} from './barPosition.ts'
+import { BUTTON, barPosition, barWidth, popoverOffset } from './barPosition.ts'
 import { isOutside } from './outsidePress.ts'
 import {
   FILLS,
@@ -36,24 +29,7 @@ import {
   type Option,
 } from './styleOptions.ts'
 import { useStore } from './useStore.ts'
-
-// The window size as an external store: re-renders on resize, and has a
-// fixed size when rendering without a window (tests).
-let windowSize: Size = { width: 1024, height: 768 }
-function readWindowSize(): Size {
-  const { innerWidth: width, innerHeight: height } = window
-  if (width !== windowSize.width || height !== windowSize.height) {
-    windowSize = { width, height }
-  }
-  return windowSize
-}
-function subscribeResize(listener: () => void) {
-  window.addEventListener('resize', listener)
-  return () => window.removeEventListener('resize', listener)
-}
-function useWindowSize() {
-  return useSyncExternalStore(subscribeResize, readWindowSize, () => windowSize)
-}
+import { useWindowSize } from './useWindowSize.ts'
 
 /** One control of the bar: its options and how a value looks on a button. */
 interface Control<K extends StyleKey> {
@@ -63,7 +39,7 @@ interface Control<K extends StyleKey> {
   show(value: NonNullable<StylePatch[K]> | 'mixed'): ReactNode
 }
 
-function Swatch({ value, round }: { value: string; round?: boolean }) {
+export function Swatch({ value, round }: { value: string; round?: boolean }) {
   const kind =
     value === 'mixed' ? ' is-mixed' : value === 'transparent' ? ' is-none' : ''
   return (
@@ -75,7 +51,7 @@ function Swatch({ value, round }: { value: string; round?: boolean }) {
   )
 }
 
-function WidthLine({ value }: { value: number | 'mixed' }) {
+export function WidthLine({ value }: { value: number | 'mixed' }) {
   return (
     <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden>
       <line
@@ -90,6 +66,11 @@ function WidthLine({ value }: { value: number | 'mixed' }) {
       />
     </svg>
   )
+}
+
+/** S/M/L/XL, or the px number for an exact size set in the panel. */
+function sizeLabel(value: number) {
+  return SIZES.find((option) => option.value === value)?.label ?? String(value)
 }
 
 const CONTROLS = [
@@ -145,7 +126,7 @@ const CONTROLS = [
     options: SIZES,
     show: (value) => (
       <span className="style-text" aria-hidden>
-        {value === 'mixed' ? '–' : labelOf(SIZES, value)}
+        {value === 'mixed' ? '–' : sizeLabel(value)}
       </span>
     ),
   } satisfies Control<'fontSize'>,
@@ -166,11 +147,18 @@ const selectBusy = (state: EditorState) =>
     state.erasing,
   )
 
+export interface StyleBarProps {
+  editor: Editor
+  /** Opens the style panel ("All styles", roadmap 2.2a). */
+  onAllStyles?(): void
+}
+
 /**
  * The contextual style bar above the selection (docs/ui.md, roadmap 2.1):
- * each control that fits a selected element, one popover open at a time.
+ * each control that fits a selected element, one popover open at a time,
+ * then "All styles", which opens the style panel.
  */
-export function StyleBar({ editor }: { editor: Editor }) {
+export function StyleBar({ editor, onAllStyles }: StyleBarProps) {
   const tool = useStore(editor.store, selectTool)
   const ids = useStore(editor.store, selectIds)
   const document = useStore(editor.store, selectDocument)
@@ -211,7 +199,8 @@ export function StyleBar({ editor }: { editor: Editor }) {
   }
   const { left, top } = barPosition(
     screenOutline,
-    barWidth(controls.length),
+    // The controls, then All styles.
+    barWidth(controls.length + 1),
     size,
   )
 
@@ -284,6 +273,18 @@ export function StyleBar({ editor }: { editor: Editor }) {
           </div>
         )
       })}
+      <button
+        type="button"
+        className="tool-button"
+        aria-label="All styles"
+        title="All styles"
+        onClick={() => {
+          setOpen(null)
+          onAllStyles?.()
+        }}
+      >
+        <SlidersHorizontal size={20} aria-hidden />
+      </button>
     </div>
   )
 }

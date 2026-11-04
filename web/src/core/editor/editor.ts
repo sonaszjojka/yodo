@@ -1,7 +1,9 @@
 import {
+  BUILT_IN_STYLE,
   createLinear,
   createPencil,
   createShape,
+  type ElementStyle,
   type LinearType,
   type ShapeType,
 } from '../document/create.ts'
@@ -40,7 +42,7 @@ import {
   selectedOf,
   topmostHit,
 } from './selection.ts'
-import { applyStyle, type StylePatch } from './style.ts'
+import { applyDefaults, applyStyle, type StylePatch } from './style.ts'
 import { commitEdit, editFor, textTargetAt, type TextEdit } from './text.ts'
 
 export interface EditorState {
@@ -88,6 +90,11 @@ export interface EditorState {
    * at pointer up, so the whole drag is one undo step.
    */
   erasing: string[] | null
+  /**
+   * The style new elements get (ADR 0036). A per-browser preference, not
+   * part of the document: changing it is no undo step and no save.
+   */
+  defaults: ElementStyle
 }
 
 /** Tools that draw an element by dragging. */
@@ -182,8 +189,12 @@ export interface Editor {
   /**
    * Applies `patch` to the selection, each style only where it fits (see
    * `style.ts`). One change, so one undo step; none if nothing changes.
+   * With nothing selected it changes the defaults instead (ADR 0036).
+   * With `selection`, it does nothing unless that is still the selection
+   * (the same `selectedIds` reference): an edit that applies late, such as
+   * on blur, must not land on what was selected in the meantime.
    */
-  setStyle(patch: StylePatch): void
+  setStyle(patch: StylePatch, options?: { selection?: string[] }): void
   /** Whether undo and redo are available, for the bottom bar (ADR 0023). */
   history: Store<HistoryStatus>
   /** Goes back one document change, dropping any drag in progress first. */
@@ -218,11 +229,13 @@ export interface Editor {
 export interface EditorOptions {
   /** Defaults to a rough estimate, which is enough for tests. */
   measure?: Measure
+  /** The style of new elements; the stored preference in the app (ADR 0036). */
+  defaults?: ElementStyle
 }
 
 export function createEditor(
   document: YodoDocument,
-  { measure = estimateMeasure }: EditorOptions = {},
+  { measure = estimateMeasure, defaults = BUILT_IN_STYLE }: EditorOptions = {},
 ): Editor {
   const store = createStore<EditorState>({
     document,
@@ -237,6 +250,7 @@ export function createEditor(
     spaceHeld: false,
     panning: false,
     selectedIds: [],
+    defaults,
     move: null,
     resize: null,
     hoverHandle: null,
@@ -302,16 +316,26 @@ export function createEditor(
   const drawTool: PointerTool = {
     pointerDown(pointerId, point, shift) {
       if (drag && !owns(pointerId)) return
-      const { tool } = store.getState()
+      const { tool, defaults: style } = store.getState()
       if (!isDrawingTool(tool)) return
       drag = { pointerId, tool, start: point, last: point, shift }
       // The seed is picked once here and kept for the element's lifetime.
       const draft =
         tool === 'pencil'
-          ? createPencil(startStroke(point))
+          ? createPencil(startStroke(point), undefined, style)
           : isLinear(tool)
-            ? createLinear(tool, lineFromDrag(point, point, shift))
-            : createShape(tool, rectFromDrag(point, point, shift))
+            ? createLinear(
+                tool,
+                lineFromDrag(point, point, shift),
+                undefined,
+                style,
+              )
+            : createShape(
+                tool,
+                rectFromDrag(point, point, shift),
+                undefined,
+                style,
+              )
       store.setState((prev) => ({ ...prev, draft }))
     },
     pointerMove(pointerId, point, shift) {
@@ -633,7 +657,7 @@ export function createEditor(
   }
 
   function startEdit(point: Point, target = textTarget(point)) {
-    const editing = editFor(target, point)
+    const editing = editFor(target, point, store.getState().defaults)
     store.setState((prev) => ({
       ...prev,
       editing,
@@ -646,7 +670,12 @@ export function createEditor(
     const { editing } = store.getState()
     if (!editing) return
     store.setState((prev) => {
-      const { document, selectId } = commitEdit(prev.document, editing, measure)
+      const { document, selectId } = commitEdit(
+        prev.document,
+        editing,
+        measure,
+        prev.defaults,
+      )
       return {
         ...prev,
         document,
@@ -933,8 +962,13 @@ export function createEditor(
         }
       })
     },
-    setStyle(patch) {
+    setStyle(patch, { selection } = {}) {
       store.setState((prev) => {
+        if (selection && selection !== prev.selectedIds) return prev
+        if (prev.selectedIds.length === 0) {
+          const defaults = applyDefaults(prev.defaults, patch)
+          return defaults === prev.defaults ? prev : { ...prev, defaults }
+        }
         const document = applyStyle(
           prev.document,
           prev.selectedIds,
