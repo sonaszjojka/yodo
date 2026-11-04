@@ -190,8 +190,11 @@ export interface Editor {
    * Applies `patch` to the selection, each style only where it fits (see
    * `style.ts`). One change, so one undo step; none if nothing changes.
    * With nothing selected it changes the defaults instead (ADR 0036).
+   * With `selection`, it does nothing unless that is still the selection
+   * (the same `selectedIds` reference): an edit that applies late, such as
+   * on blur, must not land on what was selected in the meantime.
    */
-  setStyle(patch: StylePatch): void
+  setStyle(patch: StylePatch, options?: { selection?: string[] }): void
   /** Whether undo and redo are available, for the bottom bar (ADR 0023). */
   history: Store<HistoryStatus>
   /** Goes back one document change, dropping any drag in progress first. */
@@ -959,8 +962,9 @@ export function createEditor(
         }
       })
     },
-    setStyle(patch) {
+    setStyle(patch, { selection } = {}) {
       store.setState((prev) => {
+        if (selection && selection !== prev.selectedIds) return prev
         if (prev.selectedIds.length === 0) {
           const defaults = applyDefaults(prev.defaults, patch)
           return defaults === prev.defaults ? prev : { ...prev, defaults }

@@ -1531,4 +1531,32 @@ describe('defaults for new elements (ADR 0036)', () => {
       roughness: 0,
     })
   })
+
+  test('setStyle for a selection that has since changed does nothing', () => {
+    const { editor, b } = setupSelection()
+    click(editor, [50, 50])
+    const started = editor.store.getState().selectedIds
+    click(editor, [250, 50])
+    const before = editor.store.getState()
+
+    editor.setStyle({ strokeWidth: 4 }, { selection: started })
+    click(editor, [150, 300])
+    editor.setStyle({ strokeWidth: 4 }, { selection: started })
+
+    expect(editor.store.getState().document.elements[1]).toBe(b)
+    expect(editor.store.getState().document).toBe(before.document)
+    expect(editor.store.getState().defaults).toBe(BUILT_IN_STYLE)
+  })
+
+  test('setStyle for the current selection applies', () => {
+    const { editor } = setupSelection()
+    click(editor, [50, 50])
+    const started = editor.store.getState().selectedIds
+
+    editor.setStyle({ strokeWidth: 4 }, { selection: started })
+
+    expect(editor.store.getState().document.elements[0]).toMatchObject({
+      strokeWidth: 4,
+    })
+  })
 })

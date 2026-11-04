@@ -270,14 +270,21 @@ function ChoiceSection({
   )
 }
 
-/** The exact size in px; applies on Enter or when it loses focus. */
+/**
+ * The exact size in px; applies on Enter or when it loses focus. `onSet` gets
+ * the selection the typing started with, so a blur caused by selecting
+ * something else doesn't resize that instead.
+ */
 function ExactSize({
   value,
+  selection,
   onSet,
 }: {
   value: number | 'mixed'
-  onSet(size: number): void
+  selection: string[]
+  onSet(size: number, selection: string[]): void
 }) {
+  const started = useRef(selection)
   function apply(input: HTMLInputElement) {
     const size = Math.round(Number(input.value))
     if (input.value.trim() === '' || !Number.isFinite(size)) {
@@ -286,7 +293,7 @@ function ExactSize({
     }
     const clamped = Math.min(Math.max(size, MIN_FONT_SIZE), MAX_FONT_SIZE)
     input.value = String(clamped)
-    if (clamped !== value) onSet(clamped)
+    if (clamped !== value) onSet(clamped, started.current)
   }
   return (
     <label className="panel-exact">
@@ -300,6 +307,9 @@ function ExactSize({
         step={1}
         defaultValue={value === 'mixed' ? '' : value}
         placeholder={value === 'mixed' ? 'Mixed' : undefined}
+        onFocus={() => {
+          started.current = selection
+        }}
         onBlur={(event) => apply(event.currentTarget)}
         onKeyDown={(event) => {
           if (event.key === 'Enter') apply(event.currentTarget)
@@ -544,7 +554,10 @@ export function StylePanel({ editor, panel }: StylePanelProps) {
               {key === 'fontSize' && (
                 <ExactSize
                   value={value as number | 'mixed'}
-                  onSet={(fontSize) => set({ fontSize })}
+                  selection={ids}
+                  onSet={(fontSize, selection) =>
+                    editor.setStyle({ fontSize }, { selection })
+                  }
                 />
               )}
             </ChoiceSection>
