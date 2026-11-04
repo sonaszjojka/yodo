@@ -1,0 +1,24 @@
+{
+  "name": "e2e",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "build:app": "node scripts/build-app.ts",
+    "test": "npm run build:app && playwright test",
+    "lint": "oxlint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^24.19.2",
+    "oxlint": "^1.91.0",
+    "prettier": "^3.9.10",
+    "typescript": "~7.0.2"
+  }
+}

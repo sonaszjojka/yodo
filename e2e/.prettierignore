@@ -1,0 +1,4 @@
+# Playwright output; Prettier only reads e2e/.gitignore, not the root one.
+playwright-report/
+test-results/
+.bin/

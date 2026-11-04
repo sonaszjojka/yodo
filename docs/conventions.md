@@ -35,7 +35,7 @@ Format ([conventionalcommits.org](https://www.conventionalcommits.org/)):
 ## Definition of done
 A task is done only when all of these hold:
 - Its "done when…" criterion from `docs/roadmap.md` (or the issue) is met.
-- New behaviour has tests; the full test suites pass (web and/or server, whichever changed).
+- New behaviour has tests; the full test suites pass (web, server and/or e2e, whichever changed).
 - Lint and format checks are clean; TypeScript type-check passes.
 - UI changes have been checked in the browser (screenshot), in light and dark theme once dark mode exists.
 - Docs that the change made stale are updated (ADR for any architectural decision, `docs/ui.md`, README).

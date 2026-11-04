@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Yodo is a local-first, Excalidraw-like drawing app. It's a monorepo (ADR 0012): `web/` (React + Vite + TS), `server/` (Go), `e2e/` (Playwright, added later), `docs/`. The project is early: `docs/roadmap.md` lists what exists and what's next, and `docs/plan.md` has the current status.
+Yodo is a local-first, Excalidraw-like drawing app. It's a monorepo (ADR 0012): `web/` (React + Vite + TS), `server/` (Go), `e2e/` (Playwright), `docs/`. The project is early: `docs/roadmap.md` lists what exists and what's next, and `docs/plan.md` has the current status.
 
 ## Commands
 Node 24 (`web/.nvmrc`, `nvm use`), Go 1.27. golangci-lint 2.15 is a separate binary (`brew install golangci-lint`), and sqlc is pinned in `server/go.mod` and runs via `go tool` (ADR 0017).
@@ -25,6 +25,12 @@ Node 24 (`web/.nvmrc`, `nvm use`), Go 1.27. golangci-lint 2.15 is a separate bin
 | Format | `golangci-lint fmt` · check: `golangci-lint fmt --diff` (gofmt + goimports) |
 | Generate SQL code | `go tool sqlc generate` (commit the output in `internal/db/`) |
 | Run | `go run ./cmd/yodo` (listens on `YODO_ADDR`, default `127.0.0.1:8080`; database in `YODO_DATA_DIR`, default `./data`) |
+
+**e2e/** (run from `e2e/`; needs Node, Go and `npx playwright install` once, ADR 0035)
+| Task | Command |
+|---|---|
+| Tests | `npm test` (builds web and server, then runs every project) · one project: `npx playwright test --project self-hosted-chromium` (reuses the last build) |
+| Lint / format / type-check | `npm run lint` · `npm run format:check` · `npm run typecheck` |
 
 **Docker image** (run from the repo root): `docker build -t yodo .`, then `docker run -p 127.0.0.1:8080:8080 -v yodo-data:/data yodo`. The build copies `web/dist` into `server/internal/webui/dist/` for `go:embed` (ADR 0019).
 

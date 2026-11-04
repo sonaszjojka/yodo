@@ -39,3 +39,6 @@ coverage/
 !/server/internal/webui/dist/
 /server/internal/webui/dist/*
 !/server/internal/webui/dist/.gitkeep
+
+# E2E: the server binary built by `npm run build:app` (ADR 0035)
+/e2e/.bin/
