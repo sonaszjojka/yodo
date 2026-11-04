@@ -305,6 +305,7 @@ export function StyleBar({ editor, onAllStyles }: StyleBarProps) {
   } | null>(null)
   const openKey = open?.ids === ids ? open.key : null
   const ref = useRef<HTMLDivElement>(null)
+  const moreRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     if (!openKey) return
@@ -348,8 +349,14 @@ export function StyleBar({ editor, onAllStyles }: StyleBarProps) {
     // Escape closes the popover only; the canvas would clear the selection.
     if (event.key === 'Escape' && openKey) {
       event.stopPropagation()
-      setOpen(null)
+      closeMenu()
     }
+  }
+
+  /** Closes what is open; a closing menu hands focus back to its button. */
+  function closeMenu() {
+    if (openKey === 'more') moreRef.current?.focus()
+    setOpen(null)
   }
 
   return (
@@ -427,6 +434,7 @@ export function StyleBar({ editor, onAllStyles }: StyleBarProps) {
       </button>
       <div className="style-control">
         <button
+          ref={moreRef}
           type="button"
           className="tool-button"
           aria-label="More"
@@ -443,7 +451,7 @@ export function StyleBar({ editor, onAllStyles }: StyleBarProps) {
           <MoreMenu
             editor={editor}
             canPaste={canPaste}
-            onDone={() => setOpen(null)}
+            onDone={closeMenu}
             style={menuOffset({ left, top }, controls.length + 1, size)}
           />
         )}
