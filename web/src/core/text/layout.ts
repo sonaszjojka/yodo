@@ -15,8 +15,8 @@ export type Measure = (text: string, font: string) => number
 /** CSS font stacks; a font not loaded yet falls back to the next one (ADR 0025). */
 export const FONT_STACKS: Record<FontFamily, string> = {
   hand: '"Caveat Variable", cursive',
-  sans: 'Manrope, system-ui, sans-serif',
-  mono: '"JetBrains Mono", ui-monospace, monospace',
+  sans: '"Manrope Variable", system-ui, sans-serif',
+  mono: '"JetBrains Mono Variable", ui-monospace, monospace',
 }
 
 /** Line height as a multiple of the font size, for the canvas and the textarea. */
