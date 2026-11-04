@@ -43,3 +43,5 @@ Why Yodo is built the way it is. See [0001](0001-record-architecture-decisions.m
 | [0030](0030-drawings-http-api.md) | Drawings HTTP API: REST routes that mirror `DrawingRepository` | Accepted |
 | [0031](0031-storage-mode-detection-and-server-contract-tests.md) | Pick the storage mode with a health probe; run the contract suite against a real server | Accepted |
 | [0032](0032-auto-save-debounced-serialized.md) | Auto-save: debounced, one save at a time, flushed when the page hides | Accepted |
+| [0033](0033-hash-routes-and-drawing-load-errors.md) | Hash routes via a small own hook; a drawing that fails to load shows an error, not a blank drawing | Accepted |
+| [0034](0034-render-thumbnails-on-home.md) | Render Home thumbnails from the documents, lazily, with the scene renderer | Accepted |
