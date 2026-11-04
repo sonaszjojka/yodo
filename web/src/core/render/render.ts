@@ -13,7 +13,12 @@ import type {
 import { smoothPath } from '../geometry/freehand.ts'
 import { arrowhead } from '../geometry/line.ts'
 import { GAP, grow, HANDLE_SIZE, selectionFrame } from '../geometry/frame.ts'
-import { diamondPoints, type Bounds } from '../geometry/rect.ts'
+import {
+  cornerRadius,
+  diamondPoints,
+  roundedPolygonPath,
+  type Bounds,
+} from '../geometry/rect.ts'
 import { worldToScreen, type Viewport } from '../geometry/viewport.ts'
 import {
   fontOf,
@@ -57,6 +62,7 @@ export interface SceneRough {
   polygon(...args: Parameters<RoughCanvas['polygon']>): unknown
   ellipse(...args: Parameters<RoughCanvas['ellipse']>): unknown
   linearPath(...args: Parameters<RoughCanvas['linearPath']>): unknown
+  path(...args: Parameters<RoughCanvas['path']>): unknown
 }
 
 /** The canvas's visible size in CSS pixels plus the device pixel ratio. */
@@ -198,11 +204,28 @@ function drawElement(
   const { x, y, width, height } = element
   switch (element.type) {
     case 'rectangle':
-      rough.rectangle(x, y, width, height, options)
+      if (element.roundness === 'round') {
+        const corners: Point[] = [
+          [x, y],
+          [x + width, y],
+          [x + width, y + height],
+          [x, y + height],
+        ]
+        rough.path(roundedPolygonPath(corners, cornerRadius(element)), options)
+      } else {
+        rough.rectangle(x, y, width, height, options)
+      }
       drawLabel(ctx, element)
       return
     case 'diamond':
-      rough.polygon(diamondPoints(element), options)
+      if (element.roundness === 'round') {
+        rough.path(
+          roundedPolygonPath(diamondPoints(element), cornerRadius(element)),
+          options,
+        )
+      } else {
+        rough.polygon(diamondPoints(element), options)
+      }
       drawLabel(ctx, element)
       return
     case 'ellipse':

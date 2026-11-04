@@ -3,6 +3,7 @@ import { createLinear, createShape } from '../document/create.ts'
 import { lineFromDrag } from '../geometry/line.ts'
 import {
   deleteElements,
+  duplicateElements,
   idsAlongPath,
   idsInBox,
   moveElements,
@@ -110,5 +111,41 @@ describe('idsAlongPath', () => {
 
   test('passes through the empty middle of an unfilled shape', () => {
     expect(idsAlongPath([back], [20, 40], [60, 60], 2)).toEqual([])
+  })
+})
+
+describe('duplicateElements', () => {
+  test('puts an offset copy with a new id right above each original', () => {
+    let next = 0
+    const { elements: result, ids } = duplicateElements(
+      elements,
+      new Set([back.id, line.id]),
+      () => `copy-${++next}`,
+    )
+
+    expect(ids).toEqual(['copy-1', 'copy-2'])
+    expect(result.map((element) => element.id)).toEqual([
+      back.id,
+      'copy-1',
+      front.id,
+      line.id,
+      'copy-2',
+    ])
+    // Same seed and style, so the copy looks the same, 10 units down-right.
+    expect(result[1]).toEqual({ ...back, id: 'copy-1', x: 10, y: 10 })
+    expect(result[4]).toEqual({
+      ...line,
+      id: 'copy-2',
+      x: line.x + 10,
+      y: line.y + 10,
+    })
+    // Untouched elements keep their identity.
+    expect(result[2]).toBe(front)
+  })
+
+  test('with no ids it returns the same array', () => {
+    const result = duplicateElements(elements, new Set(), () => 'x')
+    expect(result).toEqual({ elements, ids: [] })
+    expect(result.elements).toBe(elements)
   })
 })

@@ -29,6 +29,8 @@ export function stylesOf(element: YodoElement): StyleKey[] {
         'strokeWidth',
         'strokeStyle',
         'roughness',
+        // An ellipse has no corners.
+        ...(element.type === 'ellipse' ? [] : (['roundness'] as const)),
         'opacity',
       ]
     case 'line':
@@ -49,7 +51,11 @@ export function stylesOf(element: YodoElement): StyleKey[] {
 }
 
 function valueOf(element: YodoElement, key: StyleKey) {
-  return (element as unknown as Record<StyleKey, StyleValue<StyleKey>>)[key]
+  const value = (
+    element as unknown as Partial<Record<StyleKey, StyleValue<StyleKey>>>
+  )[key]
+  // Documents from before corners existed have no `roundness` (types.ts).
+  return value ?? (key === 'roundness' ? 'sharp' : value)
 }
 
 export function commonStyle(selected: readonly YodoElement[]): CommonStyle {
@@ -62,6 +68,18 @@ export function commonStyle(selected: readonly YodoElement[]): CommonStyle {
     }
   }
   return style as CommonStyle
+}
+
+/**
+ * The styles every element in `selected` shares, without the mixed ones:
+ * what "copy style" and "use as default" take (roadmap 2.2b).
+ */
+export function sharedStyle(selected: readonly YodoElement[]): StylePatch {
+  const shared: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(commonStyle(selected))) {
+    if (value !== 'mixed') shared[key] = value
+  }
+  return shared as StylePatch
 }
 
 /** `element` with the parts of `patch` that fit it, or itself if none changes it. */

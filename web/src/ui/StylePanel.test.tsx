@@ -46,6 +46,16 @@ function sections(html: string) {
   return [...html.matchAll(/<h3[^>]*>([^<]+)</g)].map((m) => m[1])
 }
 
+/** The opening tag of the button whose text ends with `label`. */
+function button(html: string, label: string) {
+  const match = [
+    ...html.matchAll(/<button[^>]*>(?:(?!<\/button>).)*<\/button>/g),
+  ]
+    .map((m) => m[0])
+    .find((tag) => tag.endsWith(`${label}</button>`))
+  return match?.slice(0, match.indexOf('>') + 1) ?? ''
+}
+
 /** The accessible label of every pressed option. */
 function pressed(html: string) {
   return [
@@ -77,7 +87,10 @@ describe('StylePanel', () => {
       'Stroke width',
       'Stroke style',
       'Look',
+      'Corners',
       'Opacity',
+      'Layers',
+      'Copy / paste style',
     ])
     expect(pressed(html)).toEqual([
       'Ink',
@@ -86,8 +99,42 @@ describe('StylePanel', () => {
       'Bold',
       'Solid',
       'Hand-drawn',
+      'Sharp',
     ])
-    expect(html).toContain('Delete')
+    for (const action of [
+      'To back',
+      'Backward',
+      'Forward',
+      'To front',
+      'Copy style',
+      'Use as default',
+      'Delete',
+    ]) {
+      expect(html).toContain(`</svg>${action}</button>`)
+    }
+  })
+
+  test('Paste style is disabled until a style is copied', () => {
+    const editor = editorWith([rect])
+    expect(button(render(editor), 'Paste style')).toContain('disabled')
+    editor.copyStyle()
+    expect(button(render(editor), 'Paste style')).not.toContain('disabled')
+  })
+
+  test('a round shape shows Round pressed under Corners', () => {
+    const html = render(editorWith([{ ...rect, roundness: 'round' }]))
+    expect(html).toMatch(/Corners<span class="panel-section-value">Round/)
+    expect(pressed(html)).toContain('Round')
+  })
+
+  test('an ellipse has no corners', () => {
+    const ellipse = createShape('ellipse', {
+      x: 0,
+      y: 0,
+      width: 50,
+      height: 50,
+    })
+    expect(sections(render(editorWith([ellipse])))).not.toContain('Corners')
   })
 
   test('a text gets colour, font with previews, size, exact size, alignment, opacity', () => {
@@ -98,6 +145,8 @@ describe('StylePanel', () => {
       'Size',
       'Alignment',
       'Opacity',
+      'Layers',
+      'Copy / paste style',
     ])
     expect(html).toMatch(
       /<span class="panel-font" style="font-family:[^"]*Caveat/,
@@ -128,6 +177,7 @@ describe('StylePanel', () => {
       'Stroke width',
       'Stroke style',
       'Look',
+      'Corners',
       'Font',
       'Size',
       'Alignment',
@@ -135,6 +185,8 @@ describe('StylePanel', () => {
     ])
     expect(pressed(html)).toContain('Dashed')
     expect(html).not.toContain('Delete')
+    expect(html).not.toContain('Use as default')
+    expect(html).not.toContain('Paste style')
   })
 
   test('agrees with the bar after a change from either', () => {

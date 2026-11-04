@@ -1,7 +1,14 @@
 import {
   ArrowCounterClockwise,
+  ArrowDown,
+  ArrowLineDown,
+  ArrowLineUp,
+  ArrowUp,
+  ClipboardText,
+  Copy,
   LineSegment,
   Palette,
+  PushPin,
   Scribble,
   TextAlignCenter,
   TextAlignLeft,
@@ -19,6 +26,7 @@ import {
 } from 'react'
 import type {
   FillStyle,
+  Roundness,
   StrokeStyle,
   TextAlign,
 } from '../core/document/types.ts'
@@ -44,6 +52,7 @@ import {
 import { Swatch, WidthLine } from './StyleBar.tsx'
 import {
   ALIGNMENTS,
+  CORNERS,
   FILL_STYLES,
   FILLS,
   FONTS,
@@ -116,6 +125,23 @@ function FillPattern({ value }: { value: FillStyle }) {
   )
 }
 
+function CornerShape({ value }: { value: Roundness }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden>
+      <rect
+        x="3.5"
+        y="3.5"
+        width="15"
+        height="15"
+        rx={value === 'round' ? 5 : 0}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+    </svg>
+  )
+}
+
 const ALIGN_ICONS: Record<TextAlign, ReactNode> = {
   left: <TextAlignLeft size={20} aria-hidden />,
   center: <TextAlignCenter size={20} aria-hidden />,
@@ -165,6 +191,12 @@ const CHOICES = {
         <Scribble size={20} aria-hidden />
       ),
   } satisfies Choice<'roughness'>,
+  roundness: {
+    key: 'roundness',
+    name: 'Corners',
+    options: CORNERS,
+    show: (value) => <CornerShape value={value} />,
+  } satisfies Choice<'roundness'>,
   // Live previews: each font's name is drawn in that font.
   fontFamily: {
     key: 'fontFamily',
@@ -206,6 +238,7 @@ const ORDER: StyleKey[] = [
   'strokeWidth',
   'strokeStyle',
   'roughness',
+  'roundness',
   'fontFamily',
   'fontSize',
   'textAlign',
@@ -220,12 +253,14 @@ function SectionTitle({
 }: {
   id: string
   name: string
-  value: string
+  value?: string
 }) {
   return (
     <h3 className="panel-section-title" id={id}>
       {name}
-      <span className="panel-section-value">{value}</span>
+      {value !== undefined && (
+        <span className="panel-section-value">{value}</span>
+      )}
     </h3>
   )
 }
@@ -387,10 +422,115 @@ function OpacitySection({
   )
 }
 
+/** A section of action buttons, each with an icon and a label. */
+function ActionSection({
+  id,
+  name,
+  children,
+}: {
+  id: string
+  name: string
+  children: ReactNode
+}) {
+  return (
+    <section className="panel-section" aria-labelledby={id}>
+      <SectionTitle id={id} name={name} />
+      <div className="panel-actions" role="group" aria-labelledby={id}>
+        {children}
+      </div>
+    </section>
+  )
+}
+
+function Action({
+  label,
+  icon,
+  onClick,
+  disabled,
+}: {
+  label: string
+  icon: ReactNode
+  onClick(): void
+  disabled?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      className="button panel-action"
+      disabled={disabled}
+      onClick={onClick}
+    >
+      {icon}
+      {label}
+    </button>
+  )
+}
+
+/**
+ * The sections that act on the selection rather than set a style (roadmap
+ * 2.2b): layers, copy/paste style and use as default.
+ */
+function SelectionActions({
+  editor,
+  canPaste,
+}: {
+  editor: Editor
+  canPaste: boolean
+}) {
+  return (
+    <>
+      <ActionSection id="panel-layers" name="Layers">
+        <Action
+          label="To back"
+          icon={<ArrowLineDown size={18} aria-hidden />}
+          onClick={() => editor.arrange('back')}
+        />
+        <Action
+          label="Backward"
+          icon={<ArrowDown size={18} aria-hidden />}
+          onClick={() => editor.arrange('backward')}
+        />
+        <Action
+          label="Forward"
+          icon={<ArrowUp size={18} aria-hidden />}
+          onClick={() => editor.arrange('forward')}
+        />
+        <Action
+          label="To front"
+          icon={<ArrowLineUp size={18} aria-hidden />}
+          onClick={() => editor.arrange('front')}
+        />
+      </ActionSection>
+      <ActionSection id="panel-copy-style" name="Copy / paste style">
+        <Action
+          label="Copy style"
+          icon={<Copy size={18} aria-hidden />}
+          onClick={() => editor.copyStyle()}
+        />
+        <Action
+          label="Paste style"
+          icon={<ClipboardText size={18} aria-hidden />}
+          disabled={!canPaste}
+          onClick={() => editor.pasteStyle()}
+        />
+      </ActionSection>
+      {/* Its label says it all, so it has no section title. */}
+      <div className="panel-section">
+        <Action
+          label="Use as default"
+          icon={<PushPin size={18} aria-hidden />}
+          onClick={() => editor.useAsDefault()}
+        />
+      </div>
+    </>
+  )
+}
+
 const selectTool = (state: EditorState) => state.tool
 const selectIds = (state: EditorState) => state.selectedIds
 const selectDocument = (state: EditorState) => state.document
 const selectDefaults = (state: EditorState) => state.defaults
+const selectCanPaste = (state: EditorState) => state.copiedStyle !== null
 /** A drag, text edit or erase in progress hides the panel, like the bar. */
 const selectBusy = (state: EditorState) =>
   Boolean(
@@ -428,6 +568,7 @@ export function StylePanel({ editor, panel }: StylePanelProps) {
   const ids = useStore(editor.store, selectIds)
   const document = useStore(editor.store, selectDocument)
   const defaults = useStore(editor.store, selectDefaults)
+  const canPaste = useStore(editor.store, selectCanPaste)
   const busy = useStore(editor.store, selectBusy)
   const layout = useStore(panel, selectLayout)
   const size = useWindowSize()
@@ -576,6 +717,9 @@ export function StylePanel({ editor, panel }: StylePanelProps) {
             </ChoiceSection>
           )
         })}
+        {!forDefaults && (
+          <SelectionActions editor={editor} canPaste={canPaste} />
+        )}
         {!forDefaults && (
           <button
             type="button"

@@ -1,8 +1,19 @@
-import { LineSegment, Scribble, SlidersHorizontal } from '@phosphor-icons/react'
+import {
+  ArrowLineUp,
+  ClipboardText,
+  Copy,
+  CopySimple,
+  DotsThree,
+  LineSegment,
+  Scribble,
+  SlidersHorizontal,
+  Trash,
+} from '@phosphor-icons/react'
 import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent,
   type ReactNode,
 } from 'react'
@@ -16,7 +27,13 @@ import {
 import { selectionFrame } from '../core/geometry/frame.ts'
 import { worldToScreen } from '../core/geometry/viewport.ts'
 import { FONT_STACKS } from '../core/text/layout.ts'
-import { BUTTON, barPosition, barWidth, popoverOffset } from './barPosition.ts'
+import {
+  BUTTON,
+  barPosition,
+  barWidth,
+  menuOffset,
+  popoverOffset,
+} from './barPosition.ts'
 import { isOutside } from './outsidePress.ts'
 import {
   FILLS,
@@ -132,10 +149,73 @@ const CONTROLS = [
   } satisfies Control<'fontSize'>,
 ] as Control<StyleKey>[]
 
+export interface MoreMenuProps {
+  editor: Editor
+  /** Whether a style has been copied, so "Paste style" can apply. */
+  canPaste: boolean
+  /** Closes the menu; called before the chosen action runs. */
+  onDone(): void
+  style?: CSSProperties
+}
+
+/**
+ * The bar's "more" menu (docs/ui.md, roadmap 2.2b): actions on the
+ * selection, each one undo step except copying a style.
+ */
+export function MoreMenu({ editor, canPaste, onDone, style }: MoreMenuProps) {
+  const item = (label: string, icon: ReactNode, run: () => void) => (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={() => {
+        onDone()
+        run()
+      }}
+    >
+      {icon}
+      {label}
+    </button>
+  )
+  return (
+    <div
+      className="menu style-menu"
+      role="menu"
+      aria-label="More"
+      style={style}
+    >
+      {item('Duplicate', <CopySimple size={18} aria-hidden />, () =>
+        editor.duplicateSelected(),
+      )}
+      {item('Copy style', <Copy size={18} aria-hidden />, () =>
+        editor.copyStyle(),
+      )}
+      <button
+        type="button"
+        role="menuitem"
+        disabled={!canPaste}
+        onClick={() => {
+          onDone()
+          editor.pasteStyle()
+        }}
+      >
+        <ClipboardText size={18} aria-hidden />
+        Paste style
+      </button>
+      {item('Bring to front', <ArrowLineUp size={18} aria-hidden />, () =>
+        editor.arrange('front'),
+      )}
+      {item('Delete', <Trash size={18} aria-hidden />, () =>
+        editor.deleteSelected(),
+      )}
+    </div>
+  )
+}
+
 const selectTool = (state: EditorState) => state.tool
 const selectIds = (state: EditorState) => state.selectedIds
 const selectDocument = (state: EditorState) => state.document
 const selectViewport = (state: EditorState) => state.viewport
+const selectCanPaste = (state: EditorState) => state.copiedStyle !== null
 /** A drag, text edit or erase in progress hides the bar. */
 const selectBusy = (state: EditorState) =>
   Boolean(
@@ -164,11 +244,14 @@ export function StyleBar({ editor, onAllStyles }: StyleBarProps) {
   const document = useStore(editor.store, selectDocument)
   const viewport = useStore(editor.store, selectViewport)
   const busy = useStore(editor.store, selectBusy)
+  const canPaste = useStore(editor.store, selectCanPaste)
   const size = useWindowSize()
-  // The open popover belongs to one selection: a new selection closes it.
-  const [open, setOpen] = useState<{ key: StyleKey; ids: string[] } | null>(
-    null,
-  )
+  // The open popover (or the "more" menu) belongs to one selection: a new
+  // selection closes it.
+  const [open, setOpen] = useState<{
+    key: StyleKey | 'more'
+    ids: string[]
+  } | null>(null)
   const openKey = open?.ids === ids ? open.key : null
   const ref = useRef<HTMLDivElement>(null)
 
@@ -178,6 +261,12 @@ export function StyleBar({ editor, onAllStyles }: StyleBarProps) {
       if (isOutside(event.target, ref.current)) setOpen(null)
     }
     window.document.addEventListener('pointerdown', onPointerDown)
+    // The menu takes focus, like the Home card menu, so arrows and Tab start there.
+    if (openKey === 'more') {
+      ref.current
+        ?.querySelector<HTMLElement>('[role="menuitem"]:not(:disabled)')
+        ?.focus()
+    }
     return () =>
       window.document.removeEventListener('pointerdown', onPointerDown)
   }, [openKey])
@@ -199,8 +288,8 @@ export function StyleBar({ editor, onAllStyles }: StyleBarProps) {
   }
   const { left, top } = barPosition(
     screenOutline,
-    // The controls, then All styles.
-    barWidth(controls.length + 1),
+    // The controls, then All styles and More.
+    barWidth(controls.length + 2),
     size,
   )
 
@@ -285,6 +374,29 @@ export function StyleBar({ editor, onAllStyles }: StyleBarProps) {
       >
         <SlidersHorizontal size={20} aria-hidden />
       </button>
+      <div className="style-control">
+        <button
+          type="button"
+          className="tool-button"
+          aria-label="More"
+          title="More"
+          aria-haspopup="menu"
+          aria-expanded={openKey === 'more'}
+          onClick={() =>
+            setOpen(openKey === 'more' ? null : { key: 'more', ids })
+          }
+        >
+          <DotsThree size={20} weight="bold" aria-hidden />
+        </button>
+        {openKey === 'more' && (
+          <MoreMenu
+            editor={editor}
+            canPaste={canPaste}
+            onDone={() => setOpen(null)}
+            style={menuOffset({ left, top }, controls.length + 1, size)}
+          />
+        )}
+      </div>
     </div>
   )
 }

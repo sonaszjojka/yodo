@@ -1560,3 +1560,148 @@ describe('defaults for new elements (ADR 0036)', () => {
     })
   })
 })
+
+describe('layers (roadmap 2.2b)', () => {
+  test('arrange reorders the selection in one undo step', () => {
+    const { editor, a, b } = setupSelection()
+    click(editor, [50, 50])
+
+    editor.arrange('front')
+
+    expect(editor.store.getState().document.elements).toEqual([b, a])
+    expect(editor.store.getState().selectedIds).toEqual([a.id])
+    editor.undo()
+    expect(editor.store.getState().document.elements).toEqual([a, b])
+  })
+
+  test('arrange with nothing to move is no undo step', () => {
+    const { editor } = setupSelection()
+    click(editor, [250, 50])
+    editor.arrange('forward')
+    editor.arrange('front')
+    expect(editor.history.getState().canUndo).toBe(false)
+  })
+})
+
+describe('duplicate (roadmap 2.2b)', () => {
+  test('duplicateSelected adds offset copies and selects them', () => {
+    const { editor, a, b } = setupSelection()
+    click(editor, [50, 50])
+
+    editor.duplicateSelected()
+
+    const { document, selectedIds } = editor.store.getState()
+    expect(document.elements).toHaveLength(3)
+    const copy = document.elements[1]!
+    expect(copy).toMatchObject({ x: a.x + 10, y: a.y + 10, seed: a.seed })
+    expect(copy.id).not.toBe(a.id)
+    expect(document.elements[2]).toBe(b)
+    expect(selectedIds).toEqual([copy.id])
+    editor.undo()
+    expect(editor.store.getState().document.elements).toEqual([a, b])
+  })
+
+  test('with nothing selected it does nothing', () => {
+    const { editor } = setupSelection()
+    editor.duplicateSelected()
+    expect(editor.history.getState().canUndo).toBe(false)
+  })
+})
+
+describe('copy and paste style (roadmap 2.2b)', () => {
+  test('copyStyle keeps the shared style; it is no document change', () => {
+    const { editor } = setupSelection()
+    click(editor, [50, 50])
+    editor.setStyle({ strokeColor: '#C2453D', roundness: 'round' })
+    const before = editor.store.getState().document
+
+    editor.copyStyle()
+
+    const state = editor.store.getState()
+    expect(state.document).toBe(before)
+    expect(state.copiedStyle).toMatchObject({
+      strokeColor: '#C2453D',
+      roundness: 'round',
+    })
+  })
+
+  test('copyStyle leaves out mixed styles', () => {
+    const { editor } = setupSelection()
+    click(editor, [50, 50])
+    editor.setStyle({ strokeColor: '#C2453D' })
+    click(editor, [250, 50], true)
+
+    editor.copyStyle()
+
+    expect(editor.store.getState().copiedStyle).not.toHaveProperty(
+      'strokeColor',
+    )
+  })
+
+  test('pasteStyle applies the copied style in one undo step', () => {
+    const { editor, b } = setupSelection()
+    click(editor, [50, 50])
+    editor.setStyle({ strokeColor: '#C2453D', strokeWidth: 4 })
+    editor.copyStyle()
+    click(editor, [250, 50])
+
+    editor.pasteStyle()
+
+    expect(editor.store.getState().document.elements[1]).toMatchObject({
+      strokeColor: '#C2453D',
+      strokeWidth: 4,
+    })
+    editor.undo()
+    expect(editor.store.getState().document.elements[1]).toBe(b)
+  })
+
+  test('pasteStyle with nothing copied or nothing selected does nothing', () => {
+    const { editor } = setupSelection()
+    click(editor, [50, 50])
+    editor.pasteStyle()
+    expect(editor.history.getState().canUndo).toBe(false)
+
+    editor.copyStyle()
+    click(editor, [150, 300])
+    const defaults = editor.store.getState().defaults
+    editor.pasteStyle()
+    expect(editor.store.getState().defaults).toBe(defaults)
+    expect(editor.history.getState().canUndo).toBe(false)
+  })
+})
+
+describe('use as default (roadmap 2.2b, ADR 0036)', () => {
+  test("copies the selection's shared style into the defaults, no undo step", () => {
+    const editor = createEditor({
+      ...createDocument(),
+      elements: [
+        {
+          ...createShape('rectangle', { x: 0, y: 0, width: 100, height: 100 }),
+          backgroundColor: FILL,
+          strokeWidth: 4,
+          roundness: 'round',
+        },
+      ],
+    })
+    click(editor, [50, 50])
+    const before = editor.store.getState().document
+
+    editor.useAsDefault()
+
+    const state = editor.store.getState()
+    expect(state.defaults).toEqual({
+      ...BUILT_IN_STYLE,
+      backgroundColor: FILL,
+      strokeWidth: 4,
+      roundness: 'round',
+    })
+    expect(state.document).toBe(before)
+    expect(editor.history.getState().canUndo).toBe(false)
+  })
+
+  test('with nothing selected the defaults stay as they are', () => {
+    const { editor } = setupSelection()
+    editor.useAsDefault()
+    expect(editor.store.getState().defaults).toBe(BUILT_IN_STYLE)
+  })
+})

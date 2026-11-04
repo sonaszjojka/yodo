@@ -43,6 +43,7 @@ describe('style defaults', () => {
       fillStyle: 'solid' as const,
       strokeStyle: 'dotted' as const,
       opacity: 40,
+      roundness: 'round' as const,
       fontFamily: 'mono' as const,
       fontSize: 13,
       textAlign: 'right' as const,
@@ -68,6 +69,7 @@ describe('style defaults', () => {
       strokeWidth: -1,
       strokeStyle: 'dashed',
       roughness: 'high',
+      roundness: 'curvy',
       opacity: 150,
       fontFamily: 'comic',
       fontSize: 0,
@@ -81,6 +83,14 @@ describe('style defaults', () => {
       strokeColor: '#3A6FD8',
       strokeStyle: 'dashed',
     })
+  })
+
+  test('defaults stored before corners existed get sharp corners', () => {
+    const { roundness: _, ...before } = BUILT_IN_STYLE
+    const raw = JSON.stringify({ ...before, strokeColor: '#3A6FD8' })
+    expect(
+      loadStyleDefaults(fakeStorage({ [STYLE_DEFAULTS_KEY]: raw })),
+    ).toEqual({ ...BUILT_IN_STYLE, strokeColor: '#3A6FD8', roundness: 'sharp' })
   })
 
   test('blocked storage loads the built-in style and saving does not throw', () => {

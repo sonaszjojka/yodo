@@ -43,6 +43,60 @@ export function diamondPoints({ x, y, width, height }: Bounds): Point[] {
   ]
 }
 
+/** The largest corner radius of a round shape, in world units. */
+export const MAX_CORNER_RADIUS = 32
+
+/**
+ * How round a `roundness: 'round'` shape's corners are: a quarter of its
+ * shorter side, so small shapes stay shapes, up to `MAX_CORNER_RADIUS`.
+ */
+export function cornerRadius({ width, height }: Bounds): number {
+  return Math.min(
+    MAX_CORNER_RADIUS,
+    Math.min(Math.abs(width), Math.abs(height)) / 4,
+  )
+}
+
+/** The point `distance` along the segment from `from` towards `to`. */
+function toward(from: Point, to: Point, distance: number): Point {
+  const length = Math.hypot(to[0] - from[0], to[1] - from[1])
+  if (length === 0) return from
+  const t = distance / length
+  return [from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t]
+}
+
+/**
+ * An SVG path for the closed polygon with each vertex replaced by a curve
+ * that starts and ends `radius` along its two edges (round corners, roadmap
+ * 2.2b). The radius is limited to half the shortest edge, so curves never
+ * overlap.
+ */
+export function roundedPolygonPath(
+  points: readonly Point[],
+  radius: number,
+): string {
+  const n = points.length
+  let shortest = Infinity
+  for (let i = 0; i < n; i++) {
+    const [a, b] = [points[i]!, points[(i + 1) % n]!]
+    shortest = Math.min(shortest, Math.hypot(b[0] - a[0], b[1] - a[1]))
+  }
+  const r = Math.max(0, Math.min(radius, shortest / 2))
+  /** The edge into vertex i, then its curve. */
+  const corner = (i: number) => {
+    const vertex = points[i]!
+    const [sx, sy] = toward(vertex, points[(i - 1 + n) % n]!, r)
+    const [ex, ey] = toward(vertex, points[(i + 1) % n]!, r)
+    return `L ${sx} ${sy} Q ${vertex[0]} ${vertex[1]} ${ex} ${ey}`
+  }
+  // Start just after the first vertex; its own curve closes the path.
+  const [mx, my] = toward(points[0]!, points[1 % n]!, r)
+  const parts = [`M ${mx} ${my}`]
+  for (let i = 1; i < n; i++) parts.push(corner(i))
+  parts.push(corner(0), 'Z')
+  return parts.join(' ')
+}
+
 /**
  * The world-space box an element covers. Lines, arrows and pencil strokes
  * measure their points, since those can lie left of or above (x, y); for them

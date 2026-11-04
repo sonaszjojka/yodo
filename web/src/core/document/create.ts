@@ -7,6 +7,7 @@ import {
   type LineElement,
   type PencilElement,
   type Point,
+  type RectangleElement,
   type TextElement,
   type TextLabel,
   type YodoDocument,
@@ -18,7 +19,7 @@ import {
  * localhost), so a self-hosted app opened over plain HTTP on a LAN address
  * falls back to `getRandomValues`, which is available everywhere.
  */
-function randomId(): string {
+export function randomId(): string {
   if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
   const bytes = crypto.getRandomValues(new Uint8Array(16))
   bytes[6] = (bytes[6]! & 0x0f) | 0x40 // version 4
@@ -74,7 +75,8 @@ export type ElementStyle = Pick<
   | 'roughness'
   | 'opacity'
 > &
-  Pick<TextElement, 'fontFamily' | 'fontSize' | 'textAlign'>
+  Pick<TextElement, 'fontFamily' | 'fontSize' | 'textAlign'> &
+  Required<Pick<RectangleElement, 'roundness'>>
 
 /** The style before any defaults are changed (Ink stroke, docs/ui.md). */
 export const BUILT_IN_STYLE: ElementStyle = {
@@ -84,6 +86,7 @@ export const BUILT_IN_STYLE: ElementStyle = {
   strokeWidth: 2,
   strokeStyle: 'solid',
   roughness: 1,
+  roundness: 'sharp',
   opacity: 100,
   fontFamily: 'hand',
   fontSize: DEFAULT_FONT_SIZE,
@@ -121,8 +124,10 @@ export function createShape<T extends ShapeType>(
   seed = randomSeed(),
   style = BUILT_IN_STYLE,
 ): Extract<YodoElement, { type: T }> {
+  // Ellipses have no corners.
+  const corners = type === 'ellipse' ? {} : { roundness: style.roundness }
   // TypeScript cannot narrow a generic `type` to one union member, hence the cast.
-  return { type, ...defaults(seed, style), ...bounds } as Extract<
+  return { type, ...defaults(seed, style), ...corners, ...bounds } as Extract<
     YodoElement,
     { type: T }
   >

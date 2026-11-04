@@ -89,6 +89,7 @@ test('createShape uses the given bounds and seed with default styles', () => {
     strokeWidth: 2,
     strokeStyle: 'solid',
     roughness: 1,
+    roundness: 'sharp',
     opacity: 100,
   })
 })
@@ -101,6 +102,14 @@ test('createShape picks a random seed when none is given', () => {
 test.each(['diamond', 'ellipse'] as const)('createShape makes a %s', (type) => {
   const shape = createShape(type, { x: 0, y: 0, width: 5, height: 6 }, 1)
   expect(shape).toMatchObject({ type, width: 5, height: 6, seed: 1 })
+})
+
+test('rectangles and diamonds take the corners of the style; ellipses have none', () => {
+  const style = { ...BUILT_IN_STYLE, roundness: 'round' as const }
+  const box = { x: 0, y: 0, width: 5, height: 6 }
+  expect(createShape('rectangle', box, 1, style).roundness).toBe('round')
+  expect(createShape('diamond', box, 1, style).roundness).toBe('round')
+  expect('roundness' in createShape('ellipse', box, 1, style)).toBe(false)
 })
 
 const GEOMETRY = {
@@ -202,6 +211,7 @@ describe('a given style (the editor defaults, ADR 0036)', () => {
       strokeWidth: 2,
       strokeStyle: 'solid',
       roughness: 1,
+      roundness: 'sharp',
       opacity: 100,
       fontFamily: 'hand',
       fontSize: DEFAULT_FONT_SIZE,

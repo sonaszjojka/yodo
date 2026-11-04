@@ -3,8 +3,13 @@ import { describe, expect, test } from 'vitest'
 import { createDocument, createShape } from '../core/document/create.ts'
 import type { YodoElement } from '../core/document/types.ts'
 import { createEditor } from '../core/editor/editor.ts'
-import { barPosition, popoverOffset } from './barPosition.ts'
-import { StyleBar } from './StyleBar.tsx'
+import {
+  barPosition,
+  MENU_SIZE,
+  menuOffset,
+  popoverOffset,
+} from './barPosition.ts'
+import { MoreMenu, StyleBar } from './StyleBar.tsx'
 
 /** An editor with `elements`, Select active and the elements at `selected` selected. */
 function editorWith(elements: YodoElement[], selected = elements) {
@@ -56,6 +61,7 @@ describe('StyleBar', () => {
       'Width: Bold',
       'Look: Hand-drawn',
       'All styles',
+      'More',
     ])
   })
 
@@ -74,6 +80,7 @@ describe('StyleBar', () => {
       'Font: Mono',
       'Size: XL',
       'All styles',
+      'More',
     ])
   })
 
@@ -83,6 +90,53 @@ describe('StyleBar', () => {
       <StyleBar editor={editorWith([rect, red])} />,
     )
     expect(controls(html)[0]).toBe('Stroke: Mixed')
+  })
+})
+
+describe('MoreMenu', () => {
+  const menu = (canPaste: boolean) =>
+    renderToStaticMarkup(
+      <MoreMenu
+        editor={editorWith([rect])}
+        canPaste={canPaste}
+        onDone={() => {}}
+      />,
+    )
+
+  test('lists the selection actions in order (docs/ui.md)', () => {
+    const items = [...menu(true).matchAll(/<\/svg>([^<]+)<\/button>/g)].map(
+      (m) => m[1],
+    )
+    expect(items).toEqual([
+      'Duplicate',
+      'Copy style',
+      'Paste style',
+      'Bring to front',
+      'Delete',
+    ])
+  })
+
+  test('Paste style is disabled until a style is copied', () => {
+    expect(menu(false)).toMatch(/<button[^>]*disabled=""[^>]*>/)
+    expect(menu(true)).not.toContain('disabled')
+  })
+})
+
+describe('menuOffset', () => {
+  const window = { width: 1000, height: 800 }
+
+  test('opens below the bar when it fits, above near the bottom', () => {
+    expect(menuOffset({ left: 100, top: 300 }, 0, window).top).toBe(50)
+    expect(menuOffset({ left: 100, top: 700 }, 0, window).top).toBe(
+      -MENU_SIZE.height - 10,
+    )
+  })
+
+  test('stays inside the window at its right edge', () => {
+    // Control 5 of a bar at 900: the menu shifts left to end 8 px from the edge.
+    const { left } = menuOffset({ left: 900, top: 300 }, 5, window)
+    const control = 900 + 5 + 5 * 42
+    expect(control + left + MENU_SIZE.width).toBe(1000 - 8)
   })
 })
 

@@ -3,6 +3,7 @@ import {
   createLinear,
   createPencil,
   createShape,
+  randomId,
   type ElementStyle,
   type LinearType,
   type ShapeType,
@@ -35,6 +36,7 @@ import { createStore, type Store } from '../store/store.ts'
 import { estimateMeasure, type Measure } from '../text/layout.ts'
 import {
   deleteElements,
+  duplicateElements,
   idsAlongPath,
   idsInBox,
   moveElements,
@@ -42,7 +44,13 @@ import {
   selectedOf,
   topmostHit,
 } from './selection.ts'
-import { applyDefaults, applyStyle, type StylePatch } from './style.ts'
+import { arrange, type LayerOrder } from './layers.ts'
+import {
+  applyDefaults,
+  applyStyle,
+  sharedStyle,
+  type StylePatch,
+} from './style.ts'
 import { commitEdit, editFor, textTargetAt, type TextEdit } from './text.ts'
 
 export interface EditorState {
@@ -95,6 +103,11 @@ export interface EditorState {
    * part of the document: changing it is no undo step and no save.
    */
   defaults: ElementStyle
+  /**
+   * The style "copy style" took (roadmap 2.2b), for "paste style". Editor
+   * state only: not saved, and copying it is no document change.
+   */
+  copiedStyle: StylePatch | null
 }
 
 /** Tools that draw an element by dragging. */
@@ -195,6 +208,16 @@ export interface Editor {
    * on blur, must not land on what was selected in the meantime.
    */
   setStyle(patch: StylePatch, options?: { selection?: string[] }): void
+  /** Moves the selection in the draw order (layers); one undo step. */
+  arrange(order: LayerOrder): void
+  /** Adds offset copies of the selection and selects them; one undo step. */
+  duplicateSelected(): void
+  /** Keeps the style the selection shares (no mixed values) for pasting. */
+  copyStyle(): void
+  /** Applies the copied style to the selection, where it fits; one undo step. */
+  pasteStyle(): void
+  /** Copies the selection's shared style into the defaults (ADR 0036). */
+  useAsDefault(): void
   /** Whether undo and redo are available, for the bottom bar (ADR 0023). */
   history: Store<HistoryStatus>
   /** Goes back one document change, dropping any drag in progress first. */
@@ -251,6 +274,7 @@ export function createEditor(
     panning: false,
     selectedIds: [],
     defaults,
+    copiedStyle: null,
     move: null,
     resize: null,
     hoverHandle: null,
@@ -272,6 +296,11 @@ export function createEditor(
     if (!restoring) history.record(seen)
     seen = current
   })
+
+  /** The selected elements, in draw order. */
+  function selectedNow(state: EditorState) {
+    return selectedOf(state.document.elements, new Set(state.selectedIds))
+  }
 
   // Transient drag data that nothing renders, so it lives outside the store.
   let drag: {
@@ -976,6 +1005,65 @@ export function createEditor(
           measure,
         )
         return document === prev.document ? prev : { ...prev, document }
+      })
+    },
+    arrange(order) {
+      store.setState((prev) => {
+        const elements = arrange(
+          prev.document.elements,
+          new Set(prev.selectedIds),
+          order,
+        )
+        return elements === prev.document.elements
+          ? prev
+          : { ...prev, document: { ...prev.document, elements } }
+      })
+    },
+    duplicateSelected() {
+      store.setState((prev) => {
+        const { elements, ids } = duplicateElements(
+          prev.document.elements,
+          new Set(prev.selectedIds),
+          randomId,
+        )
+        return ids.length === 0
+          ? prev
+          : {
+              ...prev,
+              selectedIds: ids,
+              hoverHandle: null,
+              document: { ...prev.document, elements },
+            }
+      })
+    },
+    copyStyle() {
+      store.setState((prev) =>
+        prev.selectedIds.length === 0
+          ? prev
+          : { ...prev, copiedStyle: sharedStyle(selectedNow(prev)) },
+      )
+    },
+    pasteStyle() {
+      store.setState((prev) => {
+        // Not setStyle: with nothing selected that would change the defaults.
+        if (!prev.copiedStyle || prev.selectedIds.length === 0) return prev
+        const document = applyStyle(
+          prev.document,
+          prev.selectedIds,
+          prev.copiedStyle,
+          measure,
+        )
+        return document === prev.document ? prev : { ...prev, document }
+      })
+    },
+    useAsDefault() {
+      store.setState((prev) => {
+        if (prev.selectedIds.length === 0) return prev
+        const defaults = applyDefaults(
+          prev.defaults,
+          sharedStyle(selectedNow(prev)),
+        )
+        return defaults === prev.defaults ? prev : { ...prev, defaults }
       })
     },
     history: history.status,
