@@ -9,9 +9,9 @@ Rule: every stage ends with a **file of decisions**, not just a conversation. Co
 
 ## Status (2026-11-04)
 Read this section, not the whole file; finished work is logged in `docs/history.md`.
-- **Last done:** roadmap 1.15 (issue #24): Home screen. Cards with lazily rendered thumbnails (ADR 0034), name and last edited, a "+ New drawing" tile, Open and Rename, three sort orders. Hash routes `#/` and `#/d/:id` (ADR 0033): startup follows the URL, and a drawing that fails to load shows an error screen instead of a blank fallback (closes #67).
-- Open items: `review` issues from the 1.14 and 1.15 reviews.
-- **Next step:** roadmap 1.16 (M1 e2e, issue #25).
+- **Last done:** roadmap 1.16 (issue #25): M1 e2e (ADR 0035). A Playwright package in `e2e/` draws, reloads and reopens a drawing from Home in hosted (`vite preview` under `/yodo/`, IndexedDB) and self-hosted mode (the built Go server), in Chromium, Firefox and WebKit, and checks each mode's own storage; a new `e2e` CI job is in the `ci` gate. M1 is complete.
+- Open items: `review` issues from the 1.14, 1.15 and 1.16 reviews.
+- **Next step:** create the M2 and M3 GitHub issues and milestones (roadmap header: created when M1 ends), then roadmap 2.1 (contextual style bar).
 
 ## Working mode: an educational project
 The goal is both the app and learning how to program with Claude as effectively as possible, so that the knowledge stays with you. The rules (you decide and I explain, no silent automation, features introduced on first use, a short recap after each task, "just do it" to skip explanations) live in the global `~/.claude/CLAUDE.md` and the `educational-working-mode` memory, so they apply in every session.

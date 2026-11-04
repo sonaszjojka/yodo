@@ -7,7 +7,7 @@
 Roadmap 1.16 needs a first end-to-end flow (draw → reload → open from Home) in hosted and self-hosted mode ([0011](0011-testing-strategy.md)). The two modes run the same build ([0007](0007-distribution-pages-and-docker-go-server.md)) and differ only in which `DrawingRepository` the health probe picks ([0031](0031-storage-mode-detection-and-server-contract-tests.md)). The repository layout reserves `e2e/` for these tests ([0012](0012-monorepo.md)). The Go server embeds the web build, so the build must be copied into `server/internal/webui/dist/` before `go build` ([0019](0019-docker-image-build-and-publishing.md)).
 
 ## Decision
-**Package.** `e2e/` is its own npm package with `@playwright/test`, plus the same TypeScript, Prettier and oxlint versions as `web/`, so the definition of done (format, lint, type-check) applies there too.
+**Package.** `e2e/` is its own npm package with `@playwright/test`, plus the same tools as `web/` (TypeScript, Prettier, oxlint), so the definition of done (format, lint, type-check) applies there too.
 
 **One build, two servers.** `npm test` runs `build:app` first. It builds `web/dist` once, copies it into `server/internal/webui/dist/` (gitignored, the same step as the Dockerfile) and builds the server binary into `e2e/.bin/`. Playwright's `webServer` then starts:
 - **hosted:** `vite preview --base /yodo/` on `127.0.0.1:4180`. That's the Pages path, and its HTML fallback for `api/health` fails the probe, so the app picks IndexedDB.

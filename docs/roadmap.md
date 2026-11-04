@@ -34,7 +34,7 @@ Goal: open Yodo, draw basic shapes, close the browser, come back to the same dra
 | 1.13 | HTTP repository + mode detection ✓ (PR [#61](https://github.com/sonaszjojka/yodo/pull/61)) ([#22](https://github.com/sonaszjojka/yodo/issues/22)) | `HttpDrawingRepository` passes the same contract suite against a running server; app picks HTTP if `/api/health` answers, otherwise IndexedDB. |
 | 1.14 | Auto-save ✓ (PR [#64](https://github.com/sonaszjojka/yodo/pull/64)) ([#23](https://github.com/sonaszjojka/yodo/issues/23)) | Changes save debounced, with save status in the bottom bar; reload restores the drawing in both modes. |
 | 1.15 | Home screen ✓ (PR [#70](https://github.com/sonaszjojka/yodo/pull/70)) ([#24](https://github.com/sonaszjojka/yodo/issues/24)) | Card grid with thumbnail, name, last edited; "+ New drawing" tile; open, rename; sort by recent/name/created. Hash routes `#/` and `#/d/:id`. |
-| 1.16 | M1 e2e ([#25](https://github.com/sonaszjojka/yodo/issues/25)) | Playwright: draw → reload → open from Home, in hosted and self-hosted mode (ADR 0011). |
+| 1.16 | M1 e2e ✓ (PR [#75](https://github.com/sonaszjojka/yodo/pull/75)) ([#25](https://github.com/sonaszjojka/yodo/issues/25)) | Playwright: draw → reload → open from Home, in hosted and self-hosted mode (ADR 0011). |
 
 ## M2 — Style, share, move between tools
 | # | Task | Done when… |
