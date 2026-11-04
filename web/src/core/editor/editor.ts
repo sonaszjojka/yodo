@@ -40,6 +40,7 @@ import {
   selectedOf,
   topmostHit,
 } from './selection.ts'
+import { applyStyle, type StylePatch } from './style.ts'
 import { commitEdit, editFor, textTargetAt, type TextEdit } from './text.ts'
 
 export interface EditorState {
@@ -178,6 +179,11 @@ export interface Editor {
   cancel(): void
   /** Removes the selected elements from the document (Delete). */
   deleteSelected(): void
+  /**
+   * Applies `patch` to the selection, each style only where it fits (see
+   * `style.ts`). One change, so one undo step; none if nothing changes.
+   */
+  setStyle(patch: StylePatch): void
   /** Whether undo and redo are available, for the bottom bar (ADR 0023). */
   history: Store<HistoryStatus>
   /** Goes back one document change, dropping any drag in progress first. */
@@ -925,6 +931,17 @@ export function createEditor(
           hoverHandle: null,
           document: { ...ended.document, elements },
         }
+      })
+    },
+    setStyle(patch) {
+      store.setState((prev) => {
+        const document = applyStyle(
+          prev.document,
+          prev.selectedIds,
+          patch,
+          measure,
+        )
+        return document === prev.document ? prev : { ...prev, document }
       })
     },
     history: history.status,

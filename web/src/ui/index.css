@@ -493,3 +493,75 @@ a.drawing-card-body:focus-visible,
   background: var(--raised);
   outline: none;
 }
+
+/* The contextual style bar above the selection (docs/ui.md, Editing styles). */
+.style-bar {
+  position: fixed;
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-float);
+}
+
+.style-bar .tool-button {
+  width: 40px;
+  height: 40px;
+}
+
+.style-control {
+  position: relative;
+}
+
+/* One control's options, under its button. */
+.style-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: -5px;
+  z-index: 1;
+  display: grid;
+  gap: 2px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-float);
+}
+
+.style-swatch {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+
+.style-swatch.is-round {
+  border-radius: 50%;
+}
+
+/* No fill: a diagonal line through an empty swatch. */
+.style-swatch.is-none {
+  background: linear-gradient(
+    to top right,
+    transparent calc(50% - 1px),
+    var(--danger) calc(50% - 1px) calc(50% + 1px),
+    transparent calc(50% + 1px)
+  );
+}
+
+.style-swatch.is-mixed {
+  background: conic-gradient(
+    #c2453d 0 25%,
+    #3f8f5a 0 50%,
+    #3a6fd8 0 75%,
+    #d9822b 0
+  );
+}
+
+.style-text {
+  font-size: 15px;
+  font-weight: 600;
+}

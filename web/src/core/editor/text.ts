@@ -97,7 +97,7 @@ function isBlank(text: string) {
 }
 
 /** A text resized to fit `text`. */
-function withText(
+export function withText(
   element: TextElement,
   text: string,
   measure: Measure,

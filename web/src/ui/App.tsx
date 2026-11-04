@@ -7,6 +7,7 @@ import { Canvas } from './Canvas.tsx'
 import { HistoryControl } from './HistoryControl.tsx'
 import { createCanvasMeasure } from './measure.ts'
 import { SaveStatus } from './SaveStatus.tsx'
+import { StyleBar } from './StyleBar.tsx'
 import { TextEditor } from './TextEditor.tsx'
 import { Toolbar } from './Toolbar.tsx'
 import { TopBar } from './TopBar.tsx'
@@ -54,6 +55,7 @@ export function App({ repository, document, onClose }: AppProps) {
       <Canvas editor={editor} />
       <TopBar editor={editor} />
       <TextEditor editor={editor} />
+      <StyleBar editor={editor} />
       <Toolbar editor={editor} />
       <div className="bottom-bar">
         <HistoryControl editor={editor} />
