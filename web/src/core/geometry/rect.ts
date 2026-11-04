@@ -65,16 +65,18 @@ function toward(from: Point, to: Point, distance: number): Point {
   return [from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t]
 }
 
+/** One rounded vertex: its curve runs from `start` to `end`, pulled towards `vertex`. */
+interface RoundCorner {
+  start: Point
+  vertex: Point
+  end: Point
+}
+
 /**
- * An SVG path for the closed polygon with each vertex replaced by a curve
- * that starts and ends `radius` along its two edges (round corners, roadmap
- * 2.2b). The radius is limited to half the shortest edge, so curves never
- * overlap.
+ * The corners of the polygon rounded by `radius`, limited to half the
+ * shortest edge so curves never overlap.
  */
-export function roundedPolygonPath(
-  points: readonly Point[],
-  radius: number,
-): string {
+function roundCorners(points: readonly Point[], radius: number): RoundCorner[] {
   const n = points.length
   let shortest = Infinity
   for (let i = 0; i < n; i++) {
@@ -82,19 +84,64 @@ export function roundedPolygonPath(
     shortest = Math.min(shortest, Math.hypot(b[0] - a[0], b[1] - a[1]))
   }
   const r = Math.max(0, Math.min(radius, shortest / 2))
-  /** The edge into vertex i, then its curve. */
-  const corner = (i: number) => {
-    const vertex = points[i]!
-    const [sx, sy] = toward(vertex, points[(i - 1 + n) % n]!, r)
-    const [ex, ey] = toward(vertex, points[(i + 1) % n]!, r)
-    return `L ${sx} ${sy} Q ${vertex[0]} ${vertex[1]} ${ex} ${ey}`
-  }
+  return points.map((vertex, i) => ({
+    start: toward(vertex, points[(i - 1 + n) % n]!, r),
+    vertex,
+    end: toward(vertex, points[(i + 1) % n]!, r),
+  }))
+}
+
+/**
+ * An SVG path for the closed polygon with each vertex replaced by a
+ * quadratic curve that starts and ends `radius` along its two edges (round
+ * corners, roadmap 2.2b).
+ */
+export function roundedPolygonPath(
+  points: readonly Point[],
+  radius: number,
+): string {
+  const corners = roundCorners(points, radius)
+  const curve = ({ start, vertex, end }: RoundCorner) =>
+    `L ${start[0]} ${start[1]} Q ${vertex[0]} ${vertex[1]} ${end[0]} ${end[1]}`
   // Start just after the first vertex; its own curve closes the path.
-  const [mx, my] = toward(points[0]!, points[1 % n]!, r)
-  const parts = [`M ${mx} ${my}`]
-  for (let i = 1; i < n; i++) parts.push(corner(i))
-  parts.push(corner(0), 'Z')
+  const [first, ...rest] = corners
+  const parts = [`M ${first!.end[0]} ${first!.end[1]}`]
+  for (const corner of rest) parts.push(curve(corner))
+  parts.push(curve(first!), 'Z')
   return parts.join(' ')
+}
+
+/**
+ * The outline `roundedPolygonPath` draws, as a polygon with each curve
+ * sampled at `steps` segments: what hit-testing aims at.
+ */
+export function roundedPolygonOutline(
+  points: readonly Point[],
+  radius: number,
+  steps = 8,
+): Point[] {
+  const outline: Point[] = []
+  for (const { start, vertex, end } of roundCorners(points, radius)) {
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps
+      const [a, b, c] = [(1 - t) ** 2, 2 * (1 - t) * t, t ** 2]
+      outline.push([
+        a * start[0] + b * vertex[0] + c * end[0],
+        a * start[1] + b * vertex[1] + c * end[1],
+      ])
+    }
+  }
+  return outline
+}
+
+/** The four corners of a box, clockwise from the top-left. */
+export function boxCorners({ x, y, width, height }: Bounds): Point[] {
+  return [
+    [x, y],
+    [x + width, y],
+    [x + width, y + height],
+    [x, y + height],
+  ]
 }
 
 /**

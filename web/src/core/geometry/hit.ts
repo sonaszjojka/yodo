@@ -2,7 +2,12 @@
 // canvas, so the core answers this itself (ADR 0004). Like the renderer, it
 // ignores `angle` until rotation exists.
 import type { Point, YodoElement } from '../document/types.ts'
-import { diamondPoints } from './rect.ts'
+import {
+  boxCorners,
+  cornerRadius,
+  diamondPoints,
+  roundedPolygonOutline,
+} from './rect.ts'
 
 /** Shortest distance from `p` to the segment `a`–`b`. */
 export function distanceToSegment(p: Point, a: Point, b: Point): number {
@@ -78,6 +83,22 @@ export function hitTest(
     ('label' in element && element.label !== undefined)
   const { x, y, width, height } = element
   const [px, py] = point
+
+  // A round rectangle or diamond is aimed at along its drawn curves.
+  if (
+    (element.type === 'rectangle' || element.type === 'diamond') &&
+    element.roundness === 'round'
+  ) {
+    const corners =
+      element.type === 'rectangle'
+        ? boxCorners(element)
+        : diamondPoints(element)
+    const outline = roundedPolygonOutline(corners, cornerRadius(element))
+    return (
+      nearPolyline(point, [...outline, outline[0]!], reach) ||
+      (filled && pointInPolygon(point, outline))
+    )
+  }
 
   switch (element.type) {
     case 'rectangle':
