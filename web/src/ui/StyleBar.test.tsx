@@ -109,11 +109,22 @@ describe('popoverOffset', () => {
 
   test('opens below the bar when it fits', () => {
     // 8 colours: 4 × 2, so 4·40 + 3·2 + 10 = 176 wide, 2·40 + 2 + 10 = 92 tall.
-    expect(popoverOffset({ left: 100, top: 300 }, 8, window).top).toBe(50)
+    expect(popoverOffset({ left: 100, top: 300 }, 0, 8, window).top).toBe(50)
   })
 
   test('opens above the bar near the bottom of the window', () => {
     const top = 800 - 8 - 50
-    expect(popoverOffset({ left: 100, top }, 8, window).top).toBe(-92 - 10)
+    expect(popoverOffset({ left: 100, top }, 0, 8, window).top).toBe(-92 - 10)
+  })
+
+  test('lines up with its control', () => {
+    expect(popoverOffset({ left: 100, top: 300 }, 0, 8, window).left).toBe(-5)
+  })
+
+  test('stays inside the window at its right edge', () => {
+    // A 3-control text bar pinned right; Size (index 2, 176 wide) shifts left.
+    const bar = { left: 1000 - 8 - 134, top: 300 }
+    const control = bar.left + 5 + 2 * 42
+    expect(popoverOffset(bar, 2, 4, window).left).toBe(1000 - 8 - 176 - control)
   })
 })

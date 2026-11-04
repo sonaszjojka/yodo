@@ -58,16 +58,26 @@ function popoverSize(count: number): Size {
 }
 
 /**
- * Where a control's popover goes, relative to that control: below the
- * bar, or above it when the window ends first.
+ * Where the popover of the control at `index` goes, relative to that
+ * control: below the bar, or above it when the window ends first; lined up
+ * with the control, shifted to stay inside the window.
  */
 export function popoverOffset(
   bar: { left: number; top: number },
+  index: number,
   count: number,
   window: Size,
 ): { left: number; top: number } {
-  const { height } = popoverSize(count)
+  const { width, height } = popoverSize(count)
+  const control = bar.left + INSET + index * (BUTTON + 2)
+  const left = Math.max(
+    Math.min(control - INSET, window.width - GAP - width),
+    GAP,
+  )
   const below = BUTTON + POPOVER_GAP
   const fitsBelow = bar.top + INSET + below + height <= window.height - GAP
-  return { left: -INSET, top: fitsBelow ? below : -height - POPOVER_GAP }
+  return {
+    left: left - control,
+    top: fitsBelow ? below : -height - POPOVER_GAP,
+  }
 }

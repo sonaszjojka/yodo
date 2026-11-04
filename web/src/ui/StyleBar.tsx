@@ -232,7 +232,7 @@ export function StyleBar({ editor }: { editor: Editor }) {
       style={{ left, top }}
       onKeyDown={onKeyDown}
     >
-      {controls.map((control) => {
+      {controls.map((control, index) => {
         const value = style[control.key]!
         const label = `${control.name}: ${labelOf(control.options, value)}`
         const isOpen = openKey === control.key
@@ -255,7 +255,12 @@ export function StyleBar({ editor }: { editor: Editor }) {
                 aria-label={control.name}
                 // Up to four per row: two looks fit one row, eight colours two.
                 style={{
-                  ...popoverOffset({ left, top }, control.options.length, size),
+                  ...popoverOffset(
+                    { left, top },
+                    index,
+                    control.options.length,
+                    size,
+                  ),
                   gridTemplateColumns: `repeat(${Math.min(4, control.options.length)}, ${BUTTON}px)`,
                 }}
               >
