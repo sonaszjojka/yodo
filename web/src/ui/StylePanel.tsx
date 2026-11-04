@@ -374,6 +374,14 @@ function OpacitySection({
         value={shown}
         aria-labelledby={id}
         onChange={(event) => setDraft(Number(event.currentTarget.value))}
+        // A mixed slider shows 100, so releasing it there fires no `change`;
+        // apply on release too. A repeat of the same value is no change.
+        onPointerUp={(event) => {
+          if (value === 'mixed') onSet(Number(event.currentTarget.value))
+        }}
+        onKeyUp={(event) => {
+          if (value === 'mixed') onSet(Number(event.currentTarget.value))
+        }}
       />
     </section>
   )
