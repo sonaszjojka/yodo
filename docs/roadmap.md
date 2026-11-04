@@ -1,6 +1,6 @@
 # Yodo — Roadmap
 
-> Status: **approved 2026-10-30** (Stage 5 of `docs/plan.md`). Splits the MVP in `docs/product.md` into milestones and tasks of about one session each. Each task has a "done when…" criterion on top of the definition of done in `docs/conventions.md`. M0 and M1 tasks are GitHub Issues (linked after each task name; done tasks link the PR that shipped them) grouped in milestones M0–M3; M2 and M3 issues are created when M1 ends. This file keeps the order and the milestone split.
+> Status: **approved 2026-10-30** (Stage 5 of `docs/plan.md`). Splits the MVP in `docs/product.md` into milestones and tasks of about one session each. Each task has a "done when…" criterion on top of the definition of done in `docs/conventions.md`. Every task is a GitHub Issue (linked after each task name; done tasks link the PR that shipped them) grouped in milestones M0–M3; the M2 and M3 issues were created when M1 ended. This file keeps the order and the milestone split.
 
 ## Ordering principle: walking skeleton first
 M0 builds a thin end-to-end path through every part of the system (web app, Go server, SQLite, Docker image, Pages deploy, CI) before any feature work. Integration risks (Vite `base`, hash routing, `go:embed`, CI path filters) show up on day one, and from then on every task ships to a live URL. Features are added as vertical slices on top.
@@ -39,28 +39,28 @@ Goal: open Yodo, draw basic shapes, close the browser, come back to the same dra
 ## M2 — Style, share, move between tools
 | # | Task | Done when… |
 |---|---|---|
-| 2.1 | Contextual style bar | Stroke, fill, width, look (hand-drawn/clean) above the selection, per `docs/ui.md`. |
-| 2.2 | Style panel | Movable, resizable panel with the full section list; edits defaults when nothing is selected; agrees with the bar. |
-| 2.3 | Dark mode | UI + canvas themes; choice remembered; drawing colours dark-adapted at render time (ADR 0015). |
-| 2.4 | Sticky notes | Coloured note with text: place, move, resize, edit. |
-| 2.5 | Copy / paste / duplicate | Elements copy and paste within and between drawings; duplicate; select all. |
-| 2.6 | Images | Pasted images appear on canvas; blobs stored by content hash in IndexedDB and under `/data` (ADR 0013). |
-| 2.7 | Export PNG / SVG | Export dialog: whole drawing or selection, background on/off, dark version, PNG scale; copy or download. Visual regression baseline for a few scenes. |
-| 2.8 | `.yodo` export / import | Export inlines images as base64; import recreates the drawing exactly, also from an older-version fixture. |
-| 2.9 | Excalidraw import | Converter for shapes, text, arrows, pencil, images; summary of skipped features (ADR 0014). |
-| 2.10 | Shortcuts modal | Searchable, grouped list of every shortcut. |
-| 2.11 | Optional password | `YODO_PASSWORD` + session cookie + password screen (ADR 0020); tests for locked/unlocked/wrong password. |
-| 2.12 | Performance benchmark | Playwright perf test on the generated reference board (`docs/product.md`); results recorded, tracked over time. Fix anything below target. |
+| 2.1 | Contextual style bar ✓ (PR [#95](https://github.com/sonaszjojka/yodo/pull/95)) ([#77](https://github.com/sonaszjojka/yodo/issues/77)) | Stroke, fill, width, look (hand-drawn/clean) above the selection, per `docs/ui.md`; for text, font and size S/M/L/XL. |
+| 2.2 | Style panel ([#78](https://github.com/sonaszjojka/yodo/issues/78)) | Movable, resizable panel with the full section list; edits defaults when nothing is selected; agrees with the bar. |
+| 2.3 | Dark mode ([#79](https://github.com/sonaszjojka/yodo/issues/79)) | UI + canvas themes; choice remembered; drawing colours dark-adapted at render time (ADR 0015). |
+| 2.4 | Sticky notes ([#80](https://github.com/sonaszjojka/yodo/issues/80)) | Coloured note with text: place, move, resize, edit. |
+| 2.5 | Copy / paste / duplicate ([#81](https://github.com/sonaszjojka/yodo/issues/81)) | Elements copy and paste within and between drawings; duplicate; select all. |
+| 2.6 | Images ([#82](https://github.com/sonaszjojka/yodo/issues/82)) | Pasted images appear on canvas; blobs stored by content hash in IndexedDB and under `/data` (ADR 0013). |
+| 2.7 | Export PNG / SVG ([#83](https://github.com/sonaszjojka/yodo/issues/83)) | Export dialog: whole drawing or selection, background on/off, dark version, PNG scale; copy or download. Visual regression baseline for a few scenes. |
+| 2.8 | `.yodo` export / import ([#84](https://github.com/sonaszjojka/yodo/issues/84)) | Export inlines images as base64; import recreates the drawing exactly, also from an older-version fixture. |
+| 2.9 | Excalidraw import ([#85](https://github.com/sonaszjojka/yodo/issues/85)) | Converter for shapes, text, arrows, pencil, images; summary of skipped features (ADR 0014). |
+| 2.10 | Shortcuts modal ([#86](https://github.com/sonaszjojka/yodo/issues/86)) | Searchable, grouped list of every shortcut. |
+| 2.11 | Optional password ([#87](https://github.com/sonaszjojka/yodo/issues/87)) | `YODO_PASSWORD` + session cookie + password screen (ADR 0020); tests for locked/unlocked/wrong password. |
+| 2.12 | Performance benchmark ([#88](https://github.com/sonaszjojka/yodo/issues/88)) | Playwright perf test on the generated reference board (`docs/product.md`); results recorded, tracked over time. Fix anything below target. |
 
 ## M3 — Organise
 | # | Task | Done when… |
 |---|---|---|
-| 3.1 | Folders | Create, rename, delete folders with icon + colour picker; move drawings into folders; sidebar list. Works in both modes. |
-| 3.2 | Trash | Delete moves to Trash; restore, delete forever, empty with confirm. |
-| 3.3 | Search | Finds drawings by name and canvas text (`search_text`, ADR 0013); results split as in `docs/ui.md`. |
-| 3.4 | Attached arrows | Arrows bound to shapes follow when either shape moves or resizes. |
-| 3.5 | Card menus | ⋯ and right-click menu with every action from `docs/ui.md` (duplicate, open in new tab, export, …). |
-| 3.6 | MVP e2e + release | Playwright covers the 3–5 key flows in both modes; tagged `v1.0.0` image on GHCR; README documents both usage modes. |
+| 3.1 | Folders ([#89](https://github.com/sonaszjojka/yodo/issues/89)) | Create, rename, delete folders with icon + colour picker; move drawings into folders; sidebar list. Works in both modes. |
+| 3.2 | Trash ([#90](https://github.com/sonaszjojka/yodo/issues/90)) | Delete moves to Trash; restore, delete forever, empty with confirm. |
+| 3.3 | Search ([#91](https://github.com/sonaszjojka/yodo/issues/91)) | Finds drawings by name and canvas text (`search_text`, ADR 0013); results split as in `docs/ui.md`. |
+| 3.4 | Attached arrows ([#92](https://github.com/sonaszjojka/yodo/issues/92)) | Arrows bound to shapes follow when either shape moves or resizes. |
+| 3.5 | Card menus ([#93](https://github.com/sonaszjojka/yodo/issues/93)) | ⋯ and right-click menu with every action from `docs/ui.md` (duplicate, open in new tab, export, …). |
+| 3.6 | MVP e2e + release ([#94](https://github.com/sonaszjojka/yodo/issues/94)) | Playwright covers the 3–5 key flows in both modes; tagged `v1.0.0` image on GHCR; README documents both usage modes. |
 
 ## Rules for changing this roadmap
 - Tasks may be split, merged or reordered; record why in the commit message.

@@ -1458,3 +1458,28 @@ describe('eraser', () => {
     expect(ids(editor)).toEqual([right.id, thin.id, hollow.id])
   })
 })
+
+describe('style', () => {
+  test('setStyle changes the selection in one undo step', () => {
+    const { editor, a, b } = setupSelection()
+    click(editor, [50, 50])
+
+    editor.setStyle({ strokeColor: '#C2453D', strokeWidth: 4 })
+
+    const [first, second] = editor.store.getState().document.elements
+    expect(first).toMatchObject({ strokeColor: '#C2453D', strokeWidth: 4 })
+    expect(second).toBe(b)
+    editor.undo()
+    expect(editor.store.getState().document.elements[0]).toBe(a)
+    expect(editor.history.getState().canUndo).toBe(false)
+  })
+
+  test('a style the selection already has is no undo step', () => {
+    const { editor } = setupSelection()
+    click(editor, [50, 50])
+
+    editor.setStyle({ strokeWidth: 2 })
+
+    expect(editor.history.getState().canUndo).toBe(false)
+  })
+})

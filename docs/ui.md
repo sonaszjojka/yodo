@@ -29,6 +29,7 @@
   - shape: stroke, fill, width, look (hand-drawn / clean), **All styles**, more (duplicate, copy/paste style, bring to front, delete);
   - text: font, size S/M/L/XL, **All styles**.
   - Each control opens one small popover at a time. No bar when nothing is selected.
+  - Steps: width Thin 1 / Bold 2 / Extra bold 4 px; look Hand-drawn (roughness 1) / Clean (0); size S 16 / M 20 / L 28 / XL 36 px. A control appears when it fits at least one selected element; different values show as "Mixed".
 - **Style panel** (full configuration), right side, floating:
   - opened with "All styles" or the toolbar button; closed with ✕;
   - draggable by its header, resizable from the left edge and bottom-left corner (width 240–520 px);
