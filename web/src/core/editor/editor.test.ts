@@ -1638,6 +1638,39 @@ describe('copy and paste style (roadmap 2.2b)', () => {
     )
   })
 
+  test('copyStyle with nothing shared keeps the earlier copy', () => {
+    const { editor } = setupSelection()
+    click(editor, [50, 50])
+    editor.copyStyle()
+    const earlier = editor.store.getState().copiedStyle
+    // Two shapes that differ in every style they have.
+    editor.store.setState((prev) => ({
+      ...prev,
+      document: {
+        ...prev.document,
+        elements: [
+          prev.document.elements[0]!,
+          {
+            ...prev.document.elements[1]!,
+            strokeColor: '#C2453D',
+            backgroundColor: '#F7E1DE',
+            fillStyle: 'solid',
+            strokeWidth: 4,
+            strokeStyle: 'dashed',
+            roughness: 0,
+            roundness: 'round',
+            opacity: 50,
+          },
+        ],
+      },
+    }))
+    click(editor, [250, 50], true)
+
+    editor.copyStyle()
+
+    expect(editor.store.getState().copiedStyle).toBe(earlier)
+  })
+
   test('pasteStyle applies the copied style in one undo step', () => {
     const { editor, b } = setupSelection()
     click(editor, [50, 50])

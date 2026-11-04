@@ -1037,11 +1037,14 @@ export function createEditor(
       })
     },
     copyStyle() {
-      store.setState((prev) =>
-        prev.selectedIds.length === 0
+      store.setState((prev) => {
+        const copied = sharedStyle(selectedNow(prev))
+        // Nothing shared (or nothing selected): an empty copy would enable
+        // Paste that does nothing and replace a useful earlier copy.
+        return Object.keys(copied).length === 0
           ? prev
-          : { ...prev, copiedStyle: sharedStyle(selectedNow(prev)) },
-      )
+          : { ...prev, copiedStyle: copied }
+      })
     },
     pasteStyle() {
       store.setState((prev) => {
