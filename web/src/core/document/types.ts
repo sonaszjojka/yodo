@@ -83,6 +83,17 @@ export interface NoteElement extends BaseElement {
   label?: TextLabel
 }
 
+/**
+ * A pasted image (roadmap 2.6, ADR 0040). The bytes live in the image store,
+ * keyed by `fileId` (the lowercase hex SHA-256 of the bytes); the element only
+ * has a box and `opacity`. Added as a new element type, so schemaVersion stays
+ * 1.
+ */
+export interface ImageElement extends BaseElement {
+  type: 'image'
+  fileId: string
+}
+
 export interface LineElement extends BaseElement {
   type: 'line'
   points: Point[]
@@ -113,6 +124,7 @@ export type YodoElement =
   | DiamondElement
   | EllipseElement
   | NoteElement
+  | ImageElement
   | LineElement
   | ArrowElement
   | PencilElement

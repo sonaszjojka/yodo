@@ -44,3 +44,39 @@ export async function storedElements(
     id,
   )
 }
+
+/**
+ * Whether the image with this hash is in the mode's own store (ADR 0040):
+ * the server's /api/images route, or the `blobs` store in IndexedDB.
+ */
+export async function hasStoredImage(
+  page: Page,
+  mode: Mode,
+  hash: string,
+): Promise<boolean> {
+  if (mode === 'self-hosted') {
+    const response = await page.request.get(`api/images/${hash}`)
+    return response.status() === 200
+  }
+  return page.evaluate(
+    (hash) =>
+      new Promise<boolean>((done, fail) => {
+        const open = indexedDB.open('yodo-data')
+        open.onerror = () => fail(open.error)
+        open.onsuccess = () => {
+          const db = open.result
+          if (!db.objectStoreNames.contains('blobs')) {
+            db.close()
+            return done(false)
+          }
+          const count = db.transaction('blobs').objectStore('blobs').count(hash)
+          count.onerror = () => fail(count.error)
+          count.onsuccess = () => {
+            db.close()
+            done(count.result > 0)
+          }
+        }
+      }),
+    hash,
+  )
+}

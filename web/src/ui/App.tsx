@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { YodoDocument } from '../core/document/types.ts'
 import { createEditor } from '../core/editor/editor.ts'
 import { createStore } from '../core/store/store.ts'
@@ -9,10 +9,14 @@ import {
   savePanelLayout,
   saveStyleDefaults,
 } from '../storage/preferences.ts'
+import type { ImageRepository } from '../storage/images.ts'
 import type { DrawingRepository } from '../storage/repository.ts'
 import { Canvas } from './Canvas.tsx'
 import { HistoryControl } from './HistoryControl.tsx'
+import type { ImageCache } from './imageCache.ts'
+import { createImagePaster } from './imagePaster.ts'
 import { createCanvasMeasure } from './measure.ts'
+import { Notice } from './Notice.tsx'
 import { SaveStatus } from './SaveStatus.tsx'
 import { StyleBar } from './StyleBar.tsx'
 import { StylePanel, StylePanelToggle } from './StylePanel.tsx'
@@ -25,6 +29,10 @@ import { ZoomControl } from './ZoomControl.tsx'
 export interface AppProps {
   /** Where drawings are stored, picked at startup (ADR 0031). */
   repository: DrawingRepository
+  /** Where pasted images are stored (ADR 0040). */
+  images: ImageRepository
+  /** The decoded pictures, shared with Home's thumbnails. */
+  imageCache: ImageCache
   /** The drawing to open, loaded before the first render. */
   document: YodoDocument
   /** Gets the last save (true if it succeeded) when the editor closes. */
@@ -33,7 +41,13 @@ export interface AppProps {
 
 // The editor on one drawing, auto-saved through the repository (ADR 0032).
 // Leaving it (Back, or any route change) flushes the pending save.
-export function App({ repository, document, onClose }: AppProps) {
+export function App({
+  repository,
+  images,
+  imageCache,
+  document,
+  onClose,
+}: AppProps) {
   // Lazy initialisers create these once, not on every render. Creating the
   // saver has no side effects; it starts watching in the effect below.
   const [editor] = useState(() =>
@@ -45,6 +59,13 @@ export function App({ repository, document, onClose }: AppProps) {
   const [saver] = useState(() => createAutoSaver(editor.store, repository))
   const [panel] = useState(() => createStore(loadPanelLayout()))
   const { theme } = useTheme()
+  const [notice, setNotice] = useState<string>()
+  const dismissNotice = useCallback(() => setNotice(undefined), [])
+
+  // A pasted image: stored first, then added to the drawing (ADR 0040).
+  const [paster] = useState(() =>
+    createImagePaster(editor, images, imageCache, setNotice),
+  )
 
   // Per-browser preferences (ADR 0036): stored whenever they change.
   useEffect(() => {
@@ -76,13 +97,15 @@ export function App({ repository, document, onClose }: AppProps) {
       window.document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('pagehide', flush)
       stop()
-      onClose?.(finalSave(saver))
+      // An upload still running must land in the drawing before the last save.
+      onClose?.(paster.settled().then(() => finalSave(saver)))
     }
-  }, [saver, onClose])
+  }, [saver, paster, onClose])
 
   return (
     <>
-      <Canvas editor={editor} />
+      <Canvas editor={editor} imageCache={imageCache} onImage={paster.paste} />
+      <Notice message={notice} onDismiss={dismissNotice} />
       <TopBar editor={editor} />
       <TextEditor editor={editor} theme={theme} />
       <StyleBar

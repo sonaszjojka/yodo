@@ -824,3 +824,18 @@ a.drawing-card-body:focus-visible,
   justify-content: space-between;
   width: 100%;
 }
+
+.notice {
+  position: fixed;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(90vw, 420px);
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--danger);
+  box-shadow: var(--shadow-float);
+  font-size: 14px;
+}

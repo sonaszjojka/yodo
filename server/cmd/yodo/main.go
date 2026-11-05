@@ -87,7 +87,7 @@ func run(ctx context.Context, getenv func(string) string) error {
 
 	srv := &http.Server{
 		Addr:    addr,
-		Handler: server.New(webui.FS(), origins, db.New(sqlDB)),
+		Handler: server.New(webui.FS(), origins, db.New(sqlDB), filepath.Join(dataDir, "images")),
 		// Bounds slow clients that never finish their headers (Slowloris).
 		ReadHeaderTimeout: 10 * time.Second,
 	}

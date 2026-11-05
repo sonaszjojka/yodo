@@ -25,6 +25,23 @@ export interface AutoSaverOptions {
 
 export const AUTO_SAVE_DELAY = 1000
 
+/**
+ * The document with `fileIds` set to the images its elements use: sorted,
+ * without repeats (ADR 0013, 0040). Applied when saving, so the stored list
+ * always matches the elements; unchanged if it already does.
+ */
+export function withFileIds(doc: YodoDocument): YodoDocument {
+  const ids = new Set<string>()
+  for (const element of doc.elements) {
+    if (element.type === 'image') ids.add(element.fileId)
+  }
+  const fileIds = [...ids].sort()
+  const same =
+    fileIds.length === doc.fileIds.length &&
+    fileIds.every((id, i) => id === doc.fileIds[i])
+  return same ? doc : { ...doc, fileIds }
+}
+
 export function createAutoSaver(
   editor: Store<EditorState>,
   repository: DrawingRepository,
@@ -63,10 +80,12 @@ export function createAutoSaver(
     saving = true
     update()
     try {
-      await repository.save({
-        ...document,
-        appState: { ...document.appState, viewport },
-      })
+      await repository.save(
+        withFileIds({
+          ...document,
+          appState: { ...document.appState, viewport },
+        }),
+      )
       saved = document
       failed = false
     } catch (error) {

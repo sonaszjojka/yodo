@@ -12,17 +12,18 @@ import (
 
 // New returns the root handler. static holds the built web app (index.html at
 // its root). allowedOrigins guard every route against CSRF and DNS rebinding
-// (ADR 0020). queries is the drawings store (ADR 0030). The app uses hash routing (ADR 0007), so every page is served
+// (ADR 0020). queries is the drawings store (ADR 0030). imagesDir holds the image blobs (ADR 0040). The app uses hash routing (ADR 0007), so every page is served
 // by index.html at / and no SPA fallback is needed: unknown paths are 404.
-func New(static fs.FS, allowedOrigins AllowedOrigins, queries *db.Queries) http.Handler {
-	return newHandler(static, allowedOrigins, queries, time.Now)
+func New(static fs.FS, allowedOrigins AllowedOrigins, queries *db.Queries, imagesDir string) http.Handler {
+	return newHandler(static, allowedOrigins, queries, imagesDir, time.Now)
 }
 
 // newHandler is New with an injected clock, for tests.
-func newHandler(static fs.FS, allowedOrigins AllowedOrigins, queries *db.Queries, now func() time.Time) http.Handler {
+func newHandler(static fs.FS, allowedOrigins AllowedOrigins, queries *db.Queries, imagesDir string, now func() time.Time) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", handleHealth)
 	drawingsAPI{queries: queries, now: now}.register(mux)
+	imagesAPI{dir: imagesDir}.register(mux)
 
 	if _, err := fs.Stat(static, "index.html"); err != nil {
 		// A Go build without the copied web/dist (ADR 0019).

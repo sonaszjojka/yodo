@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 import { createDocument, createShape } from '../core/document/create.ts'
 import { createEditor } from '../core/editor/editor.ts'
 import {
@@ -17,12 +17,17 @@ function setup() {
   return { editor, a }
 }
 
-function fakeClipboard(text = '', target: object | null = null) {
+function fakeClipboard(
+  text = '',
+  target: object | null = null,
+  files: File[] = [],
+) {
   const data = { text }
   let prevented = false
   const event = {
     target: target as EventTarget | null,
     clipboardData: {
+      files,
       getData: () => data.text,
       setData: (_type: string, value: string) => void (data.text = value),
     },
@@ -89,6 +94,49 @@ describe('clipboard events', () => {
     handleClipboardEvent(editor, 'paste', paste.event, view)
     expect(editor.store.getState().document.elements).toHaveLength(1)
     expect(paste.prevented()).toBe(false)
+  })
+
+  describe('pasting an image', () => {
+    const png = new File(['x'], 'shot.png', { type: 'image/png' })
+
+    test('hands the image file over and prevents the default', () => {
+      const { editor } = setup()
+      const onImage = vi.fn()
+      const paste = fakeClipboard('', null, [png])
+      handleClipboardEvent(editor, 'paste', paste.event, view, onImage)
+      expect(onImage).toHaveBeenCalledWith(png)
+      expect(paste.prevented()).toBe(true)
+    })
+
+    test('a Yodo payload wins over an image on the same clipboard', () => {
+      const { editor } = setup()
+      editor.selectAll()
+      const copy = fakeClipboard()
+      handleClipboardEvent(editor, 'copy', copy.event, view)
+      const onImage = vi.fn()
+      const paste = fakeClipboard(copy.data.text, null, [png])
+      handleClipboardEvent(editor, 'paste', paste.event, view, onImage)
+      expect(onImage).not.toHaveBeenCalled()
+      expect(editor.store.getState().document.elements).toHaveLength(2)
+    })
+
+    test('other files and plain text are left to the browser', () => {
+      const { editor } = setup()
+      const onImage = vi.fn()
+      const pdf = new File(['x'], 'a.pdf', { type: 'application/pdf' })
+      const paste = fakeClipboard('hello', null, [pdf])
+      handleClipboardEvent(editor, 'paste', paste.event, view, onImage)
+      expect(onImage).not.toHaveBeenCalled()
+      expect(paste.prevented()).toBe(false)
+    })
+
+    test('is left alone while a text field has focus', () => {
+      const { editor } = setup()
+      const onImage = vi.fn()
+      const paste = fakeClipboard('', { tagName: 'TEXTAREA' }, [png])
+      handleClipboardEvent(editor, 'paste', paste.event, view, onImage)
+      expect(onImage).not.toHaveBeenCalled()
+    })
   })
 
   test.each(['copy', 'cut', 'paste'] as const)(

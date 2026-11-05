@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import {
   createDocument,
+  createImage,
   createLinear,
   createPencil,
   createShape,
@@ -244,5 +245,34 @@ describe('a given style (the editor defaults, ADR 0036)', () => {
       fontSize: 36,
       textAlign: 'right',
     })
+  })
+})
+
+describe('createImage', () => {
+  const view = { x: 100, y: 200, width: 1000, height: 500 }
+  const fileId = 'a'.repeat(64)
+
+  test('keeps a small image at its natural size, centred on the view', () => {
+    const image = createImage(fileId, { width: 100, height: 50 }, view)
+    expect(image).toMatchObject({
+      type: 'image',
+      fileId,
+      x: 100 + (1000 - 100) / 2,
+      y: 200 + (500 - 50) / 2,
+      width: 100,
+      height: 50,
+      angle: 0,
+      roughness: 0,
+    })
+    expect(image.id).toMatch(UUID)
+  })
+
+  test('scales a large image down to 40% of the view, keeping its shape', () => {
+    // 4000x1000 is limited by the width: 400 wide, so 100 tall.
+    const wide = createImage(fileId, { width: 4000, height: 1000 }, view)
+    expect([wide.width, wide.height]).toEqual([400, 100])
+    // 1000x2000 is limited by the height: 200 tall, so 100 wide.
+    const tall = createImage(fileId, { width: 1000, height: 2000 }, view)
+    expect([tall.width, tall.height]).toEqual([100, 200])
   })
 })

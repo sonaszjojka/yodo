@@ -21,25 +21,45 @@ export function isEditable(target: EventTarget | null) {
 
 export interface ClipboardLike {
   target: EventTarget | null
-  clipboardData: Pick<DataTransfer, 'getData' | 'setData'> | null
+  clipboardData:
+    | (Pick<DataTransfer, 'getData' | 'setData'> & {
+        /** Pasted files, such as a screenshot. */
+        files?: ArrayLike<File>
+      })
+    | null
   preventDefault(): void
+}
+
+function firstImage(files: ArrayLike<File> | undefined) {
+  return Array.from(files ?? []).find((file) => file.type.startsWith('image/'))
 }
 
 /**
  * Handles `copy`, `cut` and `paste`. They are left to the browser when a text
  * field has focus (so editing text keeps its own clipboard), when nothing is
- * selected to copy, and when the pasted text isn't a Yodo payload.
+ * selected to copy, and when the paste is neither a Yodo payload nor an image.
+ * A pasted image file goes to `onImage` (ADR 0040); a Yodo payload wins when
+ * the clipboard has both, such as elements copied from another drawing.
  */
 export function handleClipboardEvent(
   editor: Editor,
   type: 'copy' | 'cut' | 'paste',
   event: ClipboardLike,
   view: Bounds,
+  onImage?: (file: File) => void,
 ) {
   if (isEditable(event.target) || !event.clipboardData) return
   if (type === 'paste') {
     const text = event.clipboardData.getData('text/plain')
-    if (editor.paste(text, view)) event.preventDefault()
+    if (editor.paste(text, view)) {
+      event.preventDefault()
+      return
+    }
+    const image = onImage && firstImage(event.clipboardData.files)
+    if (image) {
+      event.preventDefault()
+      onImage(image)
+    }
     return
   }
   const text = type === 'copy' ? editor.copySelected() : editor.cutSelected()

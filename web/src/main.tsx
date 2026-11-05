@@ -23,13 +23,13 @@ for (const family of Object.keys(FONT_STACKS) as (keyof typeof FONT_STACKS)[]) {
 
 // The Go server's API if it answers, otherwise IndexedDB (ADR 0031). The base
 // URL keeps the probe under /yodo/ on GitHub Pages.
-const { mode, repository } = await detectRepository({
+const { mode, repository, images } = await detectRepository({
   baseUrl: new URL('./', document.baseURI),
 })
 console.info(`Yodo storage: ${mode}`)
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <Root repository={repository} />
+    <Root repository={repository} images={images} />
   </StrictMode>,
 )

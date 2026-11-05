@@ -10,6 +10,7 @@ import type {
   DrawingRepository,
   DrawingSummary,
 } from '../storage/repository.ts'
+import type { ImageCache } from './imageCache.ts'
 import { DrawingCard } from './DrawingCard.tsx'
 import { Logo } from './Logo.tsx'
 import { navigate } from './route.ts'
@@ -22,6 +23,7 @@ export type HomeList =
 
 export interface HomeProps {
   repository: DrawingRepository
+  imageCache: ImageCache
   /** Resolves once the editor that just closed has saved (see Root). */
   waitForEditor(): Promise<unknown>
   /** The editor that closed last failed to save its final changes. */
@@ -31,6 +33,7 @@ export interface HomeProps {
 /** The Home screen (`docs/ui.md`, Home): every drawing as a card. */
 export function Home({
   repository,
+  imageCache,
   waitForEditor,
   lastSaveFailed = false,
 }: HomeProps) {
@@ -99,6 +102,7 @@ export function Home({
   return (
     <HomeView
       repository={repository}
+      imageCache={imageCache}
       list={list}
       sort={sort}
       onSort={setSort}
@@ -128,6 +132,7 @@ const SORTS: { value: DrawingSort; label: string }[] = [
 
 export interface HomeViewProps {
   repository: DrawingRepository
+  imageCache: ImageCache
   list: HomeList
   sort: DrawingSort
   onSort(sort: DrawingSort): void
@@ -142,6 +147,7 @@ export interface HomeViewProps {
 /** Home's markup, apart from its data loading, so it renders in tests. */
 export function HomeView({
   repository,
+  imageCache,
   list,
   sort,
   onSort,
@@ -206,6 +212,7 @@ export function HomeView({
                   key={summary.id}
                   summary={summary}
                   repository={repository}
+                  imageCache={imageCache}
                   now={now}
                   onRename={(name) => onRename(summary.id, name)}
                 />

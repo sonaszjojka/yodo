@@ -50,3 +50,4 @@ Why Yodo is built the way it is. See [0001](0001-record-architecture-decisions.m
 | [0037](0037-orca-deliver-pipeline-with-codex-review.md) | Deliver features through an Orca pipeline with Codex reviewing the plan and code and retesting in a browser | Accepted |
 | [0038](0038-sticky-notes-as-note-element.md) | Sticky notes are a `note` element with a label, a fixed default colour and a clean look | Accepted |
 | [0039](0039-copy-paste-through-the-system-clipboard.md) | Copy and paste elements through the system clipboard with a validated JSON payload | Accepted |
+| [0040](0040-images-in-a-content-addressed-image-repository.md) | Images are `image` elements backed by a content-addressed `ImageRepository` (IndexedDB blobs, `/api/images` and files under `/data`) | Accepted |

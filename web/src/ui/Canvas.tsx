@@ -3,9 +3,11 @@ import { useEffect, useRef, type MouseEvent, type PointerEvent } from 'react'
 import type { Point } from '../core/document/types.ts'
 import type { Editor, EditorState } from '../core/editor/editor.ts'
 import { sceneOf } from '../core/editor/scene.ts'
+import type { Bounds } from '../core/geometry/rect.ts'
 import type { Handle } from '../core/geometry/resize.ts'
 import { wheelZoomFactor } from '../core/geometry/viewport.ts'
 import { canvasSize, renderScene, type Surface } from '../core/render/render.ts'
+import type { ImageCache } from './imageCache.ts'
 import { getThemeStore } from './useTheme.ts'
 import {
   handleClipboardEvent,
@@ -55,7 +57,21 @@ function cursorFor(state: EditorState) {
  * The full-window drawing surface. It renders straight from the editor store
  * (ADR 0021), so drawing never re-renders React.
  */
-export function Canvas({ editor }: { editor: Editor }) {
+export function Canvas({
+  editor,
+  imageCache,
+  onImage,
+}: {
+  editor: Editor
+  imageCache: ImageCache
+  /** A pasted image file, with the visible world rectangle to place it in (ADR 0040). */
+  onImage(file: File, view: Bounds): void
+}) {
+  // The latest handler without restarting the canvas's listeners when it changes.
+  const onImageRef = useRef(onImage)
+  useEffect(() => {
+    onImageRef.current = onImage
+  })
   const ref = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
@@ -74,7 +90,11 @@ export function Canvas({ editor }: { editor: Editor }) {
         ctx,
         rc,
         elements,
-        { ...surface, theme: themeStore.getTheme() },
+        {
+          ...surface,
+          theme: themeStore.getTheme(),
+          images: imageCache.get,
+        },
         state.viewport,
         { selected, marquee },
       )
@@ -181,7 +201,9 @@ export function Canvas({ editor }: { editor: Editor }) {
     const onCut = (event: ClipboardEvent) =>
       handleClipboardEvent(editor, 'cut', event, visibleWorld())
     const onPaste = (event: ClipboardEvent) =>
-      handleClipboardEvent(editor, 'paste', event, visibleWorld())
+      handleClipboardEvent(editor, 'paste', event, visibleWorld(), (file) =>
+        onImageRef.current(file, visibleWorld()),
+      )
 
     // A keyup that happens while the window is unfocused never arrives.
     function onBlur() {
@@ -232,6 +254,8 @@ export function Canvas({ editor }: { editor: Editor }) {
     const unsubscribe = editor.store.subscribe(scheduleDraw)
     // A theme change (the user's choice, or the OS for "system") redraws too.
     const unsubscribeTheme = themeStore.subscribe(scheduleDraw)
+    // A picture arriving from the image store draws over its placeholder.
+    const unsubscribeImages = imageCache.subscribe(scheduleDraw)
     // The canvas draws with whatever font is loaded and never redraws on its
     // own, so redraw once a font arrives (ADR 0025).
     document.fonts.addEventListener('loadingdone', scheduleDraw)
@@ -250,6 +274,7 @@ export function Canvas({ editor }: { editor: Editor }) {
     return () => {
       unsubscribe()
       unsubscribeTheme()
+      unsubscribeImages()
       document.fonts.removeEventListener('loadingdone', scheduleDraw)
       cancelAnimationFrame(frame)
       dprQuery?.removeEventListener('change', onPixelRatioChange)
@@ -264,7 +289,7 @@ export function Canvas({ editor }: { editor: Editor }) {
       window.removeEventListener('gesturestart', onGestureStart)
       window.removeEventListener('gesturechange', onGestureChange)
     }
-  }, [editor])
+  }, [editor, imageCache])
 
   function toPoint(event: MouseEvent<HTMLCanvasElement>): Point {
     const rect = event.currentTarget.getBoundingClientRect()

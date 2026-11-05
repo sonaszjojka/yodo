@@ -36,6 +36,9 @@ export function stylesOf(element: YodoElement): StyleKey[] {
     // A note has a fixed paper look (ADR 0038): only its colours and opacity.
     case 'note':
       return ['strokeColor', 'backgroundColor', 'opacity']
+    // A picture has no outline or fill: only its opacity (ADR 0040).
+    case 'image':
+      return ['opacity']
     case 'line':
     case 'arrow':
       return [

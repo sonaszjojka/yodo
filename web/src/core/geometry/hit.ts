@@ -103,6 +103,7 @@ export function hitTest(
   switch (element.type) {
     case 'rectangle':
     case 'note':
+    case 'image':
     case 'text': {
       const inOuter =
         px >= x - reach &&
@@ -111,7 +112,9 @@ export function hitTest(
         py <= y + height + reach
       if (!inOuter) return false
       // Text has no outline to aim at, so its whole box counts.
-      if (filled || element.type === 'text') return true
+      if (filled || element.type === 'text' || element.type === 'image') {
+        return true
+      }
       const inInner =
         px > x + reach &&
         px < x + width - reach &&

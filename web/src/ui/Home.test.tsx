@@ -1,6 +1,8 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, test } from 'vitest'
+import { InMemoryImageRepository } from '../storage/memoryImages.ts'
 import { InMemoryDrawingRepository } from '../storage/memory.ts'
+import { createImageCache } from './imageCache.ts'
 import type { DrawingSummary } from '../storage/repository.ts'
 import { HomeView, type HomeViewProps } from './Home.tsx'
 
@@ -15,6 +17,7 @@ function render(props: Partial<HomeViewProps> = {}) {
   return renderToStaticMarkup(
     <HomeView
       repository={new InMemoryDrawingRepository()}
+      imageCache={createImageCache(new InMemoryImageRepository())}
       list={{ status: 'loaded', drawings }}
       sort="recent"
       onSort={() => {}}

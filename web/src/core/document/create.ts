@@ -4,6 +4,7 @@ import {
   CURRENT_SCHEMA_VERSION,
   type ArrowElement,
   type BaseElement,
+  type ImageElement,
   type LineElement,
   type NoteElement,
   type PencilElement,
@@ -157,6 +158,41 @@ export function createNote(
     strokeStyle: 'solid',
     roughness: 0,
     ...bounds,
+  }
+}
+
+/** A new image is at most this share of the view's width and height. */
+export const IMAGE_VIEW_SHARE = 0.4
+
+/**
+ * A new image element for the stored image `fileId` of natural size
+ * `width` x `height`, centred on `view` (the visible world rectangle). It is
+ * scaled down, keeping its proportions, to fit `IMAGE_VIEW_SHARE` of the view,
+ * and never scaled up (ADR 0040).
+ */
+export function createImage(
+  fileId: string,
+  size: { width: number; height: number },
+  view: Bounds,
+  style = BUILT_IN_STYLE,
+): ImageElement {
+  const scale = Math.min(
+    1,
+    (view.width * IMAGE_VIEW_SHARE) / size.width,
+    (view.height * IMAGE_VIEW_SHARE) / size.height,
+  )
+  const width = size.width * scale
+  const height = size.height * scale
+  return {
+    type: 'image',
+    ...defaults(randomSeed(), style),
+    // No outline or fill: only the picture and its opacity show.
+    roughness: 0,
+    x: view.x + (view.width - width) / 2,
+    y: view.y + (view.height - height) / 2,
+    width,
+    height,
+    fileId,
   }
 }
 
