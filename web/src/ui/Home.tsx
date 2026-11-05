@@ -2,7 +2,6 @@ import { Plus, UploadSimple } from '@phosphor-icons/react'
 import { useEffect, useRef, useState } from 'react'
 import {
   createDrawing,
-  importDrawing,
   renameDrawing,
   sortDrawings,
   type DrawingSort,
@@ -17,7 +16,7 @@ import { DrawingCard } from './DrawingCard.tsx'
 import { Logo } from './Logo.tsx'
 import { navigate } from './route.ts'
 import { SettingsMenu } from './SettingsMenu.tsx'
-import { importErrorMessage } from './yodoFile.ts'
+import { importErrorMessage, importFile } from './yodoFile.ts'
 
 export type HomeList =
   | { status: 'loading' }
@@ -87,8 +86,11 @@ export function Home({
   async function onImport(file: File) {
     setNotice(undefined)
     try {
-      const { id } = await importDrawing(repository, images, await file.text())
-      navigate({ name: 'drawing', id })
+      const text = await file.text()
+      navigate({
+        name: 'drawing',
+        id: await importFile(repository, images, imageCache, text),
+      })
     } catch (error) {
       console.error('Could not import the file', error)
       setNotice(importErrorMessage(error))

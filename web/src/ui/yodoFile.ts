@@ -2,8 +2,15 @@
 
 import { DocumentError } from '../core/document/migrate.ts'
 import type { YodoDocument } from '../core/document/types.ts'
-import { exportYodo, yodoFileName } from '../storage/drawings.ts'
+import {
+  exportYodo,
+  importDrawing,
+  yodoFileName,
+  type ImportOptions,
+} from '../storage/drawings.ts'
 import type { ImageRepository } from '../storage/images.ts'
+import type { DrawingRepository } from '../storage/repository.ts'
+import type { ImageCache } from './imageCache.ts'
 import { downloadText } from './download.ts'
 
 /** Downloads `doc`, with its images, as `<name>.yodo`. Throws if an image is gone. */
@@ -17,6 +24,23 @@ export async function exportDrawing(
     await exportYodo(doc, images),
     'application/json',
   )
+}
+
+/**
+ * Imports the file's text as a new drawing and returns its id. The shared
+ * image cache may have marked one of these pictures as missing earlier, so it
+ * is told to look again now that the bytes are stored.
+ */
+export async function importFile(
+  repository: DrawingRepository,
+  images: ImageRepository,
+  imageCache: ImageCache,
+  text: string,
+  options?: ImportOptions,
+): Promise<string> {
+  const { id, fileIds } = await importDrawing(repository, images, text, options)
+  for (const fileId of fileIds) imageCache.refresh(fileId)
+  return id
 }
 
 const IMPORT_MESSAGES: Record<DocumentError['code'], string> = {
