@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import type { ThemeChoice } from '../storage/preferences.ts'
 import { nextMenuIndex } from './menuKeys.ts'
 import { isOutside } from './outsidePress.ts'
+import { ShortcutsDialog } from './ShortcutsDialog.tsx'
 import { useTheme } from './useTheme.ts'
 
 const THEME_CHOICES: { value: ThemeChoice; label: string }[] = [
@@ -41,12 +42,13 @@ export function ThemeOptions({
 }
 
 /**
- * Home's Settings menu (`docs/ui.md`, Home). Only the theme exists so far;
- * the shortcuts modal (2.10) and About join it later.
+ * Home's Settings menu (`docs/ui.md`, Home). Theme and the shortcuts
+ * list exist so far; About joins it later.
  */
 export function SettingsMenu() {
   const { choice, setChoice } = useTheme()
   const [open, setOpen] = useState(false)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
 
@@ -70,7 +72,7 @@ export function SettingsMenu() {
     }
     const items = [
       ...event.currentTarget.querySelectorAll<HTMLElement>(
-        '[role="menuitemradio"]',
+        '[role="menuitemradio"], [role="menuitem"]',
       ),
     ]
     const next = nextMenuIndex(
@@ -106,8 +108,23 @@ export function SettingsMenu() {
           onKeyDown={onKeyDown}
         >
           <ThemeOptions choice={choice} onChoose={setChoice} />
+          <div className="menu-separator" role="separator" />
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false)
+              setShortcutsOpen(true)
+            }}
+          >
+            Keyboard shortcuts
+          </button>
         </div>
       )}
+      <ShortcutsDialog
+        open={shortcutsOpen}
+        onClose={() => setShortcutsOpen(false)}
+      />
     </div>
   )
 }
