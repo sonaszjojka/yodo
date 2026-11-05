@@ -158,6 +158,41 @@ jobs:
           path: e2e/playwright-report
           retention-days: 14
 
+  # The export visual baseline (ADR 0044). It runs in the same pinned image the
+  # baselines were made in (`npm run test:visual:update`), not on the bare
+  # runner, so a runner update can't change how pixels render. Keep the image
+  # tag equal to @playwright/test in e2e/package.json: with a different one
+  # the browsers are missing and the job fails loudly.
+  visual:
+    needs: changes
+    if: needs.changes.outputs.web == 'true' || needs.changes.outputs.e2e == 'true'
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.64.1-noble
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: e2e/.nvmrc
+          cache: npm
+          cache-dependency-path: |
+            web/package-lock.json
+            e2e/package-lock.json
+      - run: npm ci
+        working-directory: web
+      - run: npm run build
+        working-directory: web
+      - run: npm ci
+        working-directory: e2e
+      - run: npx playwright test -c playwright.visual.config.ts
+        working-directory: e2e
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: visual-report
+          path: e2e/playwright-report
+          retention-days: 14
+
   # Builds the multi-arch image on every PR (proves the Dockerfile works) and
   # pushes it to GHCR on merge to main (ADR 0019).
   docker:
@@ -197,7 +232,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   ci:
-    needs: [changes, web, web-server, server, e2e, docker]
+    needs: [changes, web, web-server, server, e2e, visual, docker]
     if: always()
     runs-on: ubuntu-latest
     steps:
