@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { YodoDocument } from '../core/document/types.ts'
 import { createEditor } from '../core/editor/editor.ts'
 import { createStore } from '../core/store/store.ts'
@@ -12,6 +12,9 @@ import {
 import type { ImageRepository } from '../storage/images.ts'
 import type { DrawingRepository } from '../storage/repository.ts'
 import { Canvas } from './Canvas.tsx'
+import { isExportShortcut } from './editShortcuts.ts'
+import { ExportButton } from './ExportButton.tsx'
+import { ExportDialog } from './ExportDialog.tsx'
 import { HistoryControl } from './HistoryControl.tsx'
 import type { ImageCache } from './imageCache.ts'
 import { createImagePaster } from './imagePaster.ts'
@@ -67,6 +70,39 @@ export function App({
     createImagePaster(editor, images, imageCache, setNotice),
   )
 
+  // Each opening gets a new number, used as the dialog's key: a dialog that
+  // closes and opens again in one render batch still starts fresh and open.
+  const [exportRun, setExportRun] = useState<number | null>(null)
+  const exportRuns = useRef(0)
+  const openExport = useCallback(() => {
+    // Nothing to export from an empty drawing (the button is disabled too).
+    if (editor.store.getState().document.elements.length > 0) {
+      setExportRun((exportRuns.current += 1))
+    }
+  }, [editor])
+  // A dialog's `close` event arrives a moment after it hides, so a late one
+  // from a previous opening must not close the next.
+  const closeExport = (run: number) =>
+    setExportRun((current) => (current === run ? null : current))
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      // Not while a dialog is open (it is the export dialog, or the shortcut
+      // would reset its options). Focus may still sit on a control of a
+      // dialog that just closed, so the target says nothing here.
+      if (
+        !isExportShortcut(event) ||
+        window.document.querySelector('dialog[open]')
+      ) {
+        return
+      }
+      event.preventDefault()
+      openExport()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [openExport])
+
   // Per-browser preferences (ADR 0036): stored whenever they change.
   useEffect(() => {
     let defaults = editor.store.getState().defaults
@@ -117,7 +153,15 @@ export function App({
       <StylePanel editor={editor} panel={panel} />
       <div className="top-right">
         <StylePanelToggle panel={panel} />
+        <ExportButton editor={editor} onOpen={openExport} />
       </div>
+      {exportRun !== null && (
+        <ExportDialog
+          key={exportRun}
+          editor={editor}
+          onClose={() => closeExport(exportRun)}
+        />
+      )}
       <Toolbar editor={editor} />
       <div className="bottom-bar">
         <HistoryControl editor={editor} />

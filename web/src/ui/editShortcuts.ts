@@ -19,6 +19,33 @@ export function isEditable(target: EventTarget | null) {
   )
 }
 
+/**
+ * Whether an event comes from inside an open modal dialog. The editor listens
+ * on `window`, so without this a key or paste in the dialog would also edit
+ * the drawing behind it.
+ */
+export function isInsideDialog(target: EventTarget | null) {
+  const element = target as {
+    closest?: (selector: string) => unknown
+  } | null
+  return !!element?.closest?.('dialog[open]')
+}
+
+/** Shift+Ctrl/Cmd+E opens the export dialog (as in Excalidraw). */
+export function isExportShortcut(
+  event: Pick<
+    ShortcutLike,
+    'key' | 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey'
+  >,
+) {
+  return (
+    (event.ctrlKey || event.metaKey) &&
+    event.shiftKey &&
+    !event.altKey &&
+    event.key.toLowerCase() === 'e'
+  )
+}
+
 export interface ClipboardLike {
   target: EventTarget | null
   clipboardData:
@@ -48,7 +75,13 @@ export function handleClipboardEvent(
   view: Bounds,
   onImage?: (file: File) => void,
 ) {
-  if (isEditable(event.target) || !event.clipboardData) return
+  if (
+    isEditable(event.target) ||
+    isInsideDialog(event.target) ||
+    !event.clipboardData
+  ) {
+    return
+  }
   if (type === 'paste') {
     const text = event.clipboardData.getData('text/plain')
     if (editor.paste(text, view)) {

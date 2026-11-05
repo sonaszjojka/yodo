@@ -8,6 +8,13 @@ export type ColorRole = 'stroke' | 'fill'
 
 /** The dark canvas (`--page` in dark mode, docs/ui.md). */
 export const DARK_CANVAS = '#141517'
+/** The light canvas (`--page` in light mode); an export's background. */
+export const LIGHT_CANVAS = '#f7f9f9'
+
+/** The canvas colour of a theme. */
+export function canvasColor(theme: Theme) {
+  return theme === 'dark' ? DARK_CANVAS : LIGHT_CANVAS
+}
 
 /** Minimum contrast of a custom stroke against the dark canvas (WCAG non-text). */
 const MIN_STROKE_CONTRAST = 3

@@ -11,6 +11,7 @@ import type { ImageCache } from './imageCache.ts'
 import { getThemeStore } from './useTheme.ts'
 import {
   handleClipboardEvent,
+  isInsideDialog,
   handleEditShortcut,
   isEditable,
 } from './editShortcuts.ts'
@@ -145,7 +146,7 @@ export function Canvas({
         editor.setShift(down)
         return
       }
-      if (isEditable(event.target)) return
+      if (isEditable(event.target) || isInsideDialog(event.target)) return
       if (event.key === ' ') {
         // Stops page scroll and a focused button "clicking" on Space.
         event.preventDefault()
@@ -217,6 +218,8 @@ export function Canvas({
       const zoom = event.ctrlKey || event.metaKey
       // Plain wheel over other UI is left alone, so panels can scroll.
       if (!zoom && event.target !== canvas) return
+      // A modal dialog (export) is not part of the drawing: let it scroll.
+      if (isInsideDialog(event.target)) return
       // Without this the browser zooms the page (Ctrl) or swipes back.
       event.preventDefault()
       const unit = event.deltaMode === 1 ? LINE_HEIGHT : 1

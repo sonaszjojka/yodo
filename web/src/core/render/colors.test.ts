@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'vitest'
-import { adaptColor, contrastRatio, DARK_CANVAS } from './colors.ts'
+import {
+  adaptColor,
+  canvasColor,
+  contrastRatio,
+  DARK_CANVAS,
+  LIGHT_CANVAS,
+} from './colors.ts'
 
 // The dark twins from docs/ui.md, "Drawing palette".
 const STROKE_TWINS: Record<string, string> = {
@@ -96,5 +102,13 @@ describe('adaptColor', () => {
     expect(adaptColor('#336699', 'dark', 'fill')).toBe(
       adaptColor('#336699', 'dark', 'fill'),
     )
+  })
+})
+
+describe('canvasColor', () => {
+  test('is the page colour of each theme', () => {
+    expect(canvasColor('light')).toBe('#f7f9f9')
+    expect(canvasColor('dark')).toBe('#141517')
+    expect(LIGHT_CANVAS).not.toBe(DARK_CANVAS)
   })
 })
