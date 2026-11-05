@@ -190,6 +190,7 @@ export function App({
           key={exportRun}
           editor={editor}
           imageCache={imageCache}
+          images={images}
           onClose={() => closeExport(exportRun)}
         />
       )}
