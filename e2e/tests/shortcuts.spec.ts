@@ -129,3 +129,28 @@ test('Home: Settings → Keyboard shortcuts opens the list', async ({ page }) =>
   await page.keyboard.press('Escape')
   await expect(page.getByRole('dialog')).toBeHidden()
 })
+
+test('Ctrl+scroll over the dialog does not zoom the drawing behind it', async ({
+  page,
+  browserName,
+}) => {
+  // Playwright applies held modifiers to the wheel only in Chromium.
+  test.skip(browserName !== 'chromium', 'wheel modifiers need Chromium')
+  await openEditor(page)
+  await page.keyboard.press('?')
+  const dialog = page.getByRole('dialog', { name: 'Keyboard shortcuts' })
+  await expect(dialog).toBeVisible()
+  const zoom = page.locator('.zoom-value')
+  await expect(zoom).toHaveText('100%')
+
+  const box = await dialog.boundingBox()
+  if (!box) throw new Error('the dialog is not visible')
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.keyboard.down('Control')
+  await page.mouse.wheel(0, -400)
+  await page.keyboard.up('Control')
+
+  // Zoom is applied in the next frame; give it time before checking.
+  await page.waitForTimeout(300)
+  await expect(zoom).toHaveText('100%')
+})

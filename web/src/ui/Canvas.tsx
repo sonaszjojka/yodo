@@ -245,10 +245,12 @@ export function Canvas({
     // Safari pinch: apply the change in scale since the last gesture event.
     let gestureScale = 1
     function onGestureStart(event: Event) {
+      if (isInsideDialog(event.target)) return
       event.preventDefault()
       gestureScale = 1
     }
     function onGestureChange(event: Event) {
+      if (isInsideDialog(event.target)) return
       event.preventDefault()
       const gesture = event as GestureEvent
       editor.zoomAt(
