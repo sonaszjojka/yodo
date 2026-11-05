@@ -1,8 +1,24 @@
 // What the Home screen and the editor route do with drawings (ADR 0033), on top
 // of `DrawingRepository`. Framework-free, so it's tested without React.
 
-import { createDocument } from '../core/document/create.ts'
+import { createDocument, randomId } from '../core/document/create.ts'
+import {
+  parseYodoFile,
+  serializeYodoFile,
+  type YodoFiles,
+} from '../core/document/file.ts'
+import { DocumentError } from '../core/document/migrate.ts'
 import type { YodoDocument } from '../core/document/types.ts'
+import { withFileIds } from './autosave.ts'
+import { base64ToBlob, blobToBase64 } from './base64.ts'
+import {
+  decodeSize,
+  HASH_PATTERN,
+  IMAGE_TYPES,
+  MAX_IMAGE_BYTES,
+  sha256Hex,
+  type ImageRepository,
+} from './images.ts'
 import type { DrawingRepository, DrawingSummary } from './repository.ts'
 
 export type LoadResult =
@@ -43,6 +59,91 @@ export async function createDrawing(
   const document = createDocument()
   await repository.save(document)
   return document.id
+}
+
+/**
+ * The text of the `.yodo` file for `doc`: the document with its images
+ * inlined as base64 (ADR 0013). The images come from `images`; one that is
+ * missing fails the export with a `bad-files` error rather than writing a
+ * file that cannot be imported.
+ */
+export async function exportYodo(
+  doc: YodoDocument,
+  images: ImageRepository,
+): Promise<string> {
+  // `fileIds` may lag behind the elements until the next save; the elements win.
+  const current = withFileIds(doc)
+  const files: YodoFiles = {}
+  for (const fileId of current.fileIds) {
+    const blob = await images.get(fileId)
+    if (!blob) {
+      throw new DocumentError('bad-files', `Image ${fileId} is not stored`)
+    }
+    files[fileId] = { mimeType: blob.type, data: await blobToBase64(blob) }
+  }
+  return serializeYodoFile(current, files)
+}
+
+export interface ImportOptions {
+  /** Reads an image's size, failing for bytes that are not a picture. Defaults to the browser's decoder. */
+  decode?: (blob: Blob) => Promise<{ width: number; height: number }>
+}
+
+/**
+ * Saves the drawing in a `.yodo` file as a new drawing. It gets a fresh id,
+ * so importing your own export never overwrites the original; the rest is as
+ * exported. Every image is checked first (type, size, that it decodes, and
+ * that its bytes hash to the id the drawing uses) and only then stored, so a
+ * bad file leaves nothing behind. Returns the new id and the ids of the
+ * images stored. Throws a `DocumentError` for a broken file.
+ */
+export async function importDrawing(
+  repository: DrawingRepository,
+  images: ImageRepository,
+  text: string,
+  { decode = decodeSize }: ImportOptions = {},
+): Promise<{ id: string; fileIds: string[] }> {
+  const { document, files } = parseYodoFile(text)
+  const blobs = await Promise.all(
+    Object.entries(files).map(async ([fileId, { mimeType, data }]) => {
+      const blob = base64ToBlob(data, mimeType)
+      if (
+        !(IMAGE_TYPES as readonly string[]).includes(mimeType) ||
+        blob.size > MAX_IMAGE_BYTES ||
+        !HASH_PATTERN.test(fileId)
+      ) {
+        throw new DocumentError('bad-files', `Image ${fileId} is not allowed`)
+      }
+      // Hosted storage would keep any bytes under an image label, so check
+      // here that they are a picture, as the server does for its own.
+      const size = await decode(blob).catch(() => undefined)
+      if (!size || !(size.width > 0 && size.height > 0)) {
+        throw new DocumentError('bad-files', `Image ${fileId} is not a picture`)
+      }
+      if ((await sha256Hex(await blob.arrayBuffer())) !== fileId) {
+        throw new DocumentError('bad-files', `Image ${fileId} is damaged`)
+      }
+      return blob
+    }),
+  )
+  for (const blob of blobs) await images.put(blob)
+  const id = randomId()
+  await repository.save({ ...document, id })
+  return { id, fileIds: Object.keys(files) }
+}
+
+/** A safe download name for a drawing: `<name>.yodo`. */
+export function yodoFileName(name: string): string {
+  // Control characters (code < 32, and DEL) and the characters Windows and
+  // macOS forbid in file names become "_".
+  const safe = Array.from(name, (char) => {
+    const code = char.charCodeAt(0)
+    return code < 32 || code === 127 || '/\\:*?"<>|'.includes(char) ? '_' : char
+  })
+    .join('')
+    .trim()
+    .replace(/\.+$/, '')
+  return `${safe || 'Untitled'}.yodo`
 }
 
 /**

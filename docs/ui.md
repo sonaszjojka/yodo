@@ -15,12 +15,12 @@
 ## Screens (MVP)
 | Screen | Layout |
 |---|---|
-| Home | Left sidebar: logo, **New drawing**, **Import file** (`.yodo` or `.excalidraw`, ADR 0014; until 2.8 there is only an **Import Excalidraw** button in the title row), All drawings, Folders, Trash. Main area: title, search, sort, Settings menu (theme, shortcuts, about; only Theme exists so far, as System / Light / Dark, and the editor follows it without a control of its own); card grid that starts with a **"+ New drawing" tile**. |
+| Home | Left sidebar: logo, **New drawing**, **Import file** (`.yodo` or `.excalidraw`, ADR 0014; for now one **Import file** button in the title row that picks the format by the file's extension), All drawings, Folders, Trash. Main area: title, search, sort, Settings menu (theme, shortcuts, about; only Theme exists so far, as System / Light / Dark, and the editor follows it without a control of its own); card grid that starts with a **"+ New drawing" tile**. |
 | Drawing card | Thumbnail, name, folder icon + name, last edited. **⋯ button and right-click** open the same menu: Open, Open in new tab, Rename, Duplicate, Move to folder, Export as `.yodo`, Move to Trash. |
 | Editor | Top: menu/back + drawing name (left), tool toolbar (centre), style-panel toggle + Export (right). Bottom: undo/redo, zoom, hint, save status, shortcuts. Contextual bar above the selection; style panel on the right. |
 | Trash | Sidebar as on Home. A small bar directly above the list: count + **Empty trash** (with confirm dialog). Rows: Restore (icon + label), delete forever (icon only). |
 | Search results | Split into "In names" (cards) and "In text on the canvas" (rows with highlighted snippets). |
-| Export dialog | Tabs PNG / SVG / Yodo file; scope (whole drawing or selection), background on/off, dark version, scale (PNG), file name, Copy / Download. PNG only so far, with no tab strip until SVG (2.7b) and the Yodo file (2.8) arrive; opens with Shift+Ctrl/Cmd+E. |
+| Export dialog | Tabs PNG / SVG / Yodo file; scope (whole drawing or selection), background on/off, dark version, scale (PNG), file name, Copy / Download. PNG only so far, with no tab strip: the button is `Export image` and sits next to the `.yodo` `Export` button (2.8) until the tabs arrive with SVG (2.7b); opens with Shift+Ctrl/Cmd+E. |
 | Keyboard shortcuts | Modal with search, grouped (Tools, Editing, View, Drawings). Key choices are placeholders until each feature is built. |
 | Password screen | Self-hosted only, when `YODO_PASSWORD` is set (ADR 0020): password, "Remember this browser" (off by default), Unlock, clear error state (wrong password, too many attempts, server unreachable). If the session ends while a drawing is open, the same card appears as a dialog over the drawing, which stays untouched and inert until the password is entered. |
 

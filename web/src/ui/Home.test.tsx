@@ -24,6 +24,7 @@ function render(props: Partial<HomeViewProps> = {}) {
       creating={false}
       onCreate={() => {}}
       onRename={() => {}}
+      onImport={() => {}}
       onRetry={() => {}}
       now={now}
       {...props}
@@ -36,6 +37,15 @@ const names = (html: string) =>
   [...html.matchAll(/class="drawing-card-name">([^<]*)</g)].map((m) => m[1])
 
 describe('HomeView', () => {
+  test('offers one Import file button for .yodo and Excalidraw files', () => {
+    const html = render()
+
+    expect(html).toContain('Import file</button>')
+    expect(html).toMatch(
+      /<input[^>]*type="file"[^>]*accept="\.yodo,\.excalidraw,/,
+    )
+  })
+
   test('starts the grid with the New drawing tile', () => {
     const html = render()
 
@@ -93,8 +103,8 @@ describe('HomeView', () => {
     expect(html).toMatch(/role="alert">Couldn’t rename</)
   })
 
-  test('offers Import Excalidraw, which is busy while importing', () => {
-    expect(render()).toMatch(/<button[^>]*>Import Excalidraw<\/button>/)
+  test('offers Import file, which is busy while importing', () => {
+    expect(render()).toMatch(/<button[^>]*>Import file<\/button>/)
     expect(render({ importing: true })).toMatch(
       /<button[^>]*disabled=""[^>]*>Importing…<\/button>/,
     )

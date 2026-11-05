@@ -92,7 +92,7 @@ test('exports the drawing as a PNG: size, background, dark version', async ({
   await dragRectangle(page, [200, 200], [420, 360])
   await expectInk(page)
 
-  await page.getByRole('button', { name: 'Export' }).click()
+  await page.getByRole('button', { name: 'Export image' }).click()
   const dialog = page.getByRole('dialog', { name: 'Export image' })
   await expect(dialog).toBeVisible()
   await dialog.getByLabel('File name').fill('my-sketch')
@@ -165,7 +165,7 @@ test('Copy puts the PNG on the clipboard', async ({ page, browserName }) => {
   await dragRectangle(page, [200, 200], [420, 360])
   await expectInk(page)
 
-  await page.getByRole('button', { name: 'Export' }).click()
+  await page.getByRole('button', { name: 'Export image' }).click()
   await page.getByRole('button', { name: 'Copy' }).click()
   await expect(page.getByText('Copied to the clipboard.')).toBeVisible()
 
@@ -188,7 +188,7 @@ test('Download waits until the image is drawn, even when fonts load late', async
     Object.defineProperty(document.fonts, 'ready', { get: () => late })
   })
 
-  await page.getByRole('button', { name: 'Export' }).click()
+  await page.getByRole('button', { name: 'Export image' }).click()
   const png = await inspectPng(page, (await download(page)).path, INK_LIGHT)
 
   // The drawn 504 x 384 image, not a blank default 300 x 150 canvas.
@@ -218,7 +218,7 @@ test('an exported drawing contains its pasted images, not placeholders', async (
     window.dispatchEvent(event)
   })
 
-  await page.getByRole('button', { name: 'Export' }).click()
+  await page.getByRole('button', { name: 'Export image' }).click()
   const png = await inspectPng(page, (await download(page)).path, INK_LIGHT)
 
   const [r, g, b, a] = png.centre

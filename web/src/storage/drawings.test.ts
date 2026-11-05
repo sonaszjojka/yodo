@@ -1,12 +1,23 @@
 import { describe, expect, test, vi } from 'vitest'
-import { createDocument } from '../core/document/create.ts'
+import {
+  createDocument,
+  createImage,
+  createShape,
+} from '../core/document/create.ts'
+import { DocumentError } from '../core/document/migrate.ts'
+import { blobToBase64 } from './base64.ts'
 import {
   createDrawing,
+  exportYodo,
+  importDrawing,
   loadDrawing,
   renameDrawing,
   sortDrawings,
+  yodoFileName,
 } from './drawings.ts'
+import { pngBlob } from './imageContract.ts'
 import { InMemoryDrawingRepository } from './memory.ts'
+import { InMemoryImageRepository } from './memoryImages.ts'
 import type { DrawingSummary } from './repository.ts'
 
 describe('loadDrawing', () => {
@@ -140,5 +151,181 @@ describe('sortDrawings', () => {
       expect(ids(sortDrawings(tied, by))).toEqual(['x', 'y'])
     }
     expect(ids(tied)).toEqual(['y', 'x'])
+  })
+})
+
+describe('exporting and importing a .yodo file', () => {
+  const decode = async () => ({ width: 1, height: 1 })
+
+  async function drawingWithImage(images: InMemoryImageRepository) {
+    const fileId = await images.put(pngBlob())
+    const doc = createDocument('Plan')
+    return {
+      fileId,
+      doc: {
+        ...doc,
+        elements: [
+          createShape('rectangle', { x: 1, y: 2, width: 3, height: 4 }),
+          createImage(
+            fileId,
+            { width: 1, height: 1 },
+            { x: 0, y: 0, width: 100, height: 100 },
+          ),
+        ],
+        appState: { viewport: { x: 5, y: 6, zoom: 2 } },
+      },
+    }
+  }
+
+  test('export inlines the images, even when fileIds is stale', async () => {
+    const images = new InMemoryImageRepository()
+    const { doc, fileId } = await drawingWithImage(images)
+
+    const text = await exportYodo(doc, images)
+
+    const file = JSON.parse(text) as {
+      fileIds: string[]
+      files: Record<string, { mimeType: string; data: string }>
+    }
+    expect(file.fileIds).toEqual([fileId])
+    expect(file.files[fileId]?.mimeType).toBe('image/png')
+    expect(file.files[fileId]?.data).toBe(await blobToBase64(pngBlob()))
+  })
+
+  test('export fails, naming the problem, when an image is gone', async () => {
+    const { doc } = await drawingWithImage(new InMemoryImageRepository())
+
+    await expect(
+      exportYodo(doc, new InMemoryImageRepository()),
+    ).rejects.toMatchObject({ code: 'bad-files' })
+  })
+
+  test('import recreates the drawing under a new id, images included', async () => {
+    const source = new InMemoryImageRepository()
+    const { doc, fileId } = await drawingWithImage(source)
+    const text = await exportYodo(doc, source)
+    const repository = new InMemoryDrawingRepository()
+    const images = new InMemoryImageRepository()
+
+    const { id } = await importDrawing(repository, images, text, { decode })
+
+    expect(id).not.toBe(doc.id)
+    expect(await repository.get(id)).toEqual({
+      ...doc,
+      id,
+      fileIds: [fileId],
+    })
+    expect(await images.has(fileId)).toBe(true)
+  })
+
+  test('importing the same file twice makes two drawings', async () => {
+    const repository = new InMemoryDrawingRepository()
+    const images = new InMemoryImageRepository()
+    const text = await exportYodo(createDocument('Plan'), images)
+
+    const { id: first } = await importDrawing(repository, images, text)
+    const { id: second } = await importDrawing(repository, images, text)
+
+    expect(first).not.toBe(second)
+    expect(await repository.list()).toHaveLength(2)
+  })
+
+  test('a broken file saves nothing', async () => {
+    const repository = new InMemoryDrawingRepository()
+    const images = new InMemoryImageRepository()
+
+    await expect(
+      importDrawing(repository, images, '{ nope'),
+    ).rejects.toMatchObject({ code: 'invalid-json' })
+    expect(await repository.list()).toEqual([])
+  })
+
+  test('an image whose bytes do not match its hash saves nothing', async () => {
+    const source = new InMemoryImageRepository()
+    const { doc, fileId } = await drawingWithImage(source)
+    const file = JSON.parse(await exportYodo(doc, source)) as {
+      files: Record<string, { mimeType: string; data: string }>
+    }
+    file.files[fileId]!.data = await blobToBase64(new Blob(['other bytes']))
+    const repository = new InMemoryDrawingRepository()
+    const images = new InMemoryImageRepository()
+
+    const failure = await importDrawing(
+      repository,
+      images,
+      JSON.stringify(file),
+      { decode },
+    ).catch((error: unknown) => error)
+
+    expect(failure).toBeInstanceOf(DocumentError)
+    expect(failure).toMatchObject({ code: 'bad-files' })
+    expect(await repository.list()).toEqual([])
+    expect(await images.has(fileId)).toBe(false)
+  })
+
+  test('bytes that are not a picture save nothing, not even other images', async () => {
+    const source = new InMemoryImageRepository()
+    const { doc, fileId } = await drawingWithImage(source)
+    const notAPicture = new Blob(['not an image'], { type: 'image/png' })
+    const badId = await source.put(notAPicture)
+    const file = JSON.parse(await exportYodo(doc, source)) as {
+      fileIds: string[]
+      files: Record<string, { mimeType: string; data: string }>
+    }
+    file.fileIds.push(badId)
+    file.files[badId] = {
+      mimeType: 'image/png',
+      data: await blobToBase64(notAPicture),
+    }
+    const repository = new InMemoryDrawingRepository()
+    const images = new InMemoryImageRepository()
+    // Decodes the real PNG, refuses anything else, like a browser would.
+    const decodeOnlyPng = async (blob: Blob) => {
+      if ((await blob.text()) === 'not an image') throw new Error('no')
+      return { width: 1, height: 1 }
+    }
+
+    await expect(
+      importDrawing(repository, images, JSON.stringify(file), {
+        decode: decodeOnlyPng,
+      }),
+    ).rejects.toMatchObject({ code: 'bad-files' })
+    expect(await repository.list()).toEqual([])
+    expect(await images.has(fileId)).toBe(false)
+    expect(await images.has(badId)).toBe(false)
+  })
+
+  test('an image type the app does not accept saves nothing', async () => {
+    const source = new InMemoryImageRepository()
+    const { doc, fileId } = await drawingWithImage(source)
+    const file = JSON.parse(await exportYodo(doc, source)) as {
+      files: Record<string, { mimeType: string; data: string }>
+    }
+    file.files[fileId]!.mimeType = 'image/svg+xml'
+    const repository = new InMemoryDrawingRepository()
+
+    await expect(
+      importDrawing(
+        repository,
+        new InMemoryImageRepository(),
+        JSON.stringify(file),
+        { decode },
+      ),
+    ).rejects.toMatchObject({ code: 'bad-files' })
+    expect(await repository.list()).toEqual([])
+  })
+})
+
+describe('yodoFileName', () => {
+  test.each([
+    ['Plan', 'Plan.yodo'],
+    ['  Plan  ', 'Plan.yodo'],
+    ['a/b\\c:d*e?f"g<h>i|j', 'a_b_c_d_e_f_g_h_i_j.yodo'],
+    ['', 'Untitled.yodo'],
+    ['   ', 'Untitled.yodo'],
+    ['line\nbreak', 'line_break.yodo'],
+    ['Plan.', 'Plan.yodo'],
+  ])('%j becomes %j', (name, expected) => {
+    expect(yodoFileName(name)).toBe(expected)
   })
 })

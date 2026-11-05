@@ -5,7 +5,7 @@ import { useStore } from './useStore.ts'
 const selectEmpty = (state: EditorState) => state.document.elements.length === 0
 
 /** The top-right button that opens the export dialog (docs/ui.md, Editor). */
-export function ExportButton({
+export function ExportImageButton({
   editor,
   onOpen,
 }: {
@@ -24,7 +24,7 @@ export function ExportButton({
       onClick={onOpen}
     >
       <Export size={18} aria-hidden />
-      Export
+      Export image
     </button>
   )
 }

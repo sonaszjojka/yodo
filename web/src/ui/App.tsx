@@ -15,6 +15,7 @@ import { Canvas } from './Canvas.tsx'
 import { isExportShortcut } from './editShortcuts.ts'
 import { ExportButton } from './ExportButton.tsx'
 import { ExportDialog } from './ExportDialog.tsx'
+import { ExportImageButton } from './ExportImageButton.tsx'
 import { HistoryControl } from './HistoryControl.tsx'
 import type { ImageCache } from './imageCache.ts'
 import { createImagePaster } from './imagePaster.ts'
@@ -152,8 +153,9 @@ export function App({
       />
       <StylePanel editor={editor} panel={panel} />
       <div className="top-right">
+        <ExportButton editor={editor} images={images} onError={setNotice} />
+        <ExportImageButton editor={editor} onOpen={openExport} />
         <StylePanelToggle panel={panel} />
-        <ExportButton editor={editor} onOpen={openExport} />
       </div>
       {exportRun !== null && (
         <ExportDialog
