@@ -20,7 +20,7 @@
 | Editor | Top: menu/back + drawing name (left), tool toolbar (centre), style-panel toggle + Export (right). Bottom: undo/redo, zoom, hint, save status, shortcuts. Contextual bar above the selection; style panel on the right. |
 | Trash | Sidebar as on Home. A small bar directly above the list: count + **Empty trash** (with confirm dialog). Rows: Restore (icon + label), delete forever (icon only). |
 | Search results | Split into "In names" (cards) and "In text on the canvas" (rows with highlighted snippets). |
-| Export dialog | Tabs PNG / SVG / Yodo file; scope (whole drawing or selection), background on/off, dark version, scale (PNG), file name, Copy / Download. |
+| Export dialog | Tabs PNG / SVG / Yodo file; scope (whole drawing or selection), background on/off, dark version, scale (PNG), file name, Copy / Download. PNG only so far, with no tab strip: the button is `Export image` and sits next to the `.yodo` `Export` button (2.8) until the tabs arrive with SVG (2.7b); opens with Shift+Ctrl/Cmd+E. |
 | Keyboard shortcuts | Modal with search, grouped (Tools, Editing, View, Drawings). Key choices are placeholders until each feature is built. |
 | Password screen | Self-hosted only, when `YODO_PASSWORD` is set (ADR 0020): password, "Remember this browser" (off by default), Unlock, clear error state (wrong password, too many attempts, server unreachable). If the session ends while a drawing is open, the same card appears as a dialog over the drawing, which stays untouched and inert until the password is entered. |
 

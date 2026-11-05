@@ -26,7 +26,7 @@ test('a drawing exported to a .yodo file imports as a new, identical drawing', a
 
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    page.getByRole('button', { name: 'Export' }).click(),
+    page.getByRole('button', { name: 'Export', exact: true }).click(),
   ])
   expect(download.suggestedFilename()).toBe('Untitled.yodo')
   const file = test.info().outputPath('Untitled.yodo')
@@ -62,7 +62,7 @@ test('a drawing with a pasted image keeps the picture through export and import'
 
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    page.getByRole('button', { name: 'Export' }).click(),
+    page.getByRole('button', { name: 'Export', exact: true }).click(),
   ])
   const file = test.info().outputPath('with-image.yodo')
   await download.saveAs(file)

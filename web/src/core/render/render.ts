@@ -36,6 +36,7 @@ export type SceneContext = Pick<
   CanvasRenderingContext2D,
   | 'setTransform'
   | 'clearRect'
+  | 'fillRect'
   | 'save'
   | 'restore'
   | 'globalAlpha'
@@ -84,6 +85,9 @@ export interface Surface {
    * if it is missing (a placeholder is drawn then; ADR 0040).
    */
   images?: (fileId: string) => CanvasImageSource | undefined
+
+  /** Painted under the elements; transparent when omitted (exports, ADR 0041). */
+  background?: string
 }
 
 /**
@@ -496,6 +500,10 @@ export function renderScene(
   // Clear in CSS pixels, before the camera transform applies.
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.clearRect(0, 0, surface.width, surface.height)
+  if (surface.background) {
+    ctx.fillStyle = surface.background
+    ctx.fillRect(0, 0, surface.width, surface.height)
+  }
   // One transform maps world units to device pixels, so elements below draw
   // in world coordinates: device = (world - (x, y)) * zoom * dpr.
   const scale = dpr * viewport.zoom

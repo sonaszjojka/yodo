@@ -5,6 +5,8 @@ import {
   handleClipboardEvent,
   handleEditShortcut,
   isEditable,
+  isExportShortcut,
+  isInsideDialog,
   type ClipboardLike,
   type ShortcutLike,
 } from './editShortcuts.ts'
@@ -197,4 +199,57 @@ test('isEditable recognises fields', () => {
   ).toBe(true)
   expect(isEditable({ tagName: 'DIV' } as unknown as EventTarget)).toBe(false)
   expect(isEditable(null)).toBe(false)
+})
+
+describe('isInsideDialog', () => {
+  const inside = {
+    closest: (selector: string) => (selector === 'dialog[open]' ? {} : null),
+  } as unknown as EventTarget
+
+  test('is true for an element inside an open dialog, false otherwise', () => {
+    expect(isInsideDialog(inside)).toBe(true)
+    expect(
+      isInsideDialog({ closest: () => null } as unknown as EventTarget),
+    ).toBe(false)
+    expect(isInsideDialog(null)).toBe(false)
+    expect(isInsideDialog({} as EventTarget)).toBe(false)
+  })
+
+  test('copy, cut and paste from inside a dialog leave the drawing alone', () => {
+    const { editor, a } = setup()
+    editor.store.setState((prev) => ({ ...prev, selectedIds: [a.id] }))
+    for (const type of ['copy', 'cut', 'paste'] as const) {
+      const { event, data, prevented } = fakeClipboard('anything', inside)
+      handleClipboardEvent(editor, type, event, view)
+      expect(prevented()).toBe(false)
+      expect(data.text).toBe('anything')
+    }
+    expect(editor.store.getState().document.elements).toEqual([a])
+  })
+})
+
+describe('isExportShortcut', () => {
+  const base = {
+    key: 'E',
+    ctrlKey: true,
+    metaKey: false,
+    altKey: false,
+    shiftKey: true,
+  }
+
+  test('is Shift plus Ctrl or Cmd plus E', () => {
+    expect(isExportShortcut(base)).toBe(true)
+    expect(
+      isExportShortcut({ ...base, ctrlKey: false, metaKey: true, key: 'e' }),
+    ).toBe(true)
+  })
+
+  test.each([
+    { shiftKey: false },
+    { ctrlKey: false },
+    { altKey: true },
+    { key: 'x' },
+  ])('is not %o', (change) => {
+    expect(isExportShortcut({ ...base, ...change })).toBe(false)
+  })
 })

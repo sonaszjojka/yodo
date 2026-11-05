@@ -38,6 +38,7 @@ function fakeContext() {
   return {
     setTransform: vi.fn(),
     clearRect: vi.fn(),
+    fillRect: vi.fn(),
     save: vi.fn(),
     restore: vi.fn(),
     globalAlpha: 1,
@@ -800,5 +801,42 @@ describe('dark theme', () => {
     expect(fills).toContain('#4FD1C5')
     expect(fills).toContain('#062420')
     expect(fills).toContain('#1D3836')
+  })
+})
+
+describe('renderScene background', () => {
+  const rect = createShape('rectangle', { x: 0, y: 0, width: 10, height: 10 })
+
+  test('paints the background after clearing and before the first element', () => {
+    const ctx = fakeContext()
+    const rough = fakeRough()
+    const order: string[] = []
+    ctx.fillRect.mockImplementation(() => order.push('background'))
+    rough.rectangle.mockImplementation(() => order.push('element'))
+
+    renderScene(
+      ctx,
+      rough,
+      [rect],
+      { width: 50, height: 40, dpr: 1, background: '#123456' },
+      IDENTITY,
+    )
+
+    expect(order).toEqual(['background', 'element'])
+    expect(ctx.fillRect).toHaveBeenCalledWith(0, 0, 50, 40)
+  })
+
+  test('stays transparent when no background is given', () => {
+    const ctx = fakeContext()
+
+    renderScene(
+      ctx,
+      fakeRough(),
+      [rect],
+      { width: 50, height: 40, dpr: 1 },
+      IDENTITY,
+    )
+
+    expect(ctx.fillRect).not.toHaveBeenCalled()
   })
 })
