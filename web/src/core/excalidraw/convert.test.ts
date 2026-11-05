@@ -120,6 +120,23 @@ describe('text', () => {
     ).toEqual([])
   })
 
+  test.each(['left', 'center', 'right'])(
+    'keeps the %s alignment of a shape label',
+    async (textAlign) => {
+      const { document } = await convertExcalidraw(
+        {
+          type: 'excalidraw',
+          elements: [
+            { id: 'r', type: 'rectangle', x: 0, y: 0, width: 100, height: 50 },
+            { id: 't', type: 'text', text: 'hi', containerId: 'r', textAlign },
+          ],
+        },
+        options(),
+      )
+      expect(document.elements[0]).toMatchObject({ label: { textAlign } })
+    },
+  )
+
   test('keeps free text, sized by the injected measure', async () => {
     const { document } = await convert(text)
     const free = document.elements.find(

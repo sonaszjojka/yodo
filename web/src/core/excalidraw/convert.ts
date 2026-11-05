@@ -198,7 +198,7 @@ function withLabel(
       text: original,
       fontFamily: fontOf(slot.raw.fontFamily),
       fontSize: Math.max(1, num(slot.raw.fontSize, 20)),
-      textAlign: 'center',
+      textAlign: pick(slot.raw.textAlign, ALIGNS, 'center'),
     },
   } as YodoElement
 }
