@@ -253,8 +253,11 @@ test('the reference board stays smooth', async ({
   const drag = { width: 300, height: 200 }
   const beforeDraw = await canvasDigest(page)
   await page.mouse.move(from.x, from.y)
-  await page.mouse.down()
+  // Time frames from before the mouse goes down, so the first redraw of the
+  // new shape counts, and let one frame pass to give the first interval a start.
   await startFrames(page)
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(done)))
+  await page.mouse.down()
   await page.mouse.move(from.x + drag.width, from.y + drag.height, {
     steps: 120,
   })
