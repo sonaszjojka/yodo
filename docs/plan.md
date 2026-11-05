@@ -9,9 +9,9 @@ Rule: every stage ends with a **file of decisions**, not just a conversation. Co
 
 ## Status (2026-11-05)
 Read this section, not the whole file; finished work is logged in `docs/history.md`.
-- **Last done:** roadmap 2.6 (issue #82): images (ADR 0040). A pasted image file is stored by its SHA-256 in IndexedDB (hosted) or under `<YODO_DATA_DIR>/images` (self-hosted) and shown as an `image` element that keeps its proportions when resized.
+- **Last done:** roadmap 2.7a (issue #83, with 2.7b and 2.7c split off): PNG export (ADR 0041). An Export button (top right, Shift+Ctrl/Cmd+E) opens a dialog: whole drawing or selection, background on/off, dark version, 1x/2x/3x scale, file name, Copy and Download. The scene is drawn again with `renderScene` on an offscreen canvas, so pasted images export too.
 - Open items: `review` issues from the 1.14, 1.15, 1.16, 2.2a, 2.2b and 2.3 reviews.
-- **Next step:** roadmap 2.7 (issue #83): export PNG / SVG.
+- **Next step:** roadmap 2.7b: SVG export (new issue; needs its ADR for how the SVG is generated).
 
 ## Working mode: an educational project
 The goal is both the app and learning how to program with Claude as effectively as possible, so that the knowledge stays with you. The rules (you decide and I explain, no silent automation, features introduced on first use, a short recap after each task, "just do it" to skip explanations) live in the global `~/.claude/CLAUDE.md` and the `educational-working-mode` memory, so they apply in every session.

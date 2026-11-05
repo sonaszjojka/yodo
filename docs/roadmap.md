@@ -46,7 +46,7 @@ Goal: open Yodo, draw basic shapes, close the browser, come back to the same dra
 | 2.4 | Sticky notes ✓ (PR [#107](https://github.com/sonaszjojka/yodo/pull/107)) ([#80](https://github.com/sonaszjojka/yodo/issues/80)) | Coloured note with text: place, move, resize, edit. |
 | 2.5 | Copy / paste / duplicate ✓ (PR [#109](https://github.com/sonaszjojka/yodo/pull/109)) ([#81](https://github.com/sonaszjojka/yodo/issues/81)) | Elements copy and paste within and between drawings; duplicate; select all. |
 | 2.6 | Images ✓ (PR [#110](https://github.com/sonaszjojka/yodo/pull/110)) ([#82](https://github.com/sonaszjojka/yodo/issues/82)) | Pasted images appear on canvas; blobs stored by content hash in IndexedDB and under `/data` (ADR 0013). |
-| 2.7a | Export PNG ([#83](https://github.com/sonaszjojka/yodo/issues/83)) | Export dialog: whole drawing or selection, background on/off, dark version, PNG scale; copy or download (ADR 0041). |
+| 2.7a | Export PNG ✓ (PR [#111](https://github.com/sonaszjojka/yodo/pull/111)) ([#83](https://github.com/sonaszjojka/yodo/issues/83)) | Export dialog: whole drawing or selection, background on/off, dark version, PNG scale; copy or download (ADR 0041). |
 | 2.7b | Export SVG | SVG output and tab in the export dialog, same options (scale excepted). **ADR:** how the SVG is generated. |
 | 2.7c | Export visual regression baseline | Visual regression baseline for a few scenes, each in light and dark (2.3 checks the dark colours by pixel, ADR 0015). |
 | 2.8 | `.yodo` export / import ([#84](https://github.com/sonaszjojka/yodo/issues/84)) | Export inlines images as base64; import recreates the drawing exactly, also from an older-version fixture. |
