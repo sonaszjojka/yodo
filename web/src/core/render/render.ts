@@ -14,11 +14,12 @@ import type {
 } from '../document/types.ts'
 import { adaptColor, type Theme } from './colors.ts'
 import { smoothPath } from '../geometry/freehand.ts'
-import { arrowhead } from '../geometry/line.ts'
+import { ARROWHEAD_LENGTH, arrowhead } from '../geometry/line.ts'
 import { GAP, grow, HANDLE_SIZE, selectionFrame } from '../geometry/frame.ts'
 import {
   cornerRadius,
   diamondPoints,
+  elementBounds,
   roundedPolygonPath,
   type Bounds,
 } from '../geometry/rect.ts'
@@ -487,6 +488,32 @@ function drawOverlay(
   ctx.restore()
 }
 
+/**
+ * Whether any part of `element` could land inside `view` (world units). The
+ * element's box grows by a margin for what the box leaves out: stroke width,
+ * rough.js wobble and an arrowhead. A rotated element is judged by the circle
+ * around its box, which holds it at any angle. Cheap and generous: drawing a
+ * few extra elements is fine, skipping a visible one is not.
+ */
+function mayBeVisible(element: YodoElement, view: Bounds): boolean {
+  const box = elementBounds(element)
+  const margin =
+    ARROWHEAD_LENGTH + element.strokeWidth * 2 + element.roughness * 8
+  let { x, y, width, height } = box
+  if (element.angle !== 0) {
+    const radius = Math.hypot(width, height) / 2
+    x += width / 2 - radius
+    y += height / 2 - radius
+    width = height = radius * 2
+  }
+  return (
+    x + width + margin >= view.x &&
+    x - margin <= view.x + view.width &&
+    y + height + margin >= view.y &&
+    y - margin <= view.y + view.height
+  )
+}
+
 export function renderScene(
   ctx: SceneContext,
   rough: SceneRough,
@@ -509,7 +536,16 @@ export function renderScene(
   const scale = dpr * viewport.zoom
   ctx.setTransform(scale, 0, 0, scale, -viewport.x * scale, -viewport.y * scale)
 
+  // Only what can reach the window is drawn: on a big board most elements are
+  // off screen, and rough.js is the expensive part of a frame.
+  const view: Bounds = {
+    x: viewport.x,
+    y: viewport.y,
+    width: surface.width / viewport.zoom,
+    height: surface.height / viewport.zoom,
+  }
   for (const element of elements) {
+    if (!mayBeVisible(element, view)) continue
     ctx.save()
     ctx.globalAlpha = element.opacity / 100
     drawElement(ctx, rough, element, theme, surface.images)
