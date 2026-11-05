@@ -35,6 +35,7 @@ export function Root({
   return route.name === 'home' ? (
     <Home
       repository={repository}
+      images={images}
       imageCache={imageCache}
       waitForEditor={waitForEditor}
       lastSaveFailed={lastSaveFailed}

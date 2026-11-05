@@ -9,9 +9,9 @@ Rule: every stage ends with a **file of decisions**, not just a conversation. Co
 
 ## Status (2026-11-05)
 Read this section, not the whole file; finished work is logged in `docs/history.md`.
-- **Last done:** roadmap 2.6 (issue #82): images (ADR 0040). A pasted image file is stored by its SHA-256 in IndexedDB (hosted) or under `<YODO_DATA_DIR>/images` (self-hosted) and shown as an `image` element that keeps its proportions when resized.
+- **Last done:** roadmap 2.9 (issue #85): Excalidraw import (ADR 0014). **Import Excalidraw** on Home converts a `.excalidraw` file into a new drawing (shapes, text, arrows, pencil, images) and lists what was skipped or simplified.
 - Open items: `review` issues from the 1.14, 1.15, 1.16, 2.2a, 2.2b and 2.3 reviews.
-- **Next step:** roadmap 2.7 (issue #83): export PNG / SVG.
+- **Next step:** roadmap 2.7 (issue #83): export PNG / SVG (2.8, `.yodo` export / import, is also open).
 
 ## Working mode: an educational project
 The goal is both the app and learning how to program with Claude as effectively as possible, so that the knowledge stays with you. The rules (you decide and I explain, no silent automation, features introduced on first use, a short recap after each task, "just do it" to skip explanations) live in the global `~/.claude/CLAUDE.md` and the `educational-working-mode` memory, so they apply in every session.
