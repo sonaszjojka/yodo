@@ -1,6 +1,10 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, test } from 'vitest'
-import { createDocument, createShape } from '../core/document/create.ts'
+import {
+  createDocument,
+  createNote,
+  createShape,
+} from '../core/document/create.ts'
 import type { YodoElement } from '../core/document/types.ts'
 import { createEditor } from '../core/editor/editor.ts'
 import {
@@ -60,6 +64,17 @@ describe('StyleBar', () => {
       'Fill: None',
       'Width: Bold',
       'Look: Hand-drawn',
+      'All styles',
+      'More',
+    ])
+  })
+
+  test('a note gets text colour and note colour only', () => {
+    const note = createNote({ x: 300, y: 300, width: 200, height: 200 })
+    const html = renderToStaticMarkup(<StyleBar editor={editorWith([note])} />)
+    expect(controls(html)).toEqual([
+      'Stroke: Ink',
+      'Fill: Sand',
       'All styles',
       'More',
     ])

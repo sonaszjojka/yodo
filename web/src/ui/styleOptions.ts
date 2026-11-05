@@ -1,11 +1,13 @@
 // The values the style bar offers (docs/ui.md). Colours are the stored
 // light-theme values; dark mode adapts them when rendering (ADR 0015).
+import { stylesOf } from '../core/editor/style.ts'
 import type {
   FillStyle,
   FontFamily,
   Roundness,
   StrokeStyle,
   TextAlign,
+  YodoElement,
 } from '../core/document/types.ts'
 
 export interface Option<T> {
@@ -34,6 +36,19 @@ export const FILLS: Option<string>[] = [
   { value: '#ECE6FD', label: 'Lilac' },
   { value: '#EEF0F2', label: 'Fog' },
 ]
+
+/**
+ * The fills `selected` can take: a selection of only notes can't be
+ * unfilled, so "None" is left out (ADR 0038).
+ */
+export function fillsFor(selected: readonly YodoElement[]): Option<string>[] {
+  const fillable = selected.filter((element) =>
+    stylesOf(element).includes('backgroundColor'),
+  )
+  return fillable.length > 0 && fillable.every(({ type }) => type === 'note')
+    ? FILLS.filter(({ value }) => value !== 'transparent')
+    : FILLS
+}
 
 export const WIDTHS: Option<number>[] = [
   { value: 1, label: 'Thin' },

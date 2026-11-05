@@ -33,6 +33,9 @@ export function stylesOf(element: YodoElement): StyleKey[] {
         ...(element.type === 'ellipse' ? [] : (['roundness'] as const)),
         'opacity',
       ]
+    // A note has a fixed paper look (ADR 0038): only its colours and opacity.
+    case 'note':
+      return ['strokeColor', 'backgroundColor', 'opacity']
     case 'line':
     case 'arrow':
       return [
@@ -91,6 +94,13 @@ function styled(
   const changes: Record<string, unknown> = {}
   for (const key of stylesOf(element)) {
     const value = patch[key]
+    // A note always keeps a colour (ADR 0038).
+    if (
+      element.type === 'note' &&
+      key === 'backgroundColor' &&
+      value === 'transparent'
+    )
+      continue
     if (value !== undefined && value !== valueOf(element, key)) {
       changes[key] = value
     }

@@ -1,8 +1,10 @@
 import {
   BUILT_IN_STYLE,
   createLinear,
+  createNote,
   createPencil,
   createShape,
+  NOTE_SIZE,
   randomId,
   type ElementStyle,
   type LinearType,
@@ -111,7 +113,7 @@ export interface EditorState {
 }
 
 /** Tools that draw an element by dragging. */
-export type DrawingTool = ShapeType | LinearType | 'pencil'
+export type DrawingTool = ShapeType | LinearType | 'pencil' | 'note'
 export type Tool = DrawingTool | 'select' | 'hand' | 'text' | 'eraser'
 
 function isDrawingTool(tool: Tool): tool is DrawingTool {
@@ -136,7 +138,7 @@ function isLinear(tool: DrawingTool): tool is LinearType {
  * an offset for lines. Shift squares a box or snaps a line's angle.
  */
 function geometryFromDrag(
-  tool: ShapeType | LinearType,
+  tool: ShapeType | LinearType | 'note',
   start: Point,
   end: Point,
   shift: boolean,
@@ -359,12 +361,14 @@ export function createEditor(
                 undefined,
                 style,
               )
-            : createShape(
-                tool,
-                rectFromDrag(point, point, shift),
-                undefined,
-                style,
-              )
+            : tool === 'note'
+              ? createNote(rectFromDrag(point, point, shift), undefined, style)
+              : createShape(
+                  tool,
+                  rectFromDrag(point, point, shift),
+                  undefined,
+                  style,
+                )
       store.setState((prev) => ({ ...prev, draft }))
     },
     pointerMove(pointerId, point, shift) {
@@ -383,8 +387,22 @@ export function createEditor(
       const ended = drag
       drag = null
       store.setState((prev) => {
-        const { draft } = prev
-        if (!draft) return prev
+        const { draft: dragged } = prev
+        if (!dragged) return prev
+        // A click with the note tool places a note of the default size
+        // centred on the click; a drag sizes it.
+        const draft =
+          dragged.type === 'note' &&
+          Math.max(dragged.width, dragged.height) <
+            DRAG_THRESHOLD / prev.viewport.zoom
+            ? {
+                ...dragged,
+                x: ended.start[0] - NOTE_SIZE / 2,
+                y: ended.start[1] - NOTE_SIZE / 2,
+                width: NOTE_SIZE,
+                height: NOTE_SIZE,
+              }
+            : dragged
         if (!isVisible(draft)) return { ...prev, draft: null }
         const committed = {
           ...prev,
@@ -401,7 +419,19 @@ export function createEditor(
           return committed
         // The new element is selected and Select becomes active, so it can be
         // moved right away (as in Excalidraw).
-        return { ...committed, tool: 'select', selectedIds: [draft.id] }
+        const selected = {
+          ...committed,
+          tool: 'select' as const,
+          selectedIds: [draft.id],
+        }
+        // A new note opens its text for typing at once.
+        return draft.type === 'note'
+          ? {
+              ...selected,
+              editing: editFor(draft, ended.start, prev.defaults),
+              selectedIds: [],
+            }
+          : selected
       })
     },
     pointerCancel(pointerId) {

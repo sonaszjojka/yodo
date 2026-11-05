@@ -47,6 +47,7 @@ describe('loadDocument', () => {
       'arrow',
       'pencil',
       'text',
+      'note',
     ])
   })
 

@@ -40,6 +40,7 @@ import { nextMenuIndex } from './menuKeys.ts'
 import { isOutside } from './outsidePress.ts'
 import {
   FILLS,
+  fillsFor,
   FONTS,
   labelOf,
   LOOKS,
@@ -318,7 +319,12 @@ export function StyleBar({ editor, onAllStyles }: StyleBarProps) {
   const frame = selectionFrame(selected, 1 / viewport.zoom)
   if (!frame) return null
   const style = commonStyle(selected)
-  const controls = CONTROLS.filter(({ key }) => key in style)
+  const fills = fillsFor(selected)
+  const controls = CONTROLS.filter(({ key }) => key in style).map((control) =>
+    control.key === 'backgroundColor'
+      ? { ...control, options: fills }
+      : control,
+  )
 
   const { outline } = frame
   const [x, y] = worldToScreen(viewport, [outline.x, outline.y])

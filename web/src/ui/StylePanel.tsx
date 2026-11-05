@@ -55,6 +55,7 @@ import {
   CORNERS,
   FILL_STYLES,
   FILLS,
+  fillsFor,
   FONTS,
   labelOf,
   LOOKS,
@@ -701,7 +702,11 @@ export function StylePanel({ editor, panel }: StylePanelProps) {
           return (
             <ChoiceSection
               key={key}
-              choice={choice}
+              choice={
+                key === 'backgroundColor'
+                  ? { ...choice, options: fillsFor(selected) }
+                  : choice
+              }
               value={value}
               onPick={(picked) => set({ [key]: picked })}
             >
