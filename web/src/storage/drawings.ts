@@ -1,7 +1,9 @@
 // What the Home screen and the editor route do with drawings (ADR 0033), on top
 // of `DrawingRepository`. Framework-free, so it's tested without React.
 
-import { createDocument } from '../core/document/create.ts'
+import { createDocument, randomId } from '../core/document/create.ts'
+import { parseYodoFile } from '../core/document/file.ts'
+import { DocumentError } from '../core/document/migrate.ts'
 import type { YodoDocument } from '../core/document/types.ts'
 import type { DrawingRepository, DrawingSummary } from './repository.ts'
 
@@ -43,6 +45,44 @@ export async function createDrawing(
   const document = createDocument()
   await repository.save(document)
   return document.id
+}
+
+/**
+ * Saves the drawing in a `.yodo` file as a new drawing and returns its id.
+ * It gets a fresh id, so importing your own export never overwrites the
+ * original; the rest is as exported. Throws a `DocumentError` for a broken
+ * file, saving nothing.
+ */
+export async function importDrawing(
+  repository: DrawingRepository,
+  text: string,
+): Promise<string> {
+  const { document } = parseYodoFile(text)
+  // The app has no image store yet (roadmap 2.6), so a drawing with images
+  // would lose them. Refuse it rather than drop them silently.
+  if (document.fileIds.length > 0) {
+    throw new DocumentError(
+      'images-unsupported',
+      'Importing drawings with images is not supported yet',
+    )
+  }
+  const id = randomId()
+  await repository.save({ ...document, id })
+  return id
+}
+
+/** A safe download name for a drawing: `<name>.yodo`. */
+export function yodoFileName(name: string): string {
+  // Control characters (code < 32, and DEL) and the characters Windows and
+  // macOS forbid in file names become "_".
+  const safe = Array.from(name, (char) => {
+    const code = char.charCodeAt(0)
+    return code < 32 || code === 127 || '/\\:*?"<>|'.includes(char) ? '_' : char
+  })
+    .join('')
+    .trim()
+    .replace(/\.+$/, '')
+  return `${safe || 'Untitled'}.yodo`
 }
 
 /**

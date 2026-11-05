@@ -839,3 +839,14 @@ a.drawing-card-body:focus-visible,
   box-shadow: var(--shadow-float);
   font-size: 14px;
 }
+
+/* Home header, right side: Import file beside the Settings menu. */
+.home-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.home-actions .button {
+  gap: 8px;
+}

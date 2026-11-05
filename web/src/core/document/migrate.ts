@@ -11,6 +11,12 @@ export type DocumentErrorCode =
   | 'newer-version'
   /** A bug in the app's migration steps, not in the user's data. */
   | 'migration-error'
+  /** A `.yodo` file's images are missing or malformed. */
+  | 'bad-files'
+  /** A `.yodo` file has an element the app can't draw. */
+  | 'bad-elements'
+  /** A `.yodo` file with images, which the app can't store yet (roadmap 2.6). */
+  | 'images-unsupported'
 
 export class DocumentError extends Error {
   readonly code: DocumentErrorCode
@@ -29,7 +35,7 @@ export type RawDocument = Record<string, unknown> & { schemaVersion: number }
 export type Migrations = Record<number, (doc: RawDocument) => RawDocument>
 
 // Empty until v2: add `1: migrateV1toV2` here together with a v1 fixture test.
-const migrations: Migrations = {}
+export const migrations: Migrations = {}
 
 /** Applies the migration steps from the document's version up to `target`. */
 export function runMigrations(

@@ -66,7 +66,7 @@ function isOptionalLabel(e: Record<string, unknown>) {
   return e.label === undefined || isLabel(e.label)
 }
 
-function isElement(value: unknown): value is YodoElement {
+export function isElement(value: unknown): value is YodoElement {
   if (!isRecord(value) || !hasBase(value)) return false
   // Geometry code tells lines from boxes by the presence of `points`, so a box
   // or text carrying that key (even null) would crash it.

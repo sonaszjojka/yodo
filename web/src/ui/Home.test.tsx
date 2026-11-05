@@ -24,6 +24,7 @@ function render(props: Partial<HomeViewProps> = {}) {
       creating={false}
       onCreate={() => {}}
       onRename={() => {}}
+      onImport={() => {}}
       onRetry={() => {}}
       now={now}
       {...props}
@@ -36,6 +37,13 @@ const names = (html: string) =>
   [...html.matchAll(/class="drawing-card-name">([^<]*)</g)].map((m) => m[1])
 
 describe('HomeView', () => {
+  test('offers Import file, which accepts .yodo files only', () => {
+    const html = render()
+
+    expect(html).toContain('Import file</button>')
+    expect(html).toMatch(/<input[^>]*type="file"[^>]*accept="\.yodo"/)
+  })
+
   test('starts the grid with the New drawing tile', () => {
     const html = render()
 

@@ -1,10 +1,15 @@
 import { describe, expect, test, vi } from 'vitest'
 import { createDocument } from '../core/document/create.ts'
+import { serializeYodoFile } from '../core/document/file.ts'
+import { createShape } from '../core/document/create.ts'
+import { DocumentError } from '../core/document/migrate.ts'
 import {
   createDrawing,
+  importDrawing,
   loadDrawing,
   renameDrawing,
   sortDrawings,
+  yodoFileName,
 } from './drawings.ts'
 import { InMemoryDrawingRepository } from './memory.ts'
 import type { DrawingSummary } from './repository.ts'
@@ -140,5 +145,80 @@ describe('sortDrawings', () => {
       expect(ids(sortDrawings(tied, by))).toEqual(['x', 'y'])
     }
     expect(ids(tied)).toEqual(['y', 'x'])
+  })
+})
+
+describe('importDrawing', () => {
+  function exported() {
+    const doc = createDocument('Plan')
+    return {
+      doc: {
+        ...doc,
+        elements: [
+          createShape('rectangle', { x: 1, y: 2, width: 3, height: 4 }),
+        ],
+        appState: { viewport: { x: 5, y: 6, zoom: 2 } },
+      },
+    }
+  }
+
+  test('saves the drawing under a new id with the same content', async () => {
+    const repository = new InMemoryDrawingRepository()
+    const { doc } = exported()
+
+    const id = await importDrawing(repository, serializeYodoFile(doc, {}))
+
+    expect(id).not.toBe(doc.id)
+    expect(await repository.get(id)).toEqual({ ...doc, id })
+  })
+
+  test('importing the same file twice makes two drawings', async () => {
+    const repository = new InMemoryDrawingRepository()
+    const text = serializeYodoFile(exported().doc, {})
+
+    const first = await importDrawing(repository, text)
+    const second = await importDrawing(repository, text)
+
+    expect(first).not.toBe(second)
+    expect(await repository.list()).toHaveLength(2)
+  })
+
+  test('a broken file saves nothing', async () => {
+    const repository = new InMemoryDrawingRepository()
+
+    await expect(importDrawing(repository, '{ nope')).rejects.toMatchObject({
+      code: 'invalid-json',
+    })
+    expect(await repository.list()).toEqual([])
+  })
+
+  test('refuses images until the app can store them, saving nothing', async () => {
+    const repository = new InMemoryDrawingRepository()
+    const doc = { ...exported().doc, fileIds: ['hash-a'] }
+    const text = serializeYodoFile(doc, {
+      'hash-a': { mimeType: 'image/png', data: 'AAAA' },
+    })
+
+    const failure = await importDrawing(repository, text).catch(
+      (error: unknown) => error,
+    )
+
+    expect(failure).toBeInstanceOf(DocumentError)
+    expect(failure).toMatchObject({ code: 'images-unsupported' })
+    expect(await repository.list()).toEqual([])
+  })
+})
+
+describe('yodoFileName', () => {
+  test.each([
+    ['Plan', 'Plan.yodo'],
+    ['  Plan  ', 'Plan.yodo'],
+    ['a/b\\c:d*e?f"g<h>i|j', 'a_b_c_d_e_f_g_h_i_j.yodo'],
+    ['', 'Untitled.yodo'],
+    ['   ', 'Untitled.yodo'],
+    ['line\nbreak', 'line_break.yodo'],
+    ['Plan.', 'Plan.yodo'],
+  ])('%j becomes %j', (name, expected) => {
+    expect(yodoFileName(name)).toBe(expected)
   })
 })

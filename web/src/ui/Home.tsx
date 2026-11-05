@@ -1,7 +1,8 @@
-import { Plus } from '@phosphor-icons/react'
-import { useEffect, useState } from 'react'
+import { Plus, UploadSimple } from '@phosphor-icons/react'
+import { useEffect, useRef, useState } from 'react'
 import {
   createDrawing,
+  importDrawing,
   renameDrawing,
   sortDrawings,
   type DrawingSort,
@@ -15,6 +16,7 @@ import { DrawingCard } from './DrawingCard.tsx'
 import { Logo } from './Logo.tsx'
 import { navigate } from './route.ts'
 import { SettingsMenu } from './SettingsMenu.tsx'
+import { importErrorMessage } from './yodoFile.ts'
 
 export type HomeList =
   | { status: 'loading' }
@@ -78,6 +80,19 @@ export function Home({
     }
   }
 
+  async function onImport(file: File) {
+    setNotice(undefined)
+    try {
+      navigate({
+        name: 'drawing',
+        id: await importDrawing(repository, await file.text()),
+      })
+    } catch (error) {
+      console.error('Could not import the file', error)
+      setNotice(importErrorMessage(error))
+    }
+  }
+
   async function onRename(id: string, name: string) {
     setNotice(undefined)
     try {
@@ -109,6 +124,7 @@ export function Home({
       creating={creating}
       onCreate={() => void onCreate()}
       onRename={(id, name) => void onRename(id, name)}
+      onImport={(file) => void onImport(file)}
       onRetry={() => {
         setList({ status: 'loading' })
         setAttempt((n) => n + 1)
@@ -139,6 +155,8 @@ export interface HomeViewProps {
   creating: boolean
   onCreate(): void
   onRename(id: string, name: string): void
+  /** The user chose a `.yodo` file to import. */
+  onImport(file: File): void
   onRetry(): void
   notice?: string
   now: number
@@ -154,6 +172,7 @@ export function HomeView({
   creating,
   onCreate,
   onRename,
+  onImport,
   onRetry,
   notice,
   now,
@@ -162,7 +181,10 @@ export function HomeView({
     <div className="home">
       <header className="home-header">
         <Logo />
-        <SettingsMenu />
+        <div className="home-actions">
+          <ImportButton onImport={onImport} />
+          <SettingsMenu />
+        </div>
       </header>
       <main className="home-main">
         <div className="home-title-row">
@@ -221,5 +243,35 @@ export function HomeView({
         )}
       </main>
     </div>
+  )
+}
+
+/** "Import file": a button that opens a hidden file picker (`.yodo` for now). */
+function ImportButton({ onImport }: { onImport(file: File): void }) {
+  const input = useRef<HTMLInputElement>(null)
+  return (
+    <>
+      <button
+        type="button"
+        className="button"
+        onClick={() => input.current?.click()}
+      >
+        <UploadSimple size={18} aria-hidden />
+        Import file
+      </button>
+      <input
+        ref={input}
+        type="file"
+        accept=".yodo"
+        hidden
+        aria-label="Yodo file to import"
+        onChange={(event) => {
+          const file = event.target.files?.[0]
+          // Cleared so choosing the same file again still fires a change.
+          event.target.value = ''
+          if (file) onImport(file)
+        }}
+      />
+    </>
   )
 }
