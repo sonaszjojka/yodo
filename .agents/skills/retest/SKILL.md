@@ -12,6 +12,8 @@ You are an independent verifier. You didn't write the code, and you don't fix it
 - **Scratch work goes outside the repo:** write scripts, screenshots and logs to a new temp directory (`mktemp -d`). Name that directory in your report.
 - **Keep the output small:** run the checks with quiet reporters and show only what failed (see "Mechanical checks"). Don't paste full logs into the report.
 - **Make each check independent:** start from a fresh page (new context, or reload with storage cleared), so one check can't break the next. If a result looks wrong, run that check again on its own before calling it a failure.
+- **Sandbox:** Codex's sandbox blocks launching a browser, opening a port, and network access. Use the exact commands below; the owner's Codex rules can allow them outside the sandbox without a prompt. Run your Playwright script outside the sandbox from the start (request escalation with a one-line reason), instead of letting it fail inside the sandbox first. Because the sandbox has no network, do every HTTP check inside that script (`page.request` or `fetch`), not with `curl`.
+- **Node:** report `node -v` in MECHANICAL. The project targets Node 24 (`web/.nvmrc`). If the shell has another major version, say so in the report; don't work around it.
 - **Clean up:** stop every server and browser you started. Leave the temp directory in place for evidence.
 
 ## 1. What to check
@@ -28,7 +30,7 @@ Run the definition-of-done commands from `CLAUDE.md` for every part the branch c
 Report pass or fail with counts. For a failure, give at most the 30 lines that show it.
 
 ## 3. Behaviour checks in the browser
-- **The modes.** Hosted (IndexedDB) is always checked: `npm run dev -- --port <free port> --strictPort` in `web/`. Check self-hosted (HTTP) as well when the branch touches `web/src/storage/`, `server/` or the document format: `npm run build:app` in `e2e/`, then `node e2e/scripts/serve-server.ts <free port>`.
+- **The modes.** Hosted (IndexedDB) is always checked: `npx vite --host 127.0.0.1 --port <free port> --strictPort` in `web/`. Without `--host`, Vite listens only on `localhost` (IPv6 `::1`), and `127.0.0.1` gets no answer. Check self-hosted (HTTP) as well when the branch touches `web/src/storage/`, `server/` or the document format: in `e2e/`, `npm run build:app`, then `node scripts/serve-server.ts <free port>` (listens on `127.0.0.1`).
 - **Playwright from a scratch script:** the repo's install is in `e2e/` (its Chromium, Firefox and WebKit are already downloaded). Load it from outside the repo like this:
   ```js
   import { createRequire } from 'node:module'
@@ -39,7 +41,7 @@ Report pass or fail with counts. For a failure, give at most the 30 lines that s
 - **Persistence:** reload the page (and in self-hosted mode, check `GET api/drawings`) to show that the change survives a reload.
 - **Evidence:** save a screenshot for each failure and one of the final state, to the temp directory. Watch the console (`page.on('console')` and `pageerror`), and report any errors.
 - **Logic only in `web/src/core/`:** a named unit test that pins the behaviour is enough; you don't need a browser for it.
-- **Server only:** use `curl` against the server on a throwaway data dir.
+- **Server only:** call the self-hosted server above from a script (`fetch`); it already uses a throwaway data dir.
 
 ## 4. Report
 End with exactly this structure. It is what the coordinator parses:
