@@ -15,6 +15,8 @@ export interface ImageCache {
    * exactly these bytes. A picture already loaded is kept.
    */
   refresh(fileId: string): void
+  /** `refresh` for every missing picture, e.g. after the password was entered again. */
+  retryMissing(): void
 }
 
 type Entry = CanvasImageSource | 'loading' | 'missing'
@@ -65,6 +67,16 @@ export function createImageCache(
       entries.delete(fileId)
       // Draws again, which asks `get` and so starts the new load.
       notify()
+    },
+    retryMissing() {
+      let any = false
+      for (const [fileId, entry] of entries) {
+        if (entry === 'missing') {
+          entries.delete(fileId)
+          any = true
+        }
+      }
+      if (any) notify()
     },
   }
 }
