@@ -7,6 +7,7 @@ import {
   sortDrawings,
   type DrawingSort,
 } from '../storage/drawings.ts'
+import type { ImageRepository } from '../storage/images.ts'
 import type {
   DrawingRepository,
   DrawingSummary,
@@ -25,6 +26,8 @@ export type HomeList =
 
 export interface HomeProps {
   repository: DrawingRepository
+  /** Where an imported file's images are stored. */
+  images: ImageRepository
   imageCache: ImageCache
   /** Resolves once the editor that just closed has saved (see Root). */
   waitForEditor(): Promise<unknown>
@@ -35,6 +38,7 @@ export interface HomeProps {
 /** The Home screen (`docs/ui.md`, Home): every drawing as a card. */
 export function Home({
   repository,
+  images,
   imageCache,
   waitForEditor,
   lastSaveFailed = false,
@@ -85,7 +89,7 @@ export function Home({
     try {
       navigate({
         name: 'drawing',
-        id: await importDrawing(repository, await file.text()),
+        id: await importDrawing(repository, images, await file.text()),
       })
     } catch (error) {
       console.error('Could not import the file', error)

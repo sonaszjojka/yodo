@@ -117,7 +117,7 @@ export function App({
       />
       <StylePanel editor={editor} panel={panel} />
       <div className="top-right">
-        <ExportButton editor={editor} />
+        <ExportButton editor={editor} images={images} onError={setNotice} />
         <StylePanelToggle panel={panel} />
       </div>
       <Toolbar editor={editor} />

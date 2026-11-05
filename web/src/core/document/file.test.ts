@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import v1Fixture from './fixtures/v1-every-element.json?raw'
 import v1Export from './fixtures/v1-export.yodo?raw'
 import { parseYodoFile, serializeYodoFile, type YodoFileEntry } from './file.ts'
+import { createImage } from './create.ts'
 import { DocumentError, type Migrations } from './migrate.ts'
 import type { YodoDocument } from './types.ts'
 
@@ -75,6 +76,20 @@ describe('parseYodoFile', () => {
     expect(files).toEqual({ 'hash-a': png })
     expect(seen).toHaveLength(1)
     expect(seen[0]).not.toContain('files')
+  })
+
+  test('rejects an image element whose picture the document does not list', () => {
+    const fileId = 'a'.repeat(64)
+    const image = createImage(
+      fileId,
+      { width: 10, height: 10 },
+      { x: 0, y: 0, width: 100, height: 100 },
+    )
+    const doc = { ...everyElement, elements: [image], fileIds: [] }
+
+    expect(errorCode(() => parseYodoFile(JSON.stringify(doc)))).toBe(
+      'bad-files',
+    )
   })
 
   test('a file without a files section has no images', () => {

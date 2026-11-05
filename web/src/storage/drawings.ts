@@ -2,9 +2,22 @@
 // of `DrawingRepository`. Framework-free, so it's tested without React.
 
 import { createDocument, randomId } from '../core/document/create.ts'
-import { parseYodoFile } from '../core/document/file.ts'
+import {
+  parseYodoFile,
+  serializeYodoFile,
+  type YodoFiles,
+} from '../core/document/file.ts'
 import { DocumentError } from '../core/document/migrate.ts'
 import type { YodoDocument } from '../core/document/types.ts'
+import { withFileIds } from './autosave.ts'
+import { base64ToBlob, blobToBase64 } from './base64.ts'
+import {
+  HASH_PATTERN,
+  IMAGE_TYPES,
+  MAX_IMAGE_BYTES,
+  sha256Hex,
+  type ImageRepository,
+} from './images.ts'
 import type { DrawingRepository, DrawingSummary } from './repository.ts'
 
 export type LoadResult =
@@ -48,24 +61,62 @@ export async function createDrawing(
 }
 
 /**
+ * The text of the `.yodo` file for `doc`: the document with its images
+ * inlined as base64 (ADR 0013). The images come from `images`; one that is
+ * missing fails the export with a `bad-files` error rather than writing a
+ * file that cannot be imported.
+ */
+export async function exportYodo(
+  doc: YodoDocument,
+  images: ImageRepository,
+): Promise<string> {
+  // `fileIds` may lag behind the elements until the next save; the elements win.
+  const current = withFileIds(doc)
+  const files: YodoFiles = {}
+  for (const fileId of current.fileIds) {
+    const blob = await images.get(fileId)
+    if (!blob) {
+      throw new DocumentError('bad-files', `Image ${fileId} is not stored`)
+    }
+    files[fileId] = { mimeType: blob.type, data: await blobToBase64(blob) }
+  }
+  return serializeYodoFile(current, files)
+}
+
+/**
  * Saves the drawing in a `.yodo` file as a new drawing and returns its id.
  * It gets a fresh id, so importing your own export never overwrites the
- * original; the rest is as exported. Throws a `DocumentError` for a broken
- * file, saving nothing.
+ * original; the rest is as exported. Each image is checked (type, size, and
+ * that its bytes hash to the id the drawing uses) and stored first. Throws a
+ * `DocumentError` for a broken file, saving no drawing.
  */
 export async function importDrawing(
   repository: DrawingRepository,
+  images: ImageRepository,
   text: string,
 ): Promise<string> {
-  const { document } = parseYodoFile(text)
-  // The app has no image store yet (roadmap 2.6), so a drawing with images
-  // would lose them. Refuse it rather than drop them silently.
-  if (document.fileIds.length > 0) {
-    throw new DocumentError(
-      'images-unsupported',
-      'Importing drawings with images is not supported yet',
-    )
-  }
+  const { document, files } = parseYodoFile(text)
+  // Check every image before storing any, so a bad file leaves nothing behind.
+  const blobs = Object.entries(files).map(([fileId, { mimeType, data }]) => {
+    const blob = base64ToBlob(data, mimeType)
+    if (
+      !(IMAGE_TYPES as readonly string[]).includes(mimeType) ||
+      blob.size > MAX_IMAGE_BYTES ||
+      !HASH_PATTERN.test(fileId)
+    ) {
+      throw new DocumentError('bad-files', `Image ${fileId} is not allowed`)
+    }
+    return { fileId, blob }
+  })
+  const hashes = await Promise.all(
+    blobs.map(async ({ blob }) => sha256Hex(await blob.arrayBuffer())),
+  )
+  blobs.forEach(({ fileId }, i) => {
+    if (hashes[i] !== fileId) {
+      throw new DocumentError('bad-files', `Image ${fileId} is damaged`)
+    }
+  })
+  for (const { blob } of blobs) await images.put(blob)
   const id = randomId()
   await repository.save({ ...document, id })
   return id

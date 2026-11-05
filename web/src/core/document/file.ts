@@ -105,5 +105,18 @@ export function parseYodoFile(
   }
 
   const document = migrated as unknown as YodoDocument
+  // An image element must have its picture in the file, or it would draw as a
+  // broken placeholder after import.
+  for (const element of document.elements) {
+    if (
+      element.type === 'image' &&
+      !document.fileIds.includes(element.fileId)
+    ) {
+      throw new DocumentError(
+        'bad-files',
+        `Image ${element.fileId} is not listed in the file`,
+      )
+    }
+  }
   return { document, files: pickFiles(document.fileIds, files) }
 }
