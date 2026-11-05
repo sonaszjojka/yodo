@@ -963,6 +963,7 @@ a.drawing-card-body:focus-visible,
 .password-submit:disabled {
   opacity: 0.6;
   cursor: default;
+}
 
 /* The export dialog (docs/ui.md, Export dialog; ADR 0041). */
 .export-dialog {
