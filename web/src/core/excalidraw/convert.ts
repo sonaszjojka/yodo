@@ -138,7 +138,8 @@ function baseOf(raw: Raw) {
     y: num(raw.y, 0),
     width: Math.abs(num(raw.width, 0)),
     height: Math.abs(num(raw.height, 0)),
-    angle: num(raw.angle, 0),
+    // Yodo does not draw rotation yet; `noteLosses` reports it.
+    angle: 0,
     seed:
       typeof seed === 'number' && Number.isInteger(seed) && seed > 0
         ? seed
@@ -255,7 +256,25 @@ export async function convertExcalidraw(
         if (element.rawId) containers.set(element.rawId, element.element)
       }
     }
+    noteLosses(raw)
     slots.push(element)
+  }
+
+  /** Counts visual details of a kept element that Yodo does not draw. */
+  function noteLosses(raw: Raw) {
+    // Text inside a shape turns with the shape, which is counted itself.
+    if (raw.type === 'text' && raw.containerId) return
+    if (num(raw.angle, 0) !== 0) {
+      simplified.add('rotated elements, shown unrotated')
+    }
+    const fill = raw.fillStyle
+    if (
+      typeof fill === 'string' &&
+      !(FILL_STYLES as readonly string[]).includes(fill) &&
+      str(raw.backgroundColor, 'transparent') !== 'transparent'
+    ) {
+      simplified.add(`${fill} fills, shown as hachure`)
+    }
   }
 
   async function convertOne(

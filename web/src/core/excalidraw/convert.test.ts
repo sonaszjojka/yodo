@@ -78,10 +78,12 @@ describe('shapes, lines, arrows and pencil', () => {
     const { document, summary } = await convert(shapes)
     expect(document.elements[5]).toMatchObject({ endArrowhead: 'arrow' })
     expect(summary.simplified).toEqual([
+      { reason: 'zigzag fills, shown as hachure', count: 1 },
       { reason: 'arrows no longer attached to shapes', count: 1 },
       { reason: 'arrowheads', count: 1 },
     ])
     expect(describeSummary(summary)).toEqual([
+      'Simplified zigzag fills, shown as hachure (1)',
       'Simplified arrows no longer attached to shapes (1)',
       'Simplified arrowheads (1)',
     ])
@@ -234,6 +236,52 @@ describe('unsupported content', () => {
     )
     expect(document).toMatchObject({ name: 'Mine', elements: [], fileIds: [] })
     expect(summary.imported).toBe(0)
+  })
+})
+
+describe('visual features Yodo does not draw', () => {
+  const wrap = (element: object) => ({
+    type: 'excalidraw',
+    elements: [
+      {
+        id: 'a',
+        type: 'rectangle',
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 50,
+        ...element,
+      },
+    ],
+  })
+
+  test('reports rotation, which is not drawn', async () => {
+    const { document, summary } = await convertExcalidraw(
+      wrap({ angle: Math.PI / 2 }),
+      options(),
+    )
+    expect(document.elements[0]).toMatchObject({ angle: 0 })
+    expect(summary.simplified).toEqual([
+      { reason: 'rotated elements, shown unrotated', count: 1 },
+    ])
+  })
+
+  test('reports a fill pattern Yodo does not have', async () => {
+    const { summary } = await convertExcalidraw(
+      wrap({ fillStyle: 'zigzag', backgroundColor: '#ffec99' }),
+      options(),
+    )
+    expect(summary.simplified).toEqual([
+      { reason: 'zigzag fills, shown as hachure', count: 1 },
+    ])
+  })
+
+  test('ignores the fill pattern of an unfilled shape', async () => {
+    const { summary } = await convertExcalidraw(
+      wrap({ fillStyle: 'zigzag', backgroundColor: 'transparent' }),
+      options(),
+    )
+    expect(summary.simplified).toEqual([])
   })
 })
 
