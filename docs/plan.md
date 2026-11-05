@@ -9,9 +9,9 @@ Rule: every stage ends with a **file of decisions**, not just a conversation. Co
 
 ## Status (2026-11-05)
 Read this section, not the whole file; finished work is logged in `docs/history.md`.
-- **Last done:** roadmap 2.4 (issue #80): sticky notes (ADR 0038). A new `note` element that reuses the shape label: the Note tool (`N`) places a 200 px Sand note on click or sizes it by dragging and opens it for typing; it is drawn as a plain rounded box with a soft shadow, moves and resizes like any element, and offers text colour, note colour (never transparent) and opacity.
+- **Last done:** roadmap 2.5 (issue #81): copy / paste / duplicate (ADR 0039). Ctrl/Cmd+C, X and V go through the system clipboard as a validated JSON payload, so elements move between drawings, tabs and reloads; Ctrl/Cmd+A selects all and Ctrl/Cmd+D duplicates.
 - Open items: `review` issues from the 1.14, 1.15, 1.16, 2.2a, 2.2b and 2.3 reviews.
-- **Next step:** roadmap 2.5 (issue #81): copy / paste / duplicate.
+- **Next step:** roadmap 2.6 (issue #82): images.
 
 ## Working mode: an educational project
 The goal is both the app and learning how to program with Claude as effectively as possible, so that the knowledge stays with you. The rules (you decide and I explain, no silent automation, features introduced on first use, a short recap after each task, "just do it" to skip explanations) live in the global `~/.claude/CLAUDE.md` and the `educational-working-mode` memory, so they apply in every session.
