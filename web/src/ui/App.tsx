@@ -159,6 +159,7 @@ export function App({
         <ExportDialog
           key={exportRun}
           editor={editor}
+          imageCache={imageCache}
           onClose={() => closeExport(exportRun)}
         />
       )}

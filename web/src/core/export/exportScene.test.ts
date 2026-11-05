@@ -1,5 +1,10 @@
 import { describe, expect, test, vi } from 'vitest'
-import { createLinear, createShape, DEFAULT_LABEL } from '../document/create.ts'
+import {
+  createImage,
+  createLinear,
+  createShape,
+  DEFAULT_LABEL,
+} from '../document/create.ts'
 import type { Measure } from '../text/layout.ts'
 import { DARK_CANVAS, LIGHT_CANVAS } from '../render/colors.ts'
 import {
@@ -116,6 +121,12 @@ describe('renderExport', () => {
       setTransform: vi.fn(),
       clearRect: vi.fn(),
       fillRect: vi.fn(),
+      drawImage: vi.fn(),
+      setLineDash: vi.fn(),
+      beginPath: vi.fn(),
+      rect: vi.fn(),
+      fill: vi.fn(),
+      stroke: vi.fn(),
       save: vi.fn(),
       restore: vi.fn(),
       fillStyle: '',
@@ -170,4 +181,31 @@ describe('renderExport', () => {
       expect(without.ctx.fillRect).not.toHaveBeenCalled()
     },
   )
+
+  test('draws the pictures of image elements from the given lookup', () => {
+    const { ctx, canvas, rough } = setup()
+    const image = createImage(
+      'hash-1',
+      { width: 100, height: 50 },
+      { x: 0, y: 0, width: 1000, height: 1000 },
+    )
+    const picture = {} as CanvasImageSource
+    const images = vi.fn(() => picture)
+
+    renderExport(canvas, rough, [image], frame, {
+      scale: 1,
+      theme: 'light',
+      background: false,
+      images,
+    })
+
+    expect(images).toHaveBeenCalledWith('hash-1')
+    expect(ctx.drawImage).toHaveBeenCalledWith(
+      picture,
+      image.x,
+      image.y,
+      image.width,
+      image.height,
+    )
+  })
 })

@@ -7,6 +7,7 @@ import { canvasColor, type Theme } from '../render/colors.ts'
 import {
   renderScene,
   type SceneContext,
+  type Surface,
   type SceneRough,
 } from '../render/render.ts'
 import {
@@ -119,6 +120,8 @@ export interface ExportOptions {
   theme: Theme
   /** Paint the page colour under the drawing; transparent when false. */
   background: boolean
+  /** The decoded picture of an image element; a placeholder is drawn without it. */
+  images?: Surface['images']
 }
 
 /** Draws `elements` into `canvas`, sized to the frame at `options.scale`. */
@@ -150,6 +153,7 @@ export function renderExport(
       dpr: 1,
       theme: options.theme,
       background: options.background ? canvasColor(options.theme) : undefined,
+      images: options.images,
     },
     { x: frame.x, y: frame.y, zoom: options.scale },
   )

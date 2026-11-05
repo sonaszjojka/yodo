@@ -21,6 +21,7 @@ import {
   SCALES,
   type ExportChoices,
 } from './exportChoices.ts'
+import type { ImageCache } from './imageCache.ts'
 import { createCanvasMeasure } from './measure.ts'
 import { useStore } from './useStore.ts'
 
@@ -41,9 +42,11 @@ const COPY_MESSAGES: Record<CopyResult, string> = {
  */
 export function ExportDialog({
   editor,
+  imageCache,
   onClose,
 }: {
   editor: Editor
+  imageCache: ImageCache
   onClose(): void
 }) {
   const document_ = useStore(editor.store, selectDocument)
@@ -77,12 +80,26 @@ export function ExportDialog({
   // What the canvas should show. A new object whenever any input changes, so
   // `drawn === job` says the canvas holds exactly this (Copy and Download are
   // enabled only then; before the first draw the canvas is a blank default).
+  // Pictures arrive from the image cache while the dialog is open (ADR 0040);
+  // each arrival makes a new job, so the canvas is drawn again with them.
+  const [pictures, setPictures] = useState(0)
+  useEffect(
+    () => imageCache.subscribe(() => setPictures((count) => count + 1)),
+    [imageCache],
+  )
   const job = useMemo(
     () =>
       frame && scale
-        ? { elements, frame, scale, dark: choices.dark, bg: choices.background }
+        ? {
+            elements,
+            frame,
+            scale,
+            dark: choices.dark,
+            bg: choices.background,
+            pictures,
+          }
         : null,
-    [elements, frame, scale, choices.dark, choices.background],
+    [elements, frame, scale, choices.dark, choices.background, pictures],
   )
   const [drawn, setDrawn] = useState<typeof job>(null)
 
@@ -97,13 +114,14 @@ export function ExportDialog({
         scale: job.scale,
         theme: job.dark ? 'dark' : 'light',
         background: job.bg,
+        images: imageCache.get,
       })
       setDrawn(job)
     })
     return () => {
       cancelled = true
     }
-  }, [job])
+  }, [job, imageCache])
 
   const update = (patch: Partial<ExportChoices>) => {
     setStatus('')

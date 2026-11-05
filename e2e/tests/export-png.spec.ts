@@ -1,5 +1,5 @@
 // Roadmap 2.7a: the export dialog saves the drawing or the selection as a PNG
-// with or without background, light or dark, at a scale (ADR 0040).
+// with or without background, light or dark, at a scale (ADR 0041).
 
 import type { Page } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
@@ -63,6 +63,14 @@ async function inspectPng(page: Page, path: string, ink: number[]) {
         height: image.height,
         corner: [...px.slice(8 * 4, 8 * 4 + 4)] as Rgba,
         inkPixels,
+        centre: [
+          ...ctx.getImageData(
+            Math.floor(image.width / 2),
+            Math.floor(image.height / 2),
+            1,
+            1,
+          ).data,
+        ] as Rgba,
       }
     },
     [base64, ink] as const,
@@ -185,4 +193,37 @@ test('Download waits until the image is drawn, even when fonts load late', async
 
   // The drawn 504 x 384 image, not a blank default 300 x 150 canvas.
   expect(Math.abs(png.width - 504)).toBeLessThanOrEqual(4)
+})
+
+test('an exported drawing contains its pasted images, not placeholders', async ({
+  page,
+}) => {
+  await newDrawing(page)
+  await expect(editorCanvas(page)).toBeVisible()
+  // A solid red PNG pasted as a screenshot tool would (see images.spec.ts).
+  await page.evaluate(async () => {
+    const source = document.createElement('canvas')
+    source.width = 240
+    source.height = 120
+    const ctx = source.getContext('2d')!
+    ctx.fillStyle = '#ff0000'
+    ctx.fillRect(0, 0, 240, 120)
+    const blob = await new Promise<Blob>((done) =>
+      source.toBlob((b) => done(b!), 'image/png'),
+    )
+    const data = new DataTransfer()
+    data.items.add(new File([blob], 'shot.png', { type: 'image/png' }))
+    const event = new Event('paste', { bubbles: true })
+    Object.defineProperty(event, 'clipboardData', { value: data })
+    window.dispatchEvent(event)
+  })
+
+  await page.getByRole('button', { name: 'Export' }).click()
+  const png = await inspectPng(page, (await download(page)).path, INK_LIGHT)
+
+  const [r, g, b, a] = png.centre
+  expect(r).toBeGreaterThan(200)
+  expect(g).toBeLessThan(60)
+  expect(b).toBeLessThan(60)
+  expect(a).toBe(255)
 })
