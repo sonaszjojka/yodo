@@ -8,6 +8,7 @@ import { DEFAULT_FONT_SIZE } from './core/document/create.ts'
 import { FONT_STACKS, fontOf } from './core/text/layout.ts'
 import { detectRepository } from './storage/detect.ts'
 import './ui/index.css'
+import { Gate } from './ui/Gate.tsx'
 import { Root } from './ui/Root.tsx'
 import { getThemeStore } from './ui/useTheme.ts'
 
@@ -23,13 +24,15 @@ for (const family of Object.keys(FONT_STACKS) as (keyof typeof FONT_STACKS)[]) {
 
 // The Go server's API if it answers, otherwise IndexedDB (ADR 0031). The base
 // URL keeps the probe under /yodo/ on GitHub Pages.
-const { mode, repository, images } = await detectRepository({
+const { mode, repository, images, session } = await detectRepository({
   baseUrl: new URL('./', document.baseURI),
 })
 console.info(`Yodo storage: ${mode}`)
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <Root repository={repository} images={images} />
+    <Gate session={session}>
+      <Root repository={repository} images={images} session={session} />
+    </Gate>
   </StrictMode>,
 )
