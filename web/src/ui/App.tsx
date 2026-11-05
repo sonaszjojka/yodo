@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { YodoDocument } from '../core/document/types.ts'
-import type { Bounds } from '../core/geometry/rect.ts'
 import { createEditor } from '../core/editor/editor.ts'
 import { createStore } from '../core/store/store.ts'
 import { createAutoSaver, finalSave } from '../storage/autosave.ts'
@@ -10,15 +9,12 @@ import {
   savePanelLayout,
   saveStyleDefaults,
 } from '../storage/preferences.ts'
-import {
-  ImageError,
-  ingestImage,
-  type ImageRepository,
-} from '../storage/images.ts'
+import type { ImageRepository } from '../storage/images.ts'
 import type { DrawingRepository } from '../storage/repository.ts'
 import { Canvas } from './Canvas.tsx'
 import { HistoryControl } from './HistoryControl.tsx'
 import type { ImageCache } from './imageCache.ts'
+import { createImagePaster } from './imagePaster.ts'
 import { createCanvasMeasure } from './measure.ts'
 import { Notice } from './Notice.tsx'
 import { SaveStatus } from './SaveStatus.tsx'
@@ -67,24 +63,8 @@ export function App({
   const dismissNotice = useCallback(() => setNotice(undefined), [])
 
   // A pasted image: stored first, then added to the drawing (ADR 0040).
-  const addImage = useCallback(
-    (file: File, view: Bounds) => {
-      ingestImage(file, images)
-        .then((stored) => {
-          // An element may have been waiting for exactly these bytes.
-          imageCache.refresh(stored.fileId)
-          editor.addImage(stored, view)
-        })
-        .catch((error: unknown) => {
-          console.error('Could not add the image', error)
-          setNotice(
-            error instanceof ImageError
-              ? error.message
-              : 'Couldn’t save the image. Try again.',
-          )
-        })
-    },
-    [images, imageCache, editor],
+  const [paster] = useState(() =>
+    createImagePaster(editor, images, imageCache, setNotice),
   )
 
   // Per-browser preferences (ADR 0036): stored whenever they change.
@@ -117,13 +97,14 @@ export function App({
       window.document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('pagehide', flush)
       stop()
-      onClose?.(finalSave(saver))
+      // An upload still running must land in the drawing before the last save.
+      onClose?.(paster.settled().then(() => finalSave(saver)))
     }
-  }, [saver, onClose])
+  }, [saver, paster, onClose])
 
   return (
     <>
-      <Canvas editor={editor} imageCache={imageCache} onImage={addImage} />
+      <Canvas editor={editor} imageCache={imageCache} onImage={paster.paste} />
       <Notice message={notice} onDismiss={dismissNotice} />
       <TopBar editor={editor} />
       <TextEditor editor={editor} theme={theme} />
