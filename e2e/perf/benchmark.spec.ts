@@ -124,6 +124,7 @@ async function wheelGesture(
     deltaY: number
     ctrlKey: boolean
   },
+  frames = GESTURE_FRAMES,
 ): Promise<GestureResult> {
   await startFrames(page)
   await page.evaluate(
@@ -152,7 +153,7 @@ async function wheelGesture(
         requestAnimationFrame(step)
       })
     },
-    { frames: GESTURE_FRAMES, source: event.toString() },
+    { frames, source: event.toString() },
   )
   return stopFrames(page)
 }
@@ -225,14 +226,22 @@ test('the reference board stays smooth', async ({
       ),
   )
 
-  // Warm up (fonts, shaders, JIT) with a short pan, then measure from rest.
-  await wheelGesture(page, () => ({ deltaX: 5, deltaY: 5, ctrlKey: false }))
+  // Warm up (fonts, shaders, JIT) with a short pan out and back, so the
+  // camera is where it started.
+  await wheelGesture(
+    page,
+    (frame) => ({ deltaX: frame < 30 ? 10 : -10, deltaY: 0, ctrlKey: false }),
+    60,
+  )
 
-  // Pan: a steady diagonal drag across the board.
+  // Pan: a steady diagonal drag across the board, then part of the way back.
+  // At zoom 0.25 these deltas move the camera 40 x 24 world units a frame:
+  // from (3000, 2000) out to (9400, 5840) and back to (6200, 3920), so the
+  // camera stays over the board throughout.
   const beforePan = await canvasDigest(page)
-  const pan = await wheelGesture(page, () => ({
-    deltaX: -15,
-    deltaY: -8,
+  const pan = await wheelGesture(page, (frame) => ({
+    deltaX: frame < 160 ? 10 : -10,
+    deltaY: frame < 160 ? 6 : -6,
     ctrlKey: false,
   }))
   expect(await canvasDigest(page)).not.toBe(beforePan)
@@ -266,6 +275,17 @@ test('the reference board stays smooth', async ({
   expect(rectangle.width).toBeCloseTo(drag.width / START_VIEWPORT.zoom, 0)
   expect(rectangle.height).toBeCloseTo(drag.height / START_VIEWPORT.zoom, 0)
   expect(drawn.appState.viewport.x).not.toBe(START_VIEWPORT.x)
+  // The drawing was measured over the board, not an empty view: plenty of
+  // elements start inside the window at the saved camera.
+  const { viewport } = drawn.appState
+  const inView = drawn.elements.filter(
+    (e) =>
+      e.x >= viewport.x &&
+      e.x <= viewport.x + 1440 / viewport.zoom &&
+      e.y >= viewport.y &&
+      e.y <= viewport.y + 900 / viewport.zoom,
+  ).length
+  expect(inView).toBeGreaterThan(100)
 
   // Zoom: out for two thirds of the gesture, back in for the rest, around the
   // middle of the window.
