@@ -68,8 +68,10 @@ export function ExportDialog({
 
   useEffect(() => {
     const element = dialog.current!
+    // No cleanup that closes it: unmounting removes the dialog, and in
+    // development StrictMode runs the cleanup right after mounting, whose
+    // `close` event would unmount the dialog again at once.
     if (!element.open) element.showModal()
-    return () => element.close()
   }, [])
 
   // What the canvas should show. A new object whenever any input changes, so
