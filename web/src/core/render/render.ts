@@ -513,20 +513,31 @@ function withLabel(element: YodoElement, box: Bounds): Bounds {
 const ROUGH_SHARE = 0.1
 
 /**
+ * Screen pixels kept around every element: a note's shadow (blur 10, offset 3)
+ * is fixed in screen pixels, so in world units it grows as the camera zooms out.
+ */
+const SCREEN_MARGIN = 16
+
+/**
  * Whether any part of `element` could land inside `view` (world units). The
  * element's box grows by a margin for what the box leaves out: stroke width,
  * rough.js wobble and an arrowhead. A rotated element is judged by the circle
  * around its box, which holds it at any angle. Cheap and generous: drawing a
  * few extra elements is fine, skipping a visible one is not.
  */
-function mayBeVisible(element: YodoElement, view: Bounds): boolean {
+function mayBeVisible(
+  element: YodoElement,
+  view: Bounds,
+  zoom: number,
+): boolean {
   const box = withLabel(element, elementBounds(element))
   // rough.js bends a shape by a share of its size, so big shapes need more.
   const margin =
     ARROWHEAD_LENGTH +
     element.strokeWidth * 2 +
     element.roughness * 8 +
-    Math.max(box.width, box.height) * ROUGH_SHARE
+    Math.max(box.width, box.height) * ROUGH_SHARE +
+    SCREEN_MARGIN / zoom
   let { x, y, width, height } = box
   if (element.angle !== 0) {
     const radius = Math.hypot(width, height) / 2
@@ -573,7 +584,7 @@ export function renderScene(
     height: surface.height / viewport.zoom,
   }
   for (const element of elements) {
-    if (!mayBeVisible(element, view)) continue
+    if (!mayBeVisible(element, view, viewport.zoom)) continue
     ctx.save()
     ctx.globalAlpha = element.opacity / 100
     drawElement(ctx, rough, element, theme, surface.images)

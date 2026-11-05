@@ -949,6 +949,21 @@ describe('viewport culling (roadmap 2.12)', () => {
     expect(drawn([huge]).ellipse).toHaveBeenCalled()
   })
 
+  test('keeps a note whose shadow, fixed in screen pixels, is still visible', () => {
+    // Zoomed out to 0.1, the note ends 3 screen pixels above the window, and
+    // its shadow (10 px blur, 3 px down) reaches in.
+    const note = createNote({ x: 100, y: -50, width: 20, height: 20 })
+    const ctx = fakeContext()
+
+    renderScene(ctx, fakeRough(), [note], SURFACE, {
+      x: 0,
+      y: 0,
+      zoom: 0.1,
+    })
+
+    expect(ctx.fill).toHaveBeenCalled()
+  })
+
   test('draws the selection overlay even when the element is off screen', () => {
     const ctx = fakeContext()
     const far = createShape('rectangle', {
