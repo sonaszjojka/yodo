@@ -920,6 +920,22 @@ describe('viewport culling (roadmap 2.12)', () => {
     expect(drawn([tall]).rectangle).toHaveBeenCalled()
   })
 
+  test('keeps a narrow shape whose wider label reaches into the view', () => {
+    // The 36 px label is centred on the shape and 144 units wide at least, so
+    // it spans x 773 to 917 although the shape starts at 840.
+    const narrow = {
+      ...createShape('rectangle', { x: 840, y: 100, width: 10, height: 10 }),
+      label: {
+        text: 'WWWWWW',
+        fontFamily: 'mono' as const,
+        fontSize: 36,
+        textAlign: 'center' as const,
+      },
+    }
+
+    expect(drawn([narrow]).rectangle).toHaveBeenCalled()
+  })
+
   test('draws the selection overlay even when the element is off screen', () => {
     const ctx = fakeContext()
     const far = createShape('rectangle', {

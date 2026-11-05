@@ -489,6 +489,27 @@ function drawOverlay(
 }
 
 /**
+ * `box` grown to hold the element's label, which is not clipped and may
+ * overflow a small shape (ADR 0026): it is at least `MIN_LABEL_EMS` wide,
+ * centred on the shape, and as tall as its wrapped lines. The line count is an
+ * upper bound (a character is at most one em wide), so this never undercounts.
+ */
+function withLabel(element: YodoElement, box: Bounds): Bounds {
+  if (!('label' in element) || !element.label?.text) return box
+  const { text, fontSize } = element.label
+  const width = Math.max(
+    labelBox(element, fontSize * MIN_LABEL_EMS).width,
+    box.width,
+  )
+  const lines =
+    Math.ceil((text.length * fontSize) / width) + text.split('\n').length
+  const height = Math.max(box.height, lines * fontSize * LINE_HEIGHT)
+  const cx = box.x + box.width / 2
+  const cy = box.y + box.height / 2
+  return { x: cx - width / 2, y: cy - height / 2, width, height }
+}
+
+/**
  * Whether any part of `element` could land inside `view` (world units). The
  * element's box grows by a margin for what the box leaves out: stroke width,
  * rough.js wobble and an arrowhead. A rotated element is judged by the circle
@@ -496,7 +517,7 @@ function drawOverlay(
  * few extra elements is fine, skipping a visible one is not.
  */
 function mayBeVisible(element: YodoElement, view: Bounds): boolean {
-  const box = elementBounds(element)
+  const box = withLabel(element, elementBounds(element))
   const margin =
     ARROWHEAD_LENGTH + element.strokeWidth * 2 + element.roughness * 8
   let { x, y, width, height } = box
