@@ -14,11 +14,12 @@ import type {
 } from '../document/types.ts'
 import { adaptColor, type Theme } from './colors.ts'
 import { smoothPath } from '../geometry/freehand.ts'
-import { arrowhead } from '../geometry/line.ts'
+import { ARROWHEAD_LENGTH, arrowhead } from '../geometry/line.ts'
 import { GAP, grow, HANDLE_SIZE, selectionFrame } from '../geometry/frame.ts'
 import {
   cornerRadius,
   diamondPoints,
+  elementBounds,
   roundedPolygonPath,
   type Bounds,
 } from '../geometry/rect.ts'
@@ -487,6 +488,71 @@ function drawOverlay(
   ctx.restore()
 }
 
+/**
+ * `box` grown to hold the element's label, which is not clipped and may
+ * overflow a small shape (ADR 0026): it is at least `MIN_LABEL_EMS` wide,
+ * centred on the shape, and as tall as its wrapped lines. The line count is an
+ * upper bound (a character is at most one em wide), so this never undercounts.
+ */
+function withLabel(element: YodoElement, box: Bounds): Bounds {
+  if (!('label' in element) || !element.label?.text) return box
+  const { text, fontSize } = element.label
+  const width = Math.max(
+    labelBox(element, fontSize * MIN_LABEL_EMS).width,
+    box.width,
+  )
+  const lines =
+    Math.ceil((text.length * fontSize) / width) + text.split('\n').length
+  const height = Math.max(box.height, lines * fontSize * LINE_HEIGHT)
+  const cx = box.x + box.width / 2
+  const cy = box.y + box.height / 2
+  return { x: cx - width / 2, y: cy - height / 2, width, height }
+}
+
+/** How far rough.js may move an outline, as a share of the box's larger side. */
+const ROUGH_SHARE = 0.1
+
+/**
+ * Screen pixels kept around every element: a note's shadow (blur 10, offset 3)
+ * is fixed in screen pixels, so in world units it grows as the camera zooms out.
+ */
+const SCREEN_MARGIN = 16
+
+/**
+ * Whether any part of `element` could land inside `view` (world units). The
+ * element's box grows by a margin for what the box leaves out: stroke width,
+ * rough.js wobble and an arrowhead. A rotated element is judged by the circle
+ * around its box, which holds it at any angle. Cheap and generous: drawing a
+ * few extra elements is fine, skipping a visible one is not.
+ */
+function mayBeVisible(
+  element: YodoElement,
+  view: Bounds,
+  zoom: number,
+): boolean {
+  const box = withLabel(element, elementBounds(element))
+  // rough.js bends a shape by a share of its size, so big shapes need more.
+  const margin =
+    ARROWHEAD_LENGTH +
+    element.strokeWidth * 2 +
+    element.roughness * 8 +
+    Math.max(box.width, box.height) * ROUGH_SHARE +
+    SCREEN_MARGIN / zoom
+  let { x, y, width, height } = box
+  if (element.angle !== 0) {
+    const radius = Math.hypot(width, height) / 2
+    x += width / 2 - radius
+    y += height / 2 - radius
+    width = height = radius * 2
+  }
+  return (
+    x + width + margin >= view.x &&
+    x - margin <= view.x + view.width &&
+    y + height + margin >= view.y &&
+    y - margin <= view.y + view.height
+  )
+}
+
 export function renderScene(
   ctx: SceneContext,
   rough: SceneRough,
@@ -509,7 +575,16 @@ export function renderScene(
   const scale = dpr * viewport.zoom
   ctx.setTransform(scale, 0, 0, scale, -viewport.x * scale, -viewport.y * scale)
 
+  // Only what can reach the window is drawn: on a big board most elements are
+  // off screen, and rough.js is the expensive part of a frame.
+  const view: Bounds = {
+    x: viewport.x,
+    y: viewport.y,
+    width: surface.width / viewport.zoom,
+    height: surface.height / viewport.zoom,
+  }
   for (const element of elements) {
+    if (!mayBeVisible(element, view, viewport.zoom)) continue
     ctx.save()
     ctx.globalAlpha = element.opacity / 100
     drawElement(ctx, rough, element, theme, surface.images)

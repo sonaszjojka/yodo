@@ -840,3 +840,146 @@ describe('renderScene background', () => {
     expect(ctx.fillRect).not.toHaveBeenCalled()
   })
 })
+
+describe('viewport culling (roadmap 2.12)', () => {
+  function drawn(
+    elements: Parameters<typeof renderScene>[2],
+    viewport = IDENTITY,
+  ) {
+    const rough = fakeRough()
+    renderScene(fakeContext(), rough, elements, SURFACE, viewport)
+    return rough
+  }
+
+  test('skips an element wholly outside the visible area', () => {
+    const away = [
+      createShape('rectangle', { x: 2000, y: 10, width: 50, height: 50 }),
+      createShape('rectangle', { x: -500, y: 10, width: 50, height: 50 }),
+      createShape('rectangle', { x: 10, y: 2000, width: 50, height: 50 }),
+      createShape('rectangle', { x: 10, y: -500, width: 50, height: 50 }),
+    ]
+
+    expect(drawn(away).rectangle).not.toHaveBeenCalled()
+  })
+
+  test('draws elements inside, and those only partly visible', () => {
+    const inside = createShape('rectangle', {
+      x: 100,
+      y: 100,
+      width: 50,
+      height: 50,
+    })
+    const edge = createShape('rectangle', {
+      x: 780,
+      y: 580,
+      width: 100,
+      height: 100,
+    })
+
+    expect(drawn([inside, edge]).rectangle).toHaveBeenCalledTimes(2)
+  })
+
+  test('follows the camera: position and zoom decide what is visible', () => {
+    const far = createShape('rectangle', {
+      x: 3000,
+      y: 3000,
+      width: 50,
+      height: 50,
+    })
+
+    expect(drawn([far]).rectangle).not.toHaveBeenCalled()
+    // Panned over it.
+    expect(
+      drawn([far], { x: 2900, y: 2900, zoom: 1 }).rectangle,
+    ).toHaveBeenCalled()
+    // Zoomed out far enough to see it: the window shows 8000 x 6000 units.
+    expect(drawn([far], { x: 0, y: 0, zoom: 0.1 }).rectangle).toHaveBeenCalled()
+  })
+
+  test('a line, arrow or stroke is judged by its points, not by (x, y)', () => {
+    // Starts off screen to the right and reaches back into view.
+    const line = createLinear('line', {
+      x: 1000,
+      y: 100,
+      width: 400,
+      height: 0,
+      points: [
+        [0, 0],
+        [-400, 0],
+      ],
+    })
+
+    expect(drawn([line]).linearPath).toHaveBeenCalled()
+  })
+
+  test('a rotated element is kept while any of its corners can reach the view', () => {
+    // A tall box whose centre is off screen but which, turned a quarter, reaches in.
+    const tall = {
+      ...createShape('rectangle', { x: 850, y: 250, width: 20, height: 400 }),
+      angle: Math.PI / 2,
+    }
+
+    expect(drawn([tall]).rectangle).toHaveBeenCalled()
+  })
+
+  test('keeps a narrow shape whose wider label reaches into the view', () => {
+    // The 36 px label is centred on the shape and 144 units wide at least, so
+    // it spans x 773 to 917 although the shape starts at 840.
+    const narrow = {
+      ...createShape('rectangle', { x: 840, y: 100, width: 10, height: 10 }),
+      label: {
+        text: 'WWWWWW',
+        fontFamily: 'mono' as const,
+        fontSize: 36,
+        textAlign: 'center' as const,
+      },
+    }
+
+    expect(drawn([narrow]).rectangle).toHaveBeenCalled()
+  })
+
+  test('allows for rough.js bending a very large shape beyond its box', () => {
+    // The box ends 50 units left of the view; the rough outline of a shape
+    // this big can reach several hundred units past its box.
+    const huge = createShape('ellipse', {
+      x: -10050,
+      y: 100,
+      width: 10000,
+      height: 100,
+    })
+
+    expect(drawn([huge]).ellipse).toHaveBeenCalled()
+  })
+
+  test('keeps a note whose shadow, fixed in screen pixels, is still visible', () => {
+    // Zoomed out to 0.1, the note ends 3 screen pixels above the window, and
+    // its shadow (10 px blur, 3 px down) reaches in.
+    const note = createNote({ x: 100, y: -50, width: 20, height: 20 })
+    const ctx = fakeContext()
+
+    renderScene(ctx, fakeRough(), [note], SURFACE, {
+      x: 0,
+      y: 0,
+      zoom: 0.1,
+    })
+
+    expect(ctx.fill).toHaveBeenCalled()
+  })
+
+  test('draws the selection overlay even when the element is off screen', () => {
+    const ctx = fakeContext()
+    const far = createShape('rectangle', {
+      x: 5000,
+      y: 5000,
+      width: 50,
+      height: 50,
+    })
+
+    renderScene(ctx, fakeRough(), [far], SURFACE, IDENTITY, {
+      selected: [far],
+      marquee: null,
+    })
+
+    expect(ctx.stroke).toHaveBeenCalled()
+  })
+})
