@@ -1,9 +1,15 @@
 import rough from 'roughjs'
 import { useEffect, useRef, useState } from 'react'
-import { elementBounds, unionBounds } from '../core/geometry/rect.ts'
+import type { YodoElement } from '../core/document/types.ts'
+import {
+  elementBounds,
+  unionBounds,
+  type Bounds,
+} from '../core/geometry/rect.ts'
 import { fitViewport } from '../core/geometry/viewport.ts'
 import { canvasSize, renderScene } from '../core/render/render.ts'
 import type { DrawingRepository } from '../storage/repository.ts'
+import type { ImageCache } from './imageCache.ts'
 import { thumbnailDocument } from './thumbnailDocument.ts'
 import { useTheme } from './useTheme.ts'
 
@@ -14,6 +20,8 @@ type State = 'pending' | 'drawn' | 'empty' | 'error'
 
 export interface ThumbnailProps {
   repository: DrawingRepository
+  /** The pictures of image elements; the thumbnail draws again as they load (ADR 0040). */
+  imageCache: ImageCache
   id: string
   /** Redraws when the drawing is saved again. */
   updatedAt: number
@@ -23,7 +31,12 @@ export interface ThumbnailProps {
  * A card's preview (ADR 0034): the drawing loaded and drawn with the editor's
  * renderer, only once the card is near the viewport.
  */
-export function Thumbnail({ repository, id, updatedAt }: ThumbnailProps) {
+export function Thumbnail({
+  repository,
+  imageCache,
+  id,
+  updatedAt,
+}: ThumbnailProps) {
   const ref = useRef<HTMLCanvasElement>(null)
   const [state, setState] = useState<State>('pending')
   // Thumbnails follow the current theme (ADR 0015) and redraw when it changes.
@@ -32,23 +45,32 @@ export function Thumbnail({ repository, id, updatedAt }: ThumbnailProps) {
   useEffect(() => {
     const canvas = ref.current!
     let cancelled = false
+    let unsubscribe: (() => void) | undefined
 
-    async function draw() {
-      const doc = await thumbnailDocument(repository, id, document.fonts.ready)
-      if (cancelled) return
-      const bounds = doc && unionBounds(doc.elements.map(elementBounds))
-      if (!doc || !bounds) return setState('empty')
+    // Paints a loaded drawing; called again when a picture arrives.
+    function paint(elements: YodoElement[], bounds: Bounds) {
       const size = { width: canvas.clientWidth, height: canvas.clientHeight }
       const dpr = window.devicePixelRatio || 1
       Object.assign(canvas, canvasSize(size.width, size.height, dpr))
       renderScene(
         canvas.getContext('2d')!,
         rough.canvas(canvas),
-        doc.elements,
-        { ...size, dpr, theme },
+        elements,
+        { ...size, dpr, theme, images: imageCache.get },
         fitViewport(bounds, size, PADDING),
       )
+    }
+
+    async function draw() {
+      const doc = await thumbnailDocument(repository, id, document.fonts.ready)
+      if (cancelled) return
+      const bounds = doc && unionBounds(doc.elements.map(elementBounds))
+      if (!doc || !bounds) return setState('empty')
+      paint(doc.elements, bounds)
       setState('drawn')
+      if (doc.elements.some((element) => element.type === 'image')) {
+        unsubscribe = imageCache.subscribe(() => paint(doc.elements, bounds))
+      }
     }
 
     // Start loading a little before the card scrolls into view.
@@ -66,9 +88,10 @@ export function Thumbnail({ repository, id, updatedAt }: ThumbnailProps) {
     observer.observe(canvas)
     return () => {
       cancelled = true
+      unsubscribe?.()
       observer.disconnect()
     }
-  }, [repository, id, updatedAt, theme])
+  }, [repository, imageCache, id, updatedAt, theme])
 
   return (
     <div className="thumbnail" data-state={state}>

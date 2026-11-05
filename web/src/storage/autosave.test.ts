@@ -2,7 +2,12 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { createDocument } from '../core/document/create.ts'
 import type { YodoDocument } from '../core/document/types.ts'
 import { createEditor, type Editor } from '../core/editor/editor.ts'
-import { createAutoSaver, finalSave, type AutoSaver } from './autosave.ts'
+import {
+  createAutoSaver,
+  finalSave,
+  withFileIds,
+  type AutoSaver,
+} from './autosave.ts'
 import { InMemoryDrawingRepository } from './memory.ts'
 import type { DrawingRepository } from './repository.ts'
 
@@ -227,4 +232,35 @@ test('finalSave resolves false when the last save fails, so the loss can be show
 
   expect(await finalSave(saver)).toBe(false)
   error.mockRestore()
+})
+
+const A = 'a'.repeat(64)
+const B = 'b'.repeat(64)
+const VIEW = { x: 0, y: 0, width: 1000, height: 800 }
+
+test('saves fileIds from the image elements: sorted, without repeats', async () => {
+  setUp()
+  editor.addImage({ fileId: B, width: 10, height: 10 }, VIEW)
+  editor.addImage({ fileId: A, width: 10, height: 10 }, VIEW)
+  editor.addImage({ fileId: B, width: 10, height: 10 }, VIEW)
+  await vi.advanceTimersByTimeAsync(DELAY)
+
+  const stored = await repository.get(editor.store.getState().document.id)
+  expect(stored?.fileIds).toEqual([A, B])
+})
+
+test('drops a fileId once its last image is removed', async () => {
+  setUp()
+  editor.addImage({ fileId: A, width: 10, height: 10 }, VIEW)
+  await vi.advanceTimersByTimeAsync(DELAY)
+  editor.deleteSelected()
+  await vi.advanceTimersByTimeAsync(DELAY)
+
+  const stored = await repository.get(editor.store.getState().document.id)
+  expect(stored?.fileIds).toEqual([])
+})
+
+test('withFileIds returns the same document when the list is already right', () => {
+  const doc = createDocument()
+  expect(withFileIds(doc)).toBe(doc)
 })

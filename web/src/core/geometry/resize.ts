@@ -131,7 +131,8 @@ function noNegativeZero(value: number) {
  * The element scaled by `t`. Boxes are normalised so width and height stay
  * positive after a flip; line points scale (and mirror) around the element's
  * origin. Stroke width is not scaled, and neither is a shape label's font;
- * text scales its font evenly instead of stretching.
+ * text scales its font evenly instead of stretching, and an image keeps its
+ * proportions.
  */
 export function scaleElement(
   element: YodoElement,
@@ -156,20 +157,23 @@ export function scaleElement(
     }
   }
   const [x2, y2] = map(element.x + element.width, element.y + element.height)
-  if (element.type === 'text') {
-    // Text never stretches or mirrors: it scales evenly, by the geometric
-    // mean of both axes, and is placed so the anchor keeps its place in it.
+  if (element.type === 'text' || element.type === 'image') {
+    // Text and images never stretch or mirror: they scale evenly, by the
+    // geometric mean of both axes, and are placed so the anchor keeps its
+    // place in them.
     const s = Math.sqrt(Math.abs(sx * sy))
     const width = element.width * s
     const height = element.height * s
-    return {
+    const placed = {
       ...element,
       x: placeAround(anchor[0], Math.min(x, x2), Math.abs(x2 - x), width),
       y: placeAround(anchor[1], Math.min(y, y2), Math.abs(y2 - y), height),
       width,
       height,
-      fontSize: element.fontSize * s,
     }
+    return placed.type === 'text'
+      ? { ...placed, fontSize: placed.fontSize * s }
+      : placed
   }
   return {
     ...element,

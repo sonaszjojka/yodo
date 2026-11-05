@@ -4,6 +4,7 @@ import type { RoughCanvas } from 'roughjs/bin/canvas'
 import type { Options } from 'roughjs/bin/core'
 import type {
   FontFamily,
+  ImageElement,
   NoteElement,
   PencilElement,
   Point,
@@ -40,6 +41,7 @@ export type SceneContext = Pick<
   | 'globalAlpha'
   | 'beginPath'
   | 'rect'
+  | 'drawImage'
   | 'roundRect'
   | 'stroke'
   | 'fill'
@@ -77,6 +79,11 @@ export interface Surface {
   dpr: number
   /** Colours are adapted for this theme (ADR 0015); light when omitted. */
   theme?: Theme
+  /**
+   * The decoded picture of an image element, or undefined while it loads or
+   * if it is missing (a placeholder is drawn then; ADR 0040).
+   */
+  images?: (fileId: string) => CanvasImageSource | undefined
 }
 
 /**
@@ -227,11 +234,45 @@ function drawNote(ctx: SceneContext, note: NoteElement, theme: Theme) {
   drawLabel(ctx, note, theme)
 }
 
+/** The stand-in for an image that is loading or missing, per theme. */
+const IMAGE_PLACEHOLDER = {
+  light: { fill: '#e9ecef', line: '#adb5bd' },
+  dark: { fill: '#2b2f36', line: '#5c636e' },
+}
+
+/**
+ * An image: its picture when loaded, otherwise a plain grey box. Pictures keep
+ * their colours in dark mode: the theme adaptation is for drawing colours
+ * only (ADR 0015).
+ */
+function drawImage(
+  ctx: SceneContext,
+  image: ImageElement,
+  theme: Theme,
+  source: CanvasImageSource | undefined,
+) {
+  const { x, y, width, height } = image
+  if (source) {
+    ctx.drawImage(source, x, y, width, height)
+    return
+  }
+  const colors = IMAGE_PLACEHOLDER[theme]
+  ctx.fillStyle = colors.fill
+  ctx.strokeStyle = colors.line
+  ctx.lineWidth = 1
+  ctx.setLineDash([])
+  ctx.beginPath()
+  ctx.rect(x, y, width, height)
+  ctx.fill()
+  ctx.stroke()
+}
+
 function drawElement(
   ctx: SceneContext,
   rough: SceneRough,
   element: YodoElement,
   theme: Theme,
+  images: Surface['images'],
 ) {
   const options = roughOptions(element, theme)
   const { x, y, width, height } = element
@@ -267,6 +308,9 @@ function drawElement(
       return
     case 'note':
       drawNote(ctx, element, theme)
+      return
+    case 'image':
+      drawImage(ctx, element, theme, images?.(element.fileId))
       return
     case 'line':
     case 'arrow': {
@@ -460,7 +504,7 @@ export function renderScene(
   for (const element of elements) {
     ctx.save()
     ctx.globalAlpha = element.opacity / 100
-    drawElement(ctx, rough, element, theme)
+    drawElement(ctx, rough, element, theme, surface.images)
     ctx.restore()
   }
   drawOverlay(ctx, overlay, viewport, dpr, OVERLAY_COLORS[theme])

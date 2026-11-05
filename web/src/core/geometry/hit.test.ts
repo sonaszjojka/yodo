@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { createLinear, createShape } from '../document/create.ts'
+import { createImage, createLinear, createShape } from '../document/create.ts'
 import type {
   PencilElement,
   Point,
@@ -243,5 +243,27 @@ describe('round corners (roadmap 2.2b)', () => {
   test('a round diamond hits on its rounded tip, not the sharp one', () => {
     expect(hits(diamond, [100, 11])).toBe(true)
     expect(hits(diamond, [100, 0])).toBe(false)
+  })
+})
+
+describe('image', () => {
+  const image = createImage(
+    'a'.repeat(64),
+    { width: 100, height: 60 },
+    {
+      x: 0,
+      y: 0,
+      width: 1000,
+      height: 1000,
+    },
+  )
+  const placed = { ...image, x: 0, y: 0 }
+
+  test.each<[string, Point, boolean]>([
+    ['the middle', [50, 30], true],
+    ['near the edge, inside', [3, 30], true],
+    ['well outside', [200, 30], false],
+  ])('%s', (_name, point, expected) => {
+    expect(hits(placed, point)).toBe(expected)
   })
 })

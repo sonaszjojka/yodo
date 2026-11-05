@@ -5,6 +5,9 @@
 // dropped rather than repaired.
 import type { Point, TextLabel, YodoElement } from './types.ts'
 
+/** An image id is the lowercase hex SHA-256 of its bytes (ADR 0040). */
+const FILE_ID = /^[0-9a-f]{64}$/
+
 /** A payload with more elements than this is refused whole. */
 export const MAX_PASTE_ELEMENTS = 10_000
 /** Points per line, arrow or stroke. */
@@ -86,6 +89,13 @@ function isElement(value: unknown): value is YodoElement {
     case 'ellipse':
     case 'note':
       return isOptionalLabel(value)
+    case 'image':
+      return (
+        typeof value.fileId === 'string' &&
+        FILE_ID.test(value.fileId) &&
+        (value.width as number) > 0 &&
+        (value.height as number) > 0
+      )
     case 'line':
     case 'pencil':
       return isPoints(value.points)

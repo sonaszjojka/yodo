@@ -1,14 +1,25 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { loadDrawing, type LoadResult } from '../storage/drawings.ts'
+import type { ImageRepository } from '../storage/images.ts'
 import type { DrawingRepository } from '../storage/repository.ts'
 import { App } from './App.tsx'
 import { DrawingLoadError } from './DrawingLoadError.tsx'
 import { Home } from './Home.tsx'
+import { createImageCache, type ImageCache } from './imageCache.ts'
 import { useRoute } from './route.ts'
 
 /** Picks the screen from the hash route (ADR 0033). */
-export function Root({ repository }: { repository: DrawingRepository }) {
+export function Root({
+  repository,
+  images,
+}: {
+  repository: DrawingRepository
+  images: ImageRepository
+}) {
   const route = useRoute()
+  // One cache for the whole app, so a picture decoded in the editor is ready
+  // for Home's thumbnails (ADR 0040).
+  const imageCache = useMemo(() => createImageCache(images), [images])
   // The closing editor's last save. React runs the old screen's cleanup before
   // the new screen's effects, so the next screen's first read can wait for it:
   // Home's list(), or the editor's get() after Back then Forward.
@@ -24,6 +35,7 @@ export function Root({ repository }: { repository: DrawingRepository }) {
   return route.name === 'home' ? (
     <Home
       repository={repository}
+      imageCache={imageCache}
       waitForEditor={waitForEditor}
       lastSaveFailed={lastSaveFailed}
     />
@@ -31,6 +43,8 @@ export function Root({ repository }: { repository: DrawingRepository }) {
     <DrawingScreen
       key={route.id}
       repository={repository}
+      images={images}
+      imageCache={imageCache}
       id={route.id}
       waitForEditor={waitForEditor}
       onClose={onClose}
@@ -40,6 +54,8 @@ export function Root({ repository }: { repository: DrawingRepository }) {
 
 interface DrawingScreenProps {
   repository: DrawingRepository
+  images: ImageRepository
+  imageCache: ImageCache
   id: string
   /** The previous editor's last save, which the load must not overtake. */
   waitForEditor(): Promise<boolean>
@@ -49,6 +65,8 @@ interface DrawingScreenProps {
 /** Loads the drawing, then opens the editor on it; never a blank fallback. */
 function DrawingScreen({
   repository,
+  images,
+  imageCache,
   id,
   waitForEditor,
   onClose,
@@ -89,6 +107,12 @@ function DrawingScreen({
     )
   }
   return (
-    <App repository={repository} document={result.document} onClose={onClose} />
+    <App
+      repository={repository}
+      images={images}
+      imageCache={imageCache}
+      document={result.document}
+      onClose={onClose}
+    />
   )
 }

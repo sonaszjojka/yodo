@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import {
+  createImage,
   createLinear,
   createNote,
   createPencil,
@@ -24,6 +25,7 @@ const valid = [
   createLinear('arrow', lineFromDrag([0, 0], [10, 10], false)),
   createPencil(lineFromDrag([0, 0], [10, 10], false)),
   createText([5, 5]),
+  createImage('b'.repeat(64), { width: 20, height: 10 }, box),
 ]
 
 describe('parseElements', () => {
@@ -57,6 +59,13 @@ describe('parseElements', () => {
     ['a point that is not a pair', { ...valid[6], points: [[0, 1, 2]] }],
     ['an arrow with a bad arrowhead', { ...valid[5], endArrowhead: 'dot' }],
     ['a text without text', { ...valid[7], text: undefined }],
+    ['an image without a fileId', { ...valid[8], fileId: undefined }],
+    ['an image with a malformed fileId', { ...valid[8], fileId: '../../x' }],
+    [
+      'an image with an upper-case fileId',
+      { ...valid[8], fileId: 'B'.repeat(64) },
+    ],
+    ['an image without size', { ...valid[8], width: 0 }],
     ['a box with a stray points field', { ...one, points: null }],
     ['a text with a stray points field', { ...valid[7], points: [] }],
     ['a non-object', 5],

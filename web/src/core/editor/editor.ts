@@ -1,6 +1,7 @@
 import {
   BUILT_IN_STYLE,
   createLinear,
+  createImage,
   createNote,
   createPencil,
   createShape,
@@ -233,6 +234,14 @@ export interface Editor {
    * centre. Returns false, changing nothing, when `text` isn't ours.
    */
   paste(text: string, view: Bounds): boolean
+  /**
+   * Adds a stored image (ADR 0040) centred on `view`, selects it and switches
+   * to the Select tool; one undo step.
+   */
+  addImage(
+    image: { fileId: string; width: number; height: number },
+    view: Bounds,
+  ): void
   /** Selects every element and switches to the Select tool; no document change. */
   selectAll(): void
   /** Keeps the style the selection shares (no mixed values) for pasting. */
@@ -1146,6 +1155,20 @@ export function createEditor(
         },
       }))
       return true
+    },
+    addImage({ fileId, width, height }, view) {
+      endGestures()
+      const element = createImage(fileId, { width, height }, view)
+      store.setState((prev) => ({
+        ...prev,
+        tool: 'select',
+        selectedIds: [element.id],
+        hoverHandle: null,
+        document: {
+          ...prev.document,
+          elements: [...prev.document.elements, element],
+        },
+      }))
     },
     selectAll() {
       endGestures()

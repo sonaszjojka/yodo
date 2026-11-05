@@ -7,11 +7,13 @@ import type {
 import { formatEdited } from './formatEdited.ts'
 import { isOutside } from './outsidePress.ts'
 import { navigate, routeHash } from './route.ts'
+import type { ImageCache } from './imageCache.ts'
 import { Thumbnail } from './Thumbnail.tsx'
 
 export interface DrawingCardProps {
   summary: DrawingSummary
   repository: DrawingRepository
+  imageCache: ImageCache
   /** Epoch milliseconds, for "Edited 5 min ago". */
   now: number
   onRename(name: string): void
@@ -24,6 +26,7 @@ export interface DrawingCardProps {
 export function DrawingCard({
   summary,
   repository,
+  imageCache,
   now,
   onRename,
 }: DrawingCardProps) {
@@ -47,7 +50,12 @@ export function DrawingCard({
   }, [menuOpen])
 
   const thumbnail = (
-    <Thumbnail repository={repository} id={id} updatedAt={updatedAt} />
+    <Thumbnail
+      repository={repository}
+      imageCache={imageCache}
+      id={id}
+      updatedAt={updatedAt}
+    />
   )
   const edited = (
     <span className="drawing-card-edited">{formatEdited(updatedAt, now)}</span>

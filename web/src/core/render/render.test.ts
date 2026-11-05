@@ -3,6 +3,7 @@ import {
   DEFAULT_LABEL,
   createLinear,
   createPencil,
+  createImage,
   createNote,
   createShape,
   createText,
@@ -42,6 +43,7 @@ function fakeContext() {
     globalAlpha: 1,
     beginPath: vi.fn(),
     rect: vi.fn(),
+    drawImage: vi.fn(),
     roundRect: vi.fn(),
     stroke: vi.fn(),
     fill: vi.fn(),
@@ -605,6 +607,52 @@ describe('text (ADR 0027)', () => {
     // The shadow is set for the fill and reset by restore, so text has none.
     expect(ctx.restore.mock.calls.length).toBeGreaterThanOrEqual(2)
     expect(ctx.fillText).toHaveBeenCalledWith('Hi', 100, 50)
+  })
+
+  describe('images', () => {
+    const view = { x: 0, y: 0, width: 1000, height: 1000 }
+    const image = {
+      ...createImage('a'.repeat(64), { width: 200, height: 100 }, view),
+      x: 10,
+      y: 20,
+      opacity: 50,
+    }
+
+    test('draws the picture into its box with its opacity', () => {
+      const ctx = fakeContext()
+      const picture = {} as CanvasImageSource
+      const alphas: number[] = []
+      ctx.drawImage.mockImplementation(() => alphas.push(ctx.globalAlpha))
+
+      renderScene(
+        ctx,
+        fakeRough(),
+        [image],
+        {
+          ...SURFACE,
+          images: (id) => (id === image.fileId ? picture : undefined),
+        },
+        IDENTITY,
+      )
+
+      expect(ctx.drawImage).toHaveBeenCalledWith(picture, 10, 20, 200, 100)
+      expect(alphas).toEqual([0.5])
+    })
+
+    test.each(['light', 'dark'] as const)(
+      'draws a grey placeholder box in %s mode while the picture is missing',
+      (theme) => {
+        const ctx = fakeContext()
+        const fills: string[] = []
+        ctx.fill.mockImplementation(() => fills.push(ctx.fillStyle))
+
+        renderScene(ctx, fakeRough(), [image], { ...SURFACE, theme }, IDENTITY)
+
+        expect(ctx.drawImage).not.toHaveBeenCalled()
+        expect(ctx.rect).toHaveBeenCalledWith(10, 20, 200, 100)
+        expect(fills).toHaveLength(1)
+      },
+    )
   })
 
   test('fills a note with the dark twin of its colour in dark mode', () => {

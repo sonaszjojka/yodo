@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'vitest'
-import { createLinear, createShape, createText } from '../document/create.ts'
+import {
+  createImage,
+  createLinear,
+  createShape,
+  createText,
+} from '../document/create.ts'
 import { lineFromDrag } from './line.ts'
 import {
   canResize,
@@ -219,5 +224,29 @@ describe('scaleElement on text', () => {
     expect(scaleElement(shape, { anchor: [0, 0], sx: 3, sy: 3 })).toMatchObject(
       { label },
     )
+  })
+})
+
+describe('scaleElement on an image', () => {
+  const image = {
+    ...createImage(
+      'a'.repeat(64),
+      { width: 100, height: 50 },
+      { x: 0, y: 0, width: 1000, height: 1000 },
+    ),
+    x: 10,
+    y: 20,
+  }
+
+  test('keeps its proportions when a corner stretches one axis more', () => {
+    // sx 2, sy 8: scaled by sqrt(16) = 4 on both axes, around the anchor.
+    const scaled = scaleElement(image, { anchor: [10, 20], sx: 2, sy: 8 })
+    expect(scaled).toMatchObject({ x: 10, y: 20, width: 400, height: 200 })
+  })
+
+  test('does not mirror, and keeps its file', () => {
+    const scaled = scaleElement(image, { anchor: [60, 20], sx: -1, sy: 1 })
+    expect(scaled).toMatchObject({ width: 100, height: 50 })
+    expect(scaled).toHaveProperty('fileId', image.fileId)
   })
 })
