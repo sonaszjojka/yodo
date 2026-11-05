@@ -30,6 +30,7 @@ Format ([conventionalcommits.org](https://www.conventionalcommits.org/)):
   6. The owner runs `/code-review medium <branch>` in a fresh context (`medium` is the minimum level). One round per branch, with no re-review after the fixes: fix correctness bugs there; a cleanup becomes a follow-up issue labelled `review` only if the owner wants it (created with the owner's OK), otherwise it is dropped. Severity-based triage keeps the review loop finite.
   7. Back in the authoring session, `/retest` re-runs the checks and re-verifies each review fix in the browser; then `/ship`: sync the docs the branch made stale (roadmap tick, plan status, others with the owner's OK) as a commit in the same PR, then push and open a PR (title = the future squash commit, in Conventional Commit format) on the owner's command; the owner reviews the PR, and every PR comment thread is fixed or answered and resolved before merge.
   8. Squash-merge on the owner's command; delete the branch; `/clear`.
+- **Orchestrated alternative (ADR 0037):** `/deliver <task>` runs steps 2–7 from one session with Orca. Claude plans and implements; Codex workers review the plan adversarially, then the code in at most 2 rounds (the second checks only the fixes), then retest the branch in a browser with Playwright. The owner approves the branch and the plan once, answers the `/ship` question, and merges. The manual loop above stays valid without Orca or Codex.
 - Worktrees only for genuinely parallel sessions (e.g. web and server at once), each on its own branch.
 
 ## Definition of done
@@ -62,3 +63,6 @@ A task is done only when all of these hold:
 | `/commit` | Propose a Conventional Commit for the current changes. |
 | `/ship` | Push, open the PR, review, and merge on command. |
 | `/adr <decision>` | Record an architectural decision as an ADR. |
+| `/deliver <task id or description>` | The whole cycle via Orca: plan, Codex plan review, implement, Codex code review (≤ 2 rounds), fix, Codex retest, ship (ADR 0037). |
+
+Shared skills that any agent can use (Codex included) are in `.agents/skills/`: `review` is the checklist and output format for plan and code reviews; `retest` is the Playwright verification with an evidence table. Codex reads the project rules through `AGENTS.md`, which points to `CLAUDE.md`.
