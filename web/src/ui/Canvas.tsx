@@ -6,6 +6,7 @@ import { sceneOf } from '../core/editor/scene.ts'
 import type { Handle } from '../core/geometry/resize.ts'
 import { wheelZoomFactor } from '../core/geometry/viewport.ts'
 import { canvasSize, renderScene, type Surface } from '../core/render/render.ts'
+import { getThemeStore } from './useTheme.ts'
 import { pointerSamples } from './pointerSamples.ts'
 import { TOOL_KEYS } from './tools.ts'
 
@@ -66,6 +67,7 @@ export function Canvas({ editor }: { editor: Editor }) {
     const canvas = ref.current!
     const ctx = canvas.getContext('2d')!
     const rc = rough.canvas(canvas)
+    const themeStore = getThemeStore()
     let surface: Surface = { width: 0, height: 0, dpr: 1 }
     let frame = 0
 
@@ -73,10 +75,14 @@ export function Canvas({ editor }: { editor: Editor }) {
       frame = 0
       const state = editor.store.getState()
       const { elements, selected, marquee } = sceneOf(state)
-      renderScene(ctx, rc, elements, surface, state.viewport, {
-        selected,
-        marquee,
-      })
+      renderScene(
+        ctx,
+        rc,
+        elements,
+        { ...surface, theme: themeStore.getTheme() },
+        state.viewport,
+        { selected, marquee },
+      )
       canvas.style.cursor = cursorFor(state)
     }
 
@@ -210,6 +216,8 @@ export function Canvas({ editor }: { editor: Editor }) {
     resize()
     watchPixelRatio()
     const unsubscribe = editor.store.subscribe(scheduleDraw)
+    // A theme change (the user's choice, or the OS for "system") redraws too.
+    const unsubscribeTheme = themeStore.subscribe(scheduleDraw)
     // The canvas draws with whatever font is loaded and never redraws on its
     // own, so redraw once a font arrives (ADR 0025).
     document.fonts.addEventListener('loadingdone', scheduleDraw)
@@ -224,6 +232,7 @@ export function Canvas({ editor }: { editor: Editor }) {
 
     return () => {
       unsubscribe()
+      unsubscribeTheme()
       document.fonts.removeEventListener('loadingdone', scheduleDraw)
       cancelAnimationFrame(frame)
       dprQuery?.removeEventListener('change', onPixelRatioChange)

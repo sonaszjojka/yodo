@@ -72,3 +72,15 @@ describe('commitsOn', () => {
     expect(key('Enter', { metaKey: true, isComposing: true })).toBe(false)
   })
 })
+
+test('colours the text as the canvas draws it in the theme', () => {
+  const editor = editorEditingAt([0, 0])
+
+  // Ink is the default stroke: unreadable on the dark canvas if not adapted.
+  expect(renderToStaticMarkup(<TextEditor editor={editor} />)).toContain(
+    'color:#1E1F22',
+  )
+  expect(
+    renderToStaticMarkup(<TextEditor editor={editor} theme="dark" />),
+  ).toContain('color:#E4E6E8')
+})

@@ -9,6 +9,10 @@ import { FONT_STACKS, fontOf } from './core/text/layout.ts'
 import { detectRepository } from './storage/detect.ts'
 import './ui/index.css'
 import { Root } from './ui/Root.tsx'
+import { getThemeStore } from './ui/useTheme.ts'
+
+// Put the stored theme choice on <html> before anything is drawn.
+getThemeStore()
 
 // Start loading the canvas fonts now: the canvas only asks for one when text
 // is drawn, and would draw and measure a fallback until it arrives (the style

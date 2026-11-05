@@ -10,6 +10,7 @@ import type {
   TextAlign,
   YodoElement,
 } from '../document/types.ts'
+import { adaptColor, type Theme } from './colors.ts'
 import { smoothPath } from '../geometry/freehand.ts'
 import { arrowhead } from '../geometry/line.ts'
 import { GAP, grow, HANDLE_SIZE, selectionFrame } from '../geometry/frame.ts'
@@ -70,6 +71,8 @@ export interface Surface {
   width: number
   height: number
   dpr: number
+  /** Colours are adapted for this theme (ADR 0015); light when omitted. */
+  theme?: Theme
 }
 
 /**
@@ -90,16 +93,16 @@ const DASHES: Record<StrokeStyle, number[] | undefined> = {
 }
 
 /** The rough.js options shared by every element type. */
-function roughOptions(element: YodoElement): Options {
+function roughOptions(element: YodoElement, theme: Theme): Options {
   return {
     seed: element.seed,
-    stroke: element.strokeColor,
+    stroke: adaptColor(element.strokeColor, theme, 'stroke'),
     strokeWidth: element.strokeWidth,
     roughness: element.roughness,
     fill:
       element.backgroundColor === 'transparent'
         ? undefined
-        : element.backgroundColor,
+        : adaptColor(element.backgroundColor, theme, 'fill'),
     fillStyle: element.fillStyle,
     strokeLineDash: DASHES[element.strokeStyle],
   }
@@ -109,7 +112,7 @@ function roughOptions(element: YodoElement): Options {
  * A pencil stroke: a plain, smoothed canvas path with no rough.js wobble
  * (ADR 0024). The caller's save/restore resets the style set here.
  */
-function drawStroke(ctx: SceneContext, element: PencilElement) {
+function drawStroke(ctx: SceneContext, element: PencilElement, theme: Theme) {
   const path = smoothPath(
     element.points.map(([dx, dy]): Point => [element.x + dx, element.y + dy]),
   )
@@ -120,7 +123,7 @@ function drawStroke(ctx: SceneContext, element: PencilElement) {
     else if (step.type === 'line') ctx.lineTo(...step.to)
     else ctx.quadraticCurveTo(...step.control, ...step.to)
   }
-  ctx.strokeStyle = element.strokeColor
+  ctx.strokeStyle = adaptColor(element.strokeColor, theme, 'stroke')
   ctx.lineWidth = element.strokeWidth
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
@@ -167,6 +170,7 @@ function contextMeasure(ctx: SceneContext): Measure {
 function drawLabel(
   ctx: SceneContext,
   shape: Extract<YodoElement, { type: 'rectangle' | 'diamond' | 'ellipse' }>,
+  theme: Theme,
 ) {
   const { label } = shape
   if (!label?.text) return
@@ -185,7 +189,7 @@ function drawLabel(
       family: label.fontFamily,
       size: label.fontSize,
       align: label.textAlign,
-      color: shape.strokeColor,
+      color: adaptColor(shape.strokeColor, theme, 'stroke'),
     },
     {
       left: box.x,
@@ -199,8 +203,9 @@ function drawElement(
   ctx: SceneContext,
   rough: SceneRough,
   element: YodoElement,
+  theme: Theme,
 ) {
-  const options = roughOptions(element)
+  const options = roughOptions(element, theme)
   const { x, y, width, height } = element
   switch (element.type) {
     case 'rectangle':
@@ -215,7 +220,7 @@ function drawElement(
       } else {
         rough.rectangle(x, y, width, height, options)
       }
-      drawLabel(ctx, element)
+      drawLabel(ctx, element, theme)
       return
     case 'diamond':
       if (element.roundness === 'round') {
@@ -226,11 +231,11 @@ function drawElement(
       } else {
         rough.polygon(diamondPoints(element), options)
       }
-      drawLabel(ctx, element)
+      drawLabel(ctx, element, theme)
       return
     case 'ellipse':
       rough.ellipse(x + width / 2, y + height / 2, width, height, options)
-      drawLabel(ctx, element)
+      drawLabel(ctx, element, theme)
       return
     case 'line':
     case 'arrow': {
@@ -247,7 +252,7 @@ function drawElement(
       return
     }
     case 'pencil':
-      drawStroke(ctx, element)
+      drawStroke(ctx, element, theme)
       return
     case 'text':
       // Free text doesn't wrap: its lines are its paragraphs.
@@ -258,7 +263,7 @@ function drawElement(
           family: element.fontFamily,
           size: element.fontSize,
           align: element.textAlign,
-          color: element.strokeColor,
+          color: adaptColor(element.strokeColor, theme, 'stroke'),
         },
         { left: x, top: y, width },
       )
@@ -274,16 +279,32 @@ export interface Overlay {
 
 const NO_OVERLAY: Overlay = { selected: [], marquee: null }
 
-// Overlay look from docs/ui.md "Selection", in screen px; light theme only
-// until dark mode (roadmap M2). Gap and handle size live in frame.ts.
-const ACCENT = '#0F766E'
-const ACCENT_SOFT = '#E3F2EF'
-const HANDLE_FILL = '#FFFFFF'
+// Overlay look from docs/ui.md "Selection", in screen px, with the accent
+// tokens of each theme. Gap and handle size live in frame.ts.
+interface OverlayColors {
+  accent: string
+  accentSoft: string
+  handleFill: string
+  badgeText: string
+}
+const OVERLAY_COLORS: Record<Theme, OverlayColors> = {
+  light: {
+    accent: '#0F766E',
+    accentSoft: '#E3F2EF',
+    handleFill: '#FFFFFF',
+    badgeText: '#FFFFFF',
+  },
+  dark: {
+    accent: '#4FD1C5',
+    accentSoft: '#1D3836',
+    handleFill: '#1C1E21',
+    badgeText: '#062420',
+  },
+}
 const OUTLINE_WIDTH = 1.25
 const ELEMENT_OUTLINE_WIDTH = 1
 const HANDLE_RADIUS = 2
 const BADGE_FONT = '600 11px Manrope, system-ui, sans-serif'
-const BADGE_TEXT = '#FFFFFF'
 /** Space between the outline and the badge, the badge's height and side padding. */
 const BADGE_OFFSET = 8
 const BADGE_HEIGHT = 18
@@ -306,6 +327,7 @@ function drawSizeBadge(
   outline: Bounds,
   viewport: Viewport,
   dpr: number,
+  colors: OverlayColors,
 ) {
   const text = `${Math.round(box.width)} × ${Math.round(box.height)}`
   const [cx, bottom] = worldToScreen(viewport, [
@@ -319,9 +341,9 @@ function drawSizeBadge(
   const top = bottom + BADGE_OFFSET
   ctx.beginPath()
   ctx.roundRect(cx - width / 2, top, width, BADGE_HEIGHT, BADGE_HEIGHT / 2)
-  ctx.fillStyle = ACCENT
+  ctx.fillStyle = colors.accent
   ctx.fill()
-  ctx.fillStyle = BADGE_TEXT
+  ctx.fillStyle = colors.badgeText
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.fillText(text, cx, top + BADGE_HEIGHT / 2)
@@ -337,10 +359,11 @@ function drawOverlay(
   overlay: Overlay,
   viewport: Viewport,
   dpr: number,
+  colors: OverlayColors,
 ) {
   const px = 1 / viewport.zoom
   ctx.save()
-  ctx.strokeStyle = ACCENT
+  ctx.strokeStyle = colors.accent
   const frame = selectionFrame(overlay.selected, px)
   if (frame) {
     const { elementBoxes, outline } = frame
@@ -353,7 +376,7 @@ function drawOverlay(
     strokeBox(ctx, outline, OUTLINE_WIDTH * px)
     // Corner handles; the sides between them resize too, without a handle.
     const size = HANDLE_SIZE * px
-    ctx.fillStyle = HANDLE_FILL
+    ctx.fillStyle = colors.handleFill
     ctx.lineWidth = OUTLINE_WIDTH * px
     for (const cx of [outline.x, outline.x + outline.width]) {
       for (const cy of [outline.y, outline.y + outline.height]) {
@@ -369,13 +392,13 @@ function drawOverlay(
         ctx.stroke()
       }
     }
-    drawSizeBadge(ctx, frame.box, outline, viewport, dpr)
+    drawSizeBadge(ctx, frame.box, outline, viewport, dpr, colors)
   }
   if (overlay.marquee) {
     const { x, y, width, height } = overlay.marquee
     ctx.beginPath()
     ctx.rect(x, y, width, height)
-    ctx.fillStyle = ACCENT_SOFT
+    ctx.fillStyle = colors.accentSoft
     ctx.globalAlpha = 0.5
     ctx.fill()
     ctx.globalAlpha = 1
@@ -394,6 +417,7 @@ export function renderScene(
   overlay: Overlay = NO_OVERLAY,
 ) {
   const { dpr } = surface
+  const theme = surface.theme ?? 'light'
   // Clear in CSS pixels, before the camera transform applies.
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.clearRect(0, 0, surface.width, surface.height)
@@ -405,8 +429,8 @@ export function renderScene(
   for (const element of elements) {
     ctx.save()
     ctx.globalAlpha = element.opacity / 100
-    drawElement(ctx, rough, element)
+    drawElement(ctx, rough, element, theme)
     ctx.restore()
   }
-  drawOverlay(ctx, overlay, viewport, dpr)
+  drawOverlay(ctx, overlay, viewport, dpr, OVERLAY_COLORS[theme])
 }

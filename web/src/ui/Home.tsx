@@ -13,6 +13,7 @@ import type {
 import { DrawingCard } from './DrawingCard.tsx'
 import { Logo } from './Logo.tsx'
 import { navigate } from './route.ts'
+import { SettingsMenu } from './SettingsMenu.tsx'
 
 export type HomeList =
   | { status: 'loading' }
@@ -155,6 +156,7 @@ export function HomeView({
     <div className="home">
       <header className="home-header">
         <Logo />
+        <SettingsMenu />
       </header>
       <main className="home-main">
         <div className="home-title-row">

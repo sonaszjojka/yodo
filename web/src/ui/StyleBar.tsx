@@ -26,7 +26,9 @@ import {
 } from '../core/editor/style.ts'
 import { selectionFrame } from '../core/geometry/frame.ts'
 import { worldToScreen } from '../core/geometry/viewport.ts'
+import { adaptColor, type ColorRole } from '../core/render/colors.ts'
 import { FONT_STACKS } from '../core/text/layout.ts'
+import { useTheme } from './useTheme.ts'
 import {
   BUTTON,
   barPosition,
@@ -57,13 +59,23 @@ interface Control<K extends StyleKey> {
   show(value: NonNullable<StylePatch[K]> | 'mixed'): ReactNode
 }
 
-export function Swatch({ value, round }: { value: string; round?: boolean }) {
+/** A colour sample, shown as it looks on the canvas in the current theme. */
+export function Swatch({
+  value,
+  role,
+  round,
+}: {
+  value: string
+  role: ColorRole
+  round?: boolean
+}) {
+  const { theme } = useTheme()
   const kind =
     value === 'mixed' ? ' is-mixed' : value === 'transparent' ? ' is-none' : ''
   return (
     <span
       className={`style-swatch${round ? ' is-round' : ''}${kind}`}
-      style={kind ? undefined : { background: value }}
+      style={kind ? undefined : { background: adaptColor(value, theme, role) }}
       aria-hidden
     />
   )
@@ -96,13 +108,13 @@ const CONTROLS = [
     key: 'strokeColor',
     name: 'Stroke',
     options: STROKES,
-    show: (value) => <Swatch value={value} round />,
+    show: (value) => <Swatch value={value} role="stroke" round />,
   } satisfies Control<'strokeColor'>,
   {
     key: 'backgroundColor',
     name: 'Fill',
     options: FILLS,
-    show: (value) => <Swatch value={value} />,
+    show: (value) => <Swatch value={value} role="fill" />,
   } satisfies Control<'backgroundColor'>,
   {
     key: 'strokeWidth',

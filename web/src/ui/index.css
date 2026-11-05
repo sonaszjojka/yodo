@@ -1,23 +1,39 @@
-/* UI colour tokens from docs/ui.md (light theme; dark mode arrives in M2). */
+/*
+ * UI colour tokens from docs/ui.md: light-dark(light, dark). `color-scheme`
+ * picks the side: the OS setting by default, or the user's explicit choice
+ * through data-theme on <html> (themeStore.ts). It also themes native
+ * controls such as the sort select and scrollbars.
+ */
 :root {
-  --page: #f7f9f9;
-  --surface: #ffffff;
-  --raised: #eff3f3;
-  --border: #dce4e3;
-  --text: #13201f;
-  --muted-text: #4e5c5b;
-  --accent: #0f766e;
-  --on-accent: #ffffff;
-  --accent-soft: #e3f2ef;
-  --danger: #b42318;
-  /* Soft two-layer shadow for floating elements. */
-  --shadow-float:
-    0 1px 2px rgb(19 32 31 / 0.06), 0 4px 12px rgb(19 32 31 / 0.08);
+  color-scheme: light dark;
+  --page: light-dark(#f7f9f9, #141517);
+  --surface: light-dark(#ffffff, #1c1e21);
+  --raised: light-dark(#eff3f3, #2a2e33);
+  --border: light-dark(#dce4e3, #2f3337);
+  --text: light-dark(#13201f, #eceef0);
+  --muted-text: light-dark(#4e5c5b, #a3a9b0);
+  --accent: light-dark(#0f766e, #4fd1c5);
+  --on-accent: light-dark(#ffffff, #062420);
+  --accent-soft: light-dark(#e3f2ef, #1d3836);
+  --danger: light-dark(#b42318, #f08a80);
+  /* Soft two-layer shadow for floating elements; light-dark() takes colours only. */
+  --shadow-near: light-dark(rgb(19 32 31 / 0.06), rgb(0 0 0 / 0.4));
+  --shadow-far: light-dark(rgb(19 32 31 / 0.08), rgb(0 0 0 / 0.5));
+  --shadow-float: 0 1px 2px var(--shadow-near), 0 4px 12px var(--shadow-far);
 
   /* Manrope is not loaded yet; it ships as a Fontsource package when a feature needs it (ADR 0025). */
   font-family: 'Manrope', system-ui, sans-serif;
   color: var(--text);
   background: var(--page);
+}
+
+/* An explicit choice overrides the OS setting (themeStore.ts). */
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
 }
 
 body {
@@ -278,7 +294,28 @@ body {
 
 /* Home (docs/ui.md, Home). */
 .home-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 20px 32px 0;
+}
+
+/* Anchors the Settings menu under its button. */
+.settings {
+  position: relative;
+}
+
+.menu.settings-menu {
+  top: calc(100% + 4px);
+  right: 0;
+  bottom: auto;
+}
+
+.menu-heading {
+  padding: 6px 12px 2px;
+  color: var(--muted-text);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .home-header .logo {
@@ -475,7 +512,8 @@ a.drawing-card-body:focus-visible,
   box-shadow: var(--shadow-float);
 }
 
-.menu [role='menuitem'] {
+.menu [role='menuitem'],
+.menu [role='menuitemradio'] {
   min-height: 36px;
   padding: 0 12px;
   border: 0;
@@ -489,7 +527,9 @@ a.drawing-card-body:focus-visible,
 }
 
 .menu [role='menuitem']:hover,
-.menu [role='menuitem']:focus-visible {
+.menu [role='menuitem']:focus-visible,
+.menu [role='menuitemradio']:hover,
+.menu [role='menuitemradio']:focus-visible {
   background: var(--raised);
   outline: none;
 }
@@ -775,4 +815,12 @@ a.drawing-card-body:focus-visible,
   height: 14px;
   cursor: nesw-resize;
   touch-action: none;
+}
+
+/* Radio items in a menu: the label left, a check on the current one. */
+.menu [role='menuitemradio'] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
 }

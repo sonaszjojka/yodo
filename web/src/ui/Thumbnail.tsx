@@ -5,6 +5,7 @@ import { fitViewport } from '../core/geometry/viewport.ts'
 import { canvasSize, renderScene } from '../core/render/render.ts'
 import type { DrawingRepository } from '../storage/repository.ts'
 import { thumbnailDocument } from './thumbnailDocument.ts'
+import { useTheme } from './useTheme.ts'
 
 /** Space around the drawing inside the thumbnail, in CSS pixels. */
 const PADDING = 12
@@ -25,6 +26,8 @@ export interface ThumbnailProps {
 export function Thumbnail({ repository, id, updatedAt }: ThumbnailProps) {
   const ref = useRef<HTMLCanvasElement>(null)
   const [state, setState] = useState<State>('pending')
+  // Thumbnails follow the current theme (ADR 0015) and redraw when it changes.
+  const { theme } = useTheme()
 
   useEffect(() => {
     const canvas = ref.current!
@@ -42,7 +45,7 @@ export function Thumbnail({ repository, id, updatedAt }: ThumbnailProps) {
         canvas.getContext('2d')!,
         rough.canvas(canvas),
         doc.elements,
-        { ...size, dpr },
+        { ...size, dpr, theme },
         fitViewport(bounds, size, PADDING),
       )
       setState('drawn')
@@ -65,7 +68,7 @@ export function Thumbnail({ repository, id, updatedAt }: ThumbnailProps) {
       cancelled = true
       observer.disconnect()
     }
-  }, [repository, id, updatedAt])
+  }, [repository, id, updatedAt, theme])
 
   return (
     <div className="thumbnail" data-state={state}>

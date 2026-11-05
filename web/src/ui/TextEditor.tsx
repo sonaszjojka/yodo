@@ -7,6 +7,7 @@ import {
 import type { Editor, EditorState } from '../core/editor/editor.ts'
 import { editBox, type TextEdit } from '../core/editor/text.ts'
 import { worldToScreen } from '../core/geometry/viewport.ts'
+import { adaptColor, type Theme } from '../core/render/colors.ts'
 import { FONT_STACKS, LINE_HEIGHT } from '../core/text/layout.ts'
 import { commitsOn } from './textKeys.ts'
 import { useStore } from './useStore.ts'
@@ -32,7 +33,14 @@ function editKey(edit: TextEdit) {
  * controlled view of `editing` in the core, laid out with the same core
  * function the canvas draws with, scaled by the zoom.
  */
-export function TextEditor({ editor }: { editor: Editor }) {
+export function TextEditor({
+  editor,
+  theme = 'light',
+}: {
+  editor: Editor
+  /** The text is coloured as the canvas draws it in this theme (ADR 0015). */
+  theme?: Theme
+}) {
   const editing = useStore(editor.store, selectEditing)
   const doc = useStore(editor.store, selectDocument)
   const viewport = useStore(editor.store, selectViewport)
@@ -60,7 +68,7 @@ export function TextEditor({ editor }: { editor: Editor }) {
         // keys that change, and setting `font` alone resets line-height.
         font: `${box.fontSize * zoom}px/${LINE_HEIGHT} ${FONT_STACKS[box.fontFamily]}`,
         textAlign: box.textAlign,
-        color: box.color,
+        color: adaptColor(box.color, theme, 'stroke'),
       }}
     />
   )
