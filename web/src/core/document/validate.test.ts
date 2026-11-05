@@ -57,6 +57,8 @@ describe('parseElements', () => {
     ['a point that is not a pair', { ...valid[6], points: [[0, 1, 2]] }],
     ['an arrow with a bad arrowhead', { ...valid[5], endArrowhead: 'dot' }],
     ['a text without text', { ...valid[7], text: undefined }],
+    ['a box with a stray points field', { ...one, points: null }],
+    ['a text with a stray points field', { ...valid[7], points: [] }],
     ['a non-object', 5],
   ])('drops %s', (_name, bad) => {
     const good = JSON.parse(JSON.stringify(one))

@@ -65,6 +65,16 @@ function isOptionalLabel(e: Record<string, unknown>) {
 
 function isElement(value: unknown): value is YodoElement {
   if (!isRecord(value) || !hasBase(value)) return false
+  // Geometry code tells lines from boxes by the presence of `points`, so a box
+  // or text carrying that key (even null) would crash it.
+  if (
+    value.type !== 'line' &&
+    value.type !== 'arrow' &&
+    value.type !== 'pencil' &&
+    'points' in value
+  ) {
+    return false
+  }
   switch (value.type) {
     case 'rectangle':
     case 'diamond':
