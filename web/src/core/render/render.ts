@@ -102,14 +102,14 @@ export function canvasSize(cssWidth: number, cssHeight: number, dpr: number) {
   }
 }
 
-const DASHES: Record<StrokeStyle, number[] | undefined> = {
+export const DASHES: Record<StrokeStyle, number[] | undefined> = {
   solid: undefined,
   dashed: [8, 8],
   dotted: [2, 6],
 }
 
 /** The rough.js options shared by every element type. */
-function roughOptions(element: YodoElement, theme: Theme): Options {
+export function roughOptions(element: YodoElement, theme: Theme): Options {
   return {
     seed: element.seed,
     stroke: adaptColor(element.strokeColor, theme, 'stroke'),
@@ -148,7 +148,7 @@ function drawStroke(ctx: SceneContext, element: PencilElement, theme: Theme) {
 }
 
 /** Where an aligned line starts in a box of this left edge and width. */
-function alignedX(align: TextAlign, left: number, width: number) {
+export function alignedX(align: TextAlign, left: number, width: number) {
   if (align === 'center') return left + width / 2
   return align === 'right' ? left + width : left
 }
@@ -219,8 +219,12 @@ function drawLabel(
 }
 
 /** The note's corner radius and shadow, in world units (ADR 0038). */
-const NOTE_RADIUS = 4
-const NOTE_SHADOW = { blur: 10, offsetY: 3, color: 'rgba(0, 0, 0, 0.22)' }
+export const NOTE_RADIUS = 4
+export const NOTE_SHADOW = {
+  blur: 10,
+  offsetY: 3,
+  color: 'rgba(0, 0, 0, 0.22)',
+}
 
 /**
  * A note: a plain rounded box with a soft shadow, no rough.js (ADR 0038). The
@@ -240,7 +244,7 @@ function drawNote(ctx: SceneContext, note: NoteElement, theme: Theme) {
 }
 
 /** The stand-in for an image that is loading or missing, per theme. */
-const IMAGE_PLACEHOLDER = {
+export const IMAGE_PLACEHOLDER = {
   light: { fill: '#e9ecef', line: '#adb5bd' },
   dark: { fill: '#2b2f36', line: '#5c636e' },
 }
