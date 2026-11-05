@@ -22,6 +22,8 @@ import { createImagePaster } from './imagePaster.ts'
 import { createCanvasMeasure } from './measure.ts'
 import { Notice } from './Notice.tsx'
 import { SaveStatus } from './SaveStatus.tsx'
+import { isEditable } from './editShortcuts.ts'
+import { ShortcutsButton, ShortcutsDialog } from './ShortcutsDialog.tsx'
 import { StyleBar } from './StyleBar.tsx'
 import { StylePanel, StylePanelToggle } from './StylePanel.tsx'
 import { TextEditor } from './TextEditor.tsx'
@@ -65,6 +67,32 @@ export function App({
   const { theme } = useTheme()
   const [notice, setNotice] = useState<string>()
   const dismissNotice = useCallback(() => setNotice(undefined), [])
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const openShortcuts = useCallback(() => {
+    // A key held down now would never see its keyup (the dialog takes focus).
+    editor.setSpaceHeld(false)
+    editor.setShift(false)
+    setShortcutsOpen(true)
+  }, [editor])
+  const closeShortcuts = useCallback(() => setShortcutsOpen(false), [])
+
+  // `?` opens the shortcuts list, or closes it when focus is not in the search.
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key !== '?' || event.ctrlKey || event.metaKey || event.altKey) {
+        return
+      }
+      if (isEditable(event.target)) return
+      // Never stack the list on another dialog (export); it may close itself.
+      if (!shortcutsOpen && window.document.querySelector('dialog[open]'))
+        return
+      event.preventDefault()
+      if (shortcutsOpen) closeShortcuts()
+      else openShortcuts()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [shortcutsOpen, openShortcuts, closeShortcuts])
 
   // A pasted image: stored first, then added to the drawing (ADR 0040).
   const [paster] = useState(() =>
@@ -170,7 +198,9 @@ export function App({
         <HistoryControl editor={editor} />
         <ZoomControl editor={editor} />
         <SaveStatus status={saver.status} />
+        <ShortcutsButton onClick={openShortcuts} />
       </div>
+      <ShortcutsDialog open={shortcutsOpen} onClose={closeShortcuts} />
     </>
   )
 }

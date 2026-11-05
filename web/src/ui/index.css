@@ -1041,6 +1041,103 @@ a.drawing-card-body:focus-visible,
 
 .export-size {
   margin: 4px 0 0;
+}
+
+/* Separates groups inside a menu (Settings: Theme / Keyboard shortcuts). */
+.menu-separator {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--border);
+}
+
+/* The shortcuts modal (ShortcutsDialog.tsx): a native <dialog> in the top layer. */
+.shortcuts-dialog {
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(640px, calc(100vh - 32px));
+  padding: 0;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-float);
+}
+
+.shortcuts-dialog[open] {
+  display: flex;
+}
+
+.shortcuts-dialog::backdrop {
+  background: rgb(0 0 0 / 0.4);
+}
+
+.shortcuts-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  padding: 20px;
+}
+
+.shortcuts-body h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.shortcuts-body input[type='search'] {
+  height: 40px;
+  padding: 0 12px;
+  background: var(--page);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 14px;
+}
+
+.shortcuts-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.shortcuts-list h3 {
+  margin: 12px 0 4px;
+  color: var(--muted-text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.shortcuts-list ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.shortcuts-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+
+.shortcut-keys {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px 8px;
+}
+
+.shortcut-chord {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.shortcut-or {
   color: var(--muted-text);
   font-size: 12px;
 }
@@ -1072,4 +1169,38 @@ a.drawing-card-body:focus-visible,
 .export-actions :disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.shortcuts-dialog kbd {
+  padding: 2px 6px;
+  background: var(--raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.shortcuts-empty {
+  margin: 24px 0;
+  color: var(--muted-text);
+  text-align: center;
+}
+
+.shortcuts-close {
+  align-self: flex-end;
+  height: 36px;
+  padding: 0 16px;
+  background: var(--raised);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.shortcuts-dialog :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }

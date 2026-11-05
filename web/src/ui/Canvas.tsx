@@ -11,9 +11,9 @@ import type { ImageCache } from './imageCache.ts'
 import { getThemeStore } from './useTheme.ts'
 import {
   handleClipboardEvent,
-  isInsideDialog,
   handleEditShortcut,
   isEditable,
+  isInsideDialog,
 } from './editShortcuts.ts'
 import { pointerSamples } from './pointerSamples.ts'
 import { TOOL_KEYS } from './tools.ts'
@@ -146,7 +146,13 @@ export function Canvas({
         editor.setShift(down)
         return
       }
-      if (isEditable(event.target) || isInsideDialog(event.target)) return
+      if (isEditable(event.target)) return
+      if (isInsideDialog(event.target)) {
+        // A modal (the shortcuts list) owns the keyboard. Only releasing Space
+        // still counts, so a pan that began before it opened cannot stick.
+        if (event.key === ' ' && !down) editor.setSpaceHeld(false)
+        return
+      }
       if (event.key === ' ') {
         // Stops page scroll and a focused button "clicking" on Space.
         event.preventDefault()
