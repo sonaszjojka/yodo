@@ -167,3 +167,22 @@ test('Copy puts the PNG on the clipboard', async ({ page, browserName }) => {
   })
   expect(type).toContain('image/png')
 })
+
+test('Download waits until the image is drawn, even when fonts load late', async ({
+  page,
+}) => {
+  await newDrawing(page)
+  await dragRectangle(page, [200, 200], [420, 360])
+  await expectInk(page)
+  // Fonts that settle late: the preview's first draw waits for them.
+  await page.evaluate(() => {
+    const late = new Promise((resolve) => setTimeout(resolve, 1500))
+    Object.defineProperty(document.fonts, 'ready', { get: () => late })
+  })
+
+  await page.getByRole('button', { name: 'Export' }).click()
+  const png = await inspectPng(page, (await download(page)).path, INK_LIGHT)
+
+  // The drawn 504 x 384 image, not a blank default 300 x 150 canvas.
+  expect(Math.abs(png.width - 504)).toBeLessThanOrEqual(4)
+})

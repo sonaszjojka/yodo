@@ -72,29 +72,43 @@ export function ExportDialog({
     return () => element.close()
   }, [])
 
+  // What the canvas should show. A new object whenever any input changes, so
+  // `drawn === job` says the canvas holds exactly this (Copy and Download are
+  // enabled only then; before the first draw the canvas is a blank default).
+  const job = useMemo(
+    () =>
+      frame && scale
+        ? { elements, frame, scale, dark: choices.dark, bg: choices.background }
+        : null,
+    [elements, frame, scale, choices.dark, choices.background],
+  )
+  const [drawn, setDrawn] = useState<typeof job>(null)
+
   // Draw once the fonts are ready, so text has the shape it has on screen.
   useEffect(() => {
-    if (!frame || !scale) return
+    if (!job) return
     let cancelled = false
     void window.document.fonts.ready.then(() => {
       if (cancelled) return
       const target = canvas.current!
-      renderExport(target, rough.canvas(target), elements, frame, {
-        scale,
-        theme: choices.dark ? 'dark' : 'light',
-        background: choices.background,
+      renderExport(target, rough.canvas(target), job.elements, job.frame, {
+        scale: job.scale,
+        theme: job.dark ? 'dark' : 'light',
+        background: job.bg,
       })
+      setDrawn(job)
     })
     return () => {
       cancelled = true
     }
-  }, [elements, frame, scale, choices.dark, choices.background])
+  }, [job])
 
   const update = (patch: Partial<ExportChoices>) => {
     setStatus('')
     setChoices((prev) => ({ ...prev, ...patch }))
   }
   const size = frame && scale ? exportSize(frame, scale) : undefined
+  const ready = job !== null && drawn === job
 
   function download() {
     canvasToBlob(canvas.current!).then(
@@ -226,7 +240,7 @@ export function ExportDialog({
         <button
           type="button"
           className="button"
-          disabled={!size}
+          disabled={!ready}
           onClick={() => void copy()}
         >
           Copy
@@ -234,7 +248,7 @@ export function ExportDialog({
         <button
           type="button"
           className="button-primary"
-          disabled={!size}
+          disabled={!ready}
           onClick={download}
         >
           Download
