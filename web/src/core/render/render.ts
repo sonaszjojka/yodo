@@ -509,6 +509,9 @@ function withLabel(element: YodoElement, box: Bounds): Bounds {
   return { x: cx - width / 2, y: cy - height / 2, width, height }
 }
 
+/** How far rough.js may move an outline, as a share of the box's larger side. */
+const ROUGH_SHARE = 0.1
+
 /**
  * Whether any part of `element` could land inside `view` (world units). The
  * element's box grows by a margin for what the box leaves out: stroke width,
@@ -518,8 +521,12 @@ function withLabel(element: YodoElement, box: Bounds): Bounds {
  */
 function mayBeVisible(element: YodoElement, view: Bounds): boolean {
   const box = withLabel(element, elementBounds(element))
+  // rough.js bends a shape by a share of its size, so big shapes need more.
   const margin =
-    ARROWHEAD_LENGTH + element.strokeWidth * 2 + element.roughness * 8
+    ARROWHEAD_LENGTH +
+    element.strokeWidth * 2 +
+    element.roughness * 8 +
+    Math.max(box.width, box.height) * ROUGH_SHARE
   let { x, y, width, height } = box
   if (element.angle !== 0) {
     const radius = Math.hypot(width, height) / 2

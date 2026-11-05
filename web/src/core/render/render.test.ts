@@ -936,6 +936,19 @@ describe('viewport culling (roadmap 2.12)', () => {
     expect(drawn([narrow]).rectangle).toHaveBeenCalled()
   })
 
+  test('allows for rough.js bending a very large shape beyond its box', () => {
+    // The box ends 50 units left of the view; the rough outline of a shape
+    // this big can reach several hundred units past its box.
+    const huge = createShape('ellipse', {
+      x: -10050,
+      y: 100,
+      width: 10000,
+      height: 100,
+    })
+
+    expect(drawn([huge]).ellipse).toHaveBeenCalled()
+  })
+
   test('draws the selection overlay even when the element is off screen', () => {
     const ctx = fakeContext()
     const far = createShape('rectangle', {
