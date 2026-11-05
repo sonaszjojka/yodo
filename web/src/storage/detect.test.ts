@@ -107,24 +107,71 @@ describe('detectRepository', () => {
       expect(session).toBeUndefined()
     })
 
-    test('a 401 from the API locks the session and still reaches the caller', async () => {
-      const { session, repository } = await detectRepository({
-        baseUrl,
-        fetch: vi.fn<typeof fetch>(async (input) => {
-          const path = new URL(String(input)).pathname
-          if (path.endsWith('/api/health'))
-            return Response.json({ status: 'ok' })
-          if (path.endsWith('/api/session')) {
-            return Response.json({ passwordRequired: true, unlocked: true })
+    /** A server whose drawings answer 401 until `unlocked` is set. */
+    function expiring() {
+      const state = { unlocked: false, drawingCalls: 0 }
+      const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+        const path = new URL(String(input)).pathname
+        if (path.endsWith('/api/health')) return Response.json({ status: 'ok' })
+        if (path.endsWith('/api/session')) {
+          if (init?.method === 'POST') {
+            state.unlocked = true
+            return new Response(null, { status: 204 })
           }
-          return new Response('unauthorized', { status: 401 })
-        }),
+          return Response.json({ passwordRequired: true, unlocked: true })
+        }
+        state.drawingCalls++
+        return state.unlocked
+          ? Response.json([])
+          : new Response('unauthorized', { status: 401 })
       })
+      return { state, fetch }
+    }
+    const tick = () => new Promise((resolve) => setTimeout(resolve, 0))
+
+    test('a 401 locks the session and holds the request until the unlock, then retries it', async () => {
+      const { state, fetch } = expiring()
+      const { session, repository } = await detectRepository({ baseUrl, fetch })
       expect(session?.getSnapshot().locked).toBe(false)
 
-      await expect(repository.list()).rejects.toMatchObject({ status: 401 })
+      let settled = false
+      const listing = repository.list().then((drawings) => {
+        settled = true
+        return drawings
+      })
+      await tick()
 
       expect(session?.getSnapshot()).toEqual({ locked: true, appVisible: true })
+      expect(settled).toBe(false)
+
+      await session?.unlock('pw', false)
+
+      // The write that met the expired session is not lost.
+      await expect(listing).resolves.toEqual([])
+      expect(state.drawingCalls).toBe(2)
+      expect(session?.getSnapshot().locked).toBe(false)
+    })
+
+    test('a request that is still refused after the unlock fails with its 401', async () => {
+      const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+        const path = new URL(String(input)).pathname
+        if (path.endsWith('/api/health')) return Response.json({ status: 'ok' })
+        if (path.endsWith('/api/session')) {
+          return init?.method === 'POST'
+            ? new Response(null, { status: 204 })
+            : Response.json({ passwordRequired: true, unlocked: true })
+        }
+        return new Response('unauthorized', { status: 401 })
+      })
+      const { session, repository } = await detectRepository({ baseUrl, fetch })
+      const listing = repository.list()
+      const failed = expect(listing).rejects.toMatchObject({ status: 401 })
+      await tick()
+
+      await session?.unlock('pw', false)
+
+      await failed
+      expect(session?.getSnapshot().locked).toBe(true)
     })
 
     test('if the session probe fails the app still starts, unlocked', async () => {

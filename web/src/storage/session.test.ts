@@ -149,4 +149,37 @@ describe('createSession', () => {
     )
     expect(session.getSnapshot()).toBe(session.getSnapshot())
   })
+
+  test('untilUnlocked resolves at once when unlocked, and after the unlock when locked', async () => {
+    const open = createSession(
+      { passwordRequired: true, unlocked: true },
+      send('ok'),
+    )
+    await expect(open.untilUnlocked()).resolves.toBeUndefined()
+
+    const session = createSession(
+      { passwordRequired: true, unlocked: false },
+      send('ok'),
+    )
+    let done = false
+    const waiting = session.untilUnlocked().then(() => (done = true))
+    await Promise.resolve()
+    expect(done).toBe(false)
+
+    await session.unlock('pw', false)
+    await waiting
+    expect(done).toBe(true)
+  })
+
+  test('a wrong password does not release the waiters', async () => {
+    const session = createSession(
+      { passwordRequired: true, unlocked: false },
+      send('wrong'),
+    )
+    let done = false
+    void session.untilUnlocked().then(() => (done = true))
+    await session.unlock('pw', false)
+    await Promise.resolve()
+    expect(done).toBe(false)
+  })
 })

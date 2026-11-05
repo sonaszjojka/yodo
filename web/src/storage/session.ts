@@ -69,6 +69,8 @@ export interface Session {
   /** The server answered 401: the session ended (or the server restarted). */
   lock(): void
   unlock(password: string, remember: boolean): Promise<UnlockResult>
+  /** Resolves at once if unlocked, otherwise after the next successful unlock. */
+  untilUnlocked(): Promise<void>
   /** Calls `listener` after every successful unlock. */
   onUnlocked(listener: () => void): () => void
 }
@@ -111,6 +113,16 @@ export function createSession(
         unlockedListeners.forEach((listener) => listener())
       }
       return result
+    },
+    untilUnlocked() {
+      if (!snapshot.locked) return Promise.resolve()
+      return new Promise<void>((resolve) => {
+        const release = () => {
+          unlockedListeners.delete(release)
+          resolve()
+        }
+        unlockedListeners.add(release)
+      })
     },
     onUnlocked(listener) {
       unlockedListeners.add(listener)

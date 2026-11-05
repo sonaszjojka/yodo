@@ -77,12 +77,18 @@ export async function detectRepository({
     const session = createSession(state, (password, remember) =>
       sendPassword(baseUrl, boundFetch, password, remember),
     )
-    // A 401 means the session ended: show the password screen, and still give
-    // the caller the response so it fails as usual.
+    // A 401 means the session ended: show the password screen and hold the
+    // request until the password is entered, then send it once more. Failing
+    // it at once would lose what it carried, e.g. the editor's final save when
+    // the session ended while the drawing was open.
     const guardedFetch: typeof globalThis.fetch = async (input, init) => {
       const response = await boundFetch(input, init)
-      if (response.status === 401) session.lock()
-      return response
+      if (response.status !== 401) return response
+      session.lock()
+      await session.untilUnlocked()
+      const retried = await boundFetch(input, init)
+      if (retried.status === 401) session.lock()
+      return retried
     }
     return {
       mode: 'self-hosted',
