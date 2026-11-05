@@ -12,6 +12,7 @@ import type { YodoDocument } from '../core/document/types.ts'
 import { withFileIds } from './autosave.ts'
 import { base64ToBlob, blobToBase64 } from './base64.ts'
 import {
+  decodeSize,
   HASH_PATTERN,
   IMAGE_TYPES,
   MAX_IMAGE_BYTES,
@@ -83,43 +84,52 @@ export async function exportYodo(
   return serializeYodoFile(current, files)
 }
 
+export interface ImportOptions {
+  /** Reads an image's size, failing for bytes that are not a picture. Defaults to the browser's decoder. */
+  decode?: (blob: Blob) => Promise<{ width: number; height: number }>
+}
+
 /**
- * Saves the drawing in a `.yodo` file as a new drawing and returns its id.
- * It gets a fresh id, so importing your own export never overwrites the
- * original; the rest is as exported. Each image is checked (type, size, and
- * that its bytes hash to the id the drawing uses) and stored first. Throws a
- * `DocumentError` for a broken file, saving no drawing.
+ * Saves the drawing in a `.yodo` file as a new drawing. It gets a fresh id,
+ * so importing your own export never overwrites the original; the rest is as
+ * exported. Every image is checked first (type, size, that it decodes, and
+ * that its bytes hash to the id the drawing uses) and only then stored, so a
+ * bad file leaves nothing behind. Returns the new id and the ids of the
+ * images stored. Throws a `DocumentError` for a broken file.
  */
 export async function importDrawing(
   repository: DrawingRepository,
   images: ImageRepository,
   text: string,
-): Promise<string> {
+  { decode = decodeSize }: ImportOptions = {},
+): Promise<{ id: string; fileIds: string[] }> {
   const { document, files } = parseYodoFile(text)
-  // Check every image before storing any, so a bad file leaves nothing behind.
-  const blobs = Object.entries(files).map(([fileId, { mimeType, data }]) => {
-    const blob = base64ToBlob(data, mimeType)
-    if (
-      !(IMAGE_TYPES as readonly string[]).includes(mimeType) ||
-      blob.size > MAX_IMAGE_BYTES ||
-      !HASH_PATTERN.test(fileId)
-    ) {
-      throw new DocumentError('bad-files', `Image ${fileId} is not allowed`)
-    }
-    return { fileId, blob }
-  })
-  const hashes = await Promise.all(
-    blobs.map(async ({ blob }) => sha256Hex(await blob.arrayBuffer())),
+  const blobs = await Promise.all(
+    Object.entries(files).map(async ([fileId, { mimeType, data }]) => {
+      const blob = base64ToBlob(data, mimeType)
+      if (
+        !(IMAGE_TYPES as readonly string[]).includes(mimeType) ||
+        blob.size > MAX_IMAGE_BYTES ||
+        !HASH_PATTERN.test(fileId)
+      ) {
+        throw new DocumentError('bad-files', `Image ${fileId} is not allowed`)
+      }
+      // Hosted storage would keep any bytes under an image label, so check
+      // here that they are a picture, as the server does for its own.
+      const size = await decode(blob).catch(() => undefined)
+      if (!size || !(size.width > 0 && size.height > 0)) {
+        throw new DocumentError('bad-files', `Image ${fileId} is not a picture`)
+      }
+      if ((await sha256Hex(await blob.arrayBuffer())) !== fileId) {
+        throw new DocumentError('bad-files', `Image ${fileId} is damaged`)
+      }
+      return blob
+    }),
   )
-  blobs.forEach(({ fileId }, i) => {
-    if (hashes[i] !== fileId) {
-      throw new DocumentError('bad-files', `Image ${fileId} is damaged`)
-    }
-  })
-  for (const { blob } of blobs) await images.put(blob)
+  for (const blob of blobs) await images.put(blob)
   const id = randomId()
   await repository.save({ ...document, id })
-  return id
+  return { id, fileIds: Object.keys(files) }
 }
 
 /** A safe download name for a drawing: `<name>.yodo`. */

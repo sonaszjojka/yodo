@@ -87,10 +87,8 @@ export function Home({
   async function onImport(file: File) {
     setNotice(undefined)
     try {
-      navigate({
-        name: 'drawing',
-        id: await importDrawing(repository, images, await file.text()),
-      })
+      const { id } = await importDrawing(repository, images, await file.text())
+      navigate({ name: 'drawing', id })
     } catch (error) {
       console.error('Could not import the file', error)
       setNotice(importErrorMessage(error))
