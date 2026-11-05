@@ -4,10 +4,20 @@
 // grow the main bundle.
 import caveatLatin from '@fontsource-variable/caveat/files/caveat-latin-wght-normal.woff2?url'
 import caveatLatinExt from '@fontsource-variable/caveat/files/caveat-latin-ext-wght-normal.woff2?url'
-import jetbrainsLatin from '@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2?url'
-import jetbrainsLatinExt from '@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-ext-wght-normal.woff2?url'
+import caveatCyrillic from '@fontsource-variable/caveat/files/caveat-cyrillic-wght-normal.woff2?url'
+import caveatCyrillicExt from '@fontsource-variable/caveat/files/caveat-cyrillic-ext-wght-normal.woff2?url'
 import manropeLatin from '@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2?url'
 import manropeLatinExt from '@fontsource-variable/manrope/files/manrope-latin-ext-wght-normal.woff2?url'
+import manropeCyrillic from '@fontsource-variable/manrope/files/manrope-cyrillic-wght-normal.woff2?url'
+import manropeCyrillicExt from '@fontsource-variable/manrope/files/manrope-cyrillic-ext-wght-normal.woff2?url'
+import manropeGreek from '@fontsource-variable/manrope/files/manrope-greek-wght-normal.woff2?url'
+import manropeVietnamese from '@fontsource-variable/manrope/files/manrope-vietnamese-wght-normal.woff2?url'
+import jetbrainsMonoLatin from '@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2?url'
+import jetbrainsMonoLatinExt from '@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-ext-wght-normal.woff2?url'
+import jetbrainsMonoCyrillic from '@fontsource-variable/jetbrains-mono/files/jetbrains-mono-cyrillic-wght-normal.woff2?url'
+import jetbrainsMonoCyrillicExt from '@fontsource-variable/jetbrains-mono/files/jetbrains-mono-cyrillic-ext-wght-normal.woff2?url'
+import jetbrainsMonoGreek from '@fontsource-variable/jetbrains-mono/files/jetbrains-mono-greek-wght-normal.woff2?url'
+import jetbrainsMonoVietnamese from '@fontsource-variable/jetbrains-mono/files/jetbrains-mono-vietnamese-wght-normal.woff2?url'
 import type {
   EmbeddedFont,
   FontFile,
@@ -18,10 +28,29 @@ import type { FontFamily, YodoElement } from '../core/document/types.ts'
 import { fontOf } from '../core/text/layout.ts'
 import { blobToBase64 } from '../storage/base64.ts'
 
-const URLS: Record<FontFamily, Record<FontSubset, string>> = {
-  hand: { latin: caveatLatin, 'latin-ext': caveatLatinExt },
-  sans: { latin: manropeLatin, 'latin-ext': manropeLatinExt },
-  mono: { latin: jetbrainsLatin, 'latin-ext': jetbrainsLatinExt },
+const URLS: Record<FontFamily, Partial<Record<FontSubset, string>>> = {
+  hand: {
+    latin: caveatLatin,
+    'latin-ext': caveatLatinExt,
+    cyrillic: caveatCyrillic,
+    'cyrillic-ext': caveatCyrillicExt,
+  },
+  sans: {
+    latin: manropeLatin,
+    'latin-ext': manropeLatinExt,
+    cyrillic: manropeCyrillic,
+    'cyrillic-ext': manropeCyrillicExt,
+    greek: manropeGreek,
+    vietnamese: manropeVietnamese,
+  },
+  mono: {
+    latin: jetbrainsMonoLatin,
+    'latin-ext': jetbrainsMonoLatinExt,
+    cyrillic: jetbrainsMonoCyrillic,
+    'cyrillic-ext': jetbrainsMonoCyrillicExt,
+    greek: jetbrainsMonoGreek,
+    vietnamese: jetbrainsMonoVietnamese,
+  },
 }
 
 export type Fetch = (url: string) => Promise<{
@@ -37,6 +66,8 @@ export function createFontLoader(
   const cache = new Map<string, Promise<string>>()
   function load({ family, subset }: FontFile): Promise<string> {
     const url = urls[family][subset]
+    if (!url)
+      return Promise.reject(new Error(`No ${subset} font for ${family}`))
     let loading = cache.get(url)
     if (!loading) {
       loading = fetchFile(url).then(async (response) => {

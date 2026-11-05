@@ -2,7 +2,7 @@ import { describe, expect, test, vi } from 'vitest'
 import { createLinear, createText } from '../core/document/create.ts'
 import { createFontLoader, pageFontsReady, type Fetch } from './svgFonts.ts'
 
-const urls = {
+const urls: Parameters<typeof createFontLoader>[1] = {
   hand: { latin: '/hand.woff2', 'latin-ext': '/hand-ext.woff2' },
   sans: { latin: '/sans.woff2', 'latin-ext': '/sans-ext.woff2' },
   mono: { latin: '/mono.woff2', 'latin-ext': '/mono-ext.woff2' },

@@ -51,10 +51,8 @@ describe('neededFontFiles', () => {
   })
 
   test('Polish letters also need the latin-ext file of that family', () => {
-    expect(neededFontFiles([hand])).toEqual([
-      { family: 'hand', subset: 'latin' },
-      { family: 'hand', subset: 'latin-ext' },
-    ])
+    const subsets = neededFontFiles([hand]).map((file) => file.subset)
+    expect(subsets.sort()).toEqual(['latin', 'latin-ext'])
   })
 
   test('latin-ext text in another family does not pull its files in', () => {
@@ -63,9 +61,34 @@ describe('neededFontFiles', () => {
     ).toEqual([{ family: 'sans', subset: 'latin' }])
   })
 
-  test('scripts without an embedded file fall back to the font stack', () => {
-    const cyrillic = freeText('Привет', 'sans')
-    expect(neededFontFiles([cyrillic])).toEqual([])
+  test('Cyrillic text needs the cyrillic file of its family', () => {
+    expect(neededFontFiles([freeText('Привет', 'sans')])).toEqual([
+      { family: 'sans', subset: 'cyrillic' },
+    ])
+  })
+
+  test('Greek and Vietnamese text get their own files', () => {
+    expect(neededFontFiles([freeText('Γειά', 'mono')])).toEqual([
+      { family: 'mono', subset: 'greek' },
+    ])
+    expect(neededFontFiles([freeText('Việt', 'sans')])).toContainEqual({
+      family: 'sans',
+      subset: 'vietnamese',
+    })
+  })
+
+  test('a family without a file for the script falls back to its font stack', () => {
+    // Caveat has no Greek file.
+    expect(neededFontFiles([freeText('Γειά', 'hand')])).toEqual([])
+  })
+
+  test('mixed scripts embed every subset that is used', () => {
+    const files = neededFontFiles([freeText('Hi Привет Łódź', 'sans')])
+    expect(files.map((file) => file.subset).sort()).toEqual([
+      'cyrillic',
+      'latin',
+      'latin-ext',
+    ])
   })
 })
 
