@@ -21,5 +21,11 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["playwright.config.ts", "scripts/**/*.ts", "tests/**/*.ts"]
+  "include": [
+    "playwright.config.ts",
+    "playwright.perf.config.ts",
+    "perf/**/*.ts",
+    "scripts/**/*.ts",
+    "tests/**/*.ts"
+  ]
 }
