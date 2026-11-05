@@ -53,7 +53,7 @@ Goal: open Yodo, draw basic shapes, close the browser, come back to the same dra
 | 2.9 | Excalidraw import ✓ (PR [#111](https://github.com/sonaszjojka/yodo/pull/111)) ([#85](https://github.com/sonaszjojka/yodo/issues/85)) | Converter for shapes, text, arrows, pencil, images; summary of skipped features (ADR 0014). |
 | 2.10 | Shortcuts modal ([#86](https://github.com/sonaszjojka/yodo/issues/86)) | Searchable, grouped list of every shortcut. |
 | 2.11 | Optional password ✓ ([#87](https://github.com/sonaszjojka/yodo/issues/87)) | `YODO_PASSWORD` + session cookie + password screen (ADR 0020); tests for locked/unlocked/wrong password. |
-| 2.12 | Performance benchmark ([#88](https://github.com/sonaszjojka/yodo/issues/88)) | Playwright perf test on the generated reference board (`docs/product.md`); results recorded, tracked over time. Fix anything below target. |
+| 2.12 | Performance benchmark ✓ (PR [#120](https://github.com/sonaszjojka/yodo/pull/120)) ([#88](https://github.com/sonaszjojka/yodo/issues/88)) | Playwright perf test on the generated reference board (`docs/product.md`); results recorded, tracked over time. Fix anything below target. |
 
 ## M3 — Organise
 | # | Task | Done when… |
