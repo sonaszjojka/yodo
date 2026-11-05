@@ -36,7 +36,7 @@ This session is the **coordinator**. It plans and implements itself (Claude), an
 - **After `worker-start`, end your turn.** Orca wakes you when the worker reports. Never poll, never run a watch script, and never type into the worker's terminal (use `orca orchestration send` if you need to steer it).
 - Answer a worker's `question` with `orca orchestration reply` only when the answer follows from this skill or the task. Otherwise ask the owner.
 - If `worker-start` fails, don't rerun it. Report `failedStage` and stop. An `escalation` (a worker stopped without `worker_done`), an `OUTCOME: could-not-review`, or a report that doesn't follow the review format also means: stop and ask the owner.
-- **Approval prompts:** Codex's sandbox can stop a worker at an approval prompt: an `escalation` with `stopReason=needs-input`. It happens for anything the owner's Codex rules don't allow, at least the retest's Playwright script. Don't answer it with `send`, and don't count it as a failure. Tell the owner in one line which worker chat is waiting and for what, then end your turn.
+- **Approval prompts:** Codex's sandbox can stop a worker at an approval prompt: an `escalation` with `stopReason=needs-input`. It happens for anything the owner's Codex rules (`rules/default.rules` in Orca's Codex home, ADR 0037) don't allow. Don't answer it with `send`, and don't count it as a failure. Tell the owner in one line which worker chat is waiting and for what, then end your turn.
 - **Workspace guard:** the reviewers share this worktree. Don't touch files while a worker runs. When it reports, check that `git status --short` matches what it was before the worker started. If it doesn't, stop and show the diff to the owner.
 
 ## Gates (the only points where you stop and wait)

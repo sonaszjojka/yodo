@@ -9,7 +9,7 @@ You are an independent verifier. You didn't write the code, and you don't fix it
 
 ## Rules
 - **Don't touch tracked files.** Don't edit, stage, commit, push or check out anything in the repo. Build output that is already git-ignored is fine (`web/dist`, `e2e/.bin`, test results).
-- **Scratch work goes outside the repo:** write scripts, screenshots and logs to a new temp directory (`mktemp -d`). Name that directory in your report.
+- **Scratch work goes outside the repo:** write screenshots and logs to a new temp directory (`mktemp -d`). Name that directory in your report. The one exception is the Playwright script, which always goes to the fixed path `/tmp/yodo-retest/check.mjs` (create `/tmp/yodo-retest/` first, overwrite the file each run): the owner's Codex rules allow exactly that command without a prompt, and a rule can't match a path that changes every run. Pass the temp directory to the script as an argument for its output.
 - **Keep the output small:** run the checks with quiet reporters and show only what failed (see "Mechanical checks"). Don't paste full logs into the report.
 - **Make each check independent:** start from a fresh page (new context, or reload with storage cleared), so one check can't break the next. If a result looks wrong, run that check again on its own before calling it a failure.
 - **Sandbox:** Codex's sandbox blocks launching a browser, opening a port, and network access. Use the exact commands below; the owner's Codex rules can allow them outside the sandbox without a prompt. Run your Playwright script outside the sandbox from the start (request escalation with a one-line reason), instead of letting it fail inside the sandbox first. Because the sandbox has no network, do every HTTP check inside that script (`page.request` or `fetch`), not with `curl`.
@@ -36,7 +36,7 @@ Report pass or fail with counts. For a failure, give at most the 30 lines that s
   import { createRequire } from 'node:module'
   const { chromium } = createRequire('<repo>/e2e/package.json')('playwright')
   ```
-  Run it with `node <tempdir>/check.mjs`. Use Chromium by default. Add Firefox or WebKit only when a done-when item or fix is about browser-specific input or rendering.
+  Run it as `node /tmp/yodo-retest/check.mjs <tempdir>`. Use Chromium by default. Add Firefox or WebKit only when a done-when item or fix is about browser-specific input or rendering.
 - **The canvas** is the drawing surface. Draw with `page.mouse` (`move`, `down`, `move` with `steps`, `up`), and press keys with `page.keyboard`. To check what was drawn, read pixels in `page.evaluate` (for example the bounding box of non-background pixels before and after an action). Use the DOM and accessibility tree for the UI chrome (toolbars, menus, dialogs). Measure in CSS pixels.
 - **Persistence:** reload the page (and in self-hosted mode, check `GET api/drawings`) to show that the change survives a reload.
 - **Evidence:** save a screenshot for each failure and one of the final state, to the temp directory. Watch the console (`page.on('console')` and `pageerror`), and report any errors.
