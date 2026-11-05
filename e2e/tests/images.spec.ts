@@ -43,11 +43,13 @@ function centrePixel(canvas: Locator) {
 }
 
 /** Red enough to be the image and not its grey placeholder or the page. */
-function expectRed(pixel: number[]) {
-  expect(pixel[0]).toBeGreaterThan(200)
-  expect(pixel[1]).toBeLessThan(60)
-  expect(pixel[2]).toBeLessThan(60)
-  expect(pixel[3]).toBe(255)
+function isRed([r, g, b, a]: number[]) {
+  return r! > 200 && g! < 60 && b! < 60 && a === 255
+}
+
+/** Waits for the middle of the canvas to be the red image, not its placeholder. */
+async function expectRedCentre(canvas: Locator) {
+  await expect.poll(async () => isRed(await centrePixel(canvas))).toBe(true)
 }
 
 test('a pasted image shows, is stored, survives a reload and fills its thumbnail', async ({
@@ -62,10 +64,7 @@ test('a pasted image shows, is stored, survives a reload and fills its thumbnail
   const id = decodeURIComponent(new URL(page.url()).hash.slice('#/d/'.length))
 
   await pasteRedImage(page)
-  await expect
-    .poll(async () => (await centrePixel(editorCanvas(page)))[0])
-    .toBeGreaterThan(200)
-  expectRed(await centrePixel(editorCanvas(page)))
+  await expectRedCentre(editorCanvas(page))
 
   // The blob is in the mode's own store, under its content hash, and the
   // saved drawing lists it.
@@ -79,10 +78,7 @@ test('a pasted image shows, is stored, survives a reload and fills its thumbnail
   expect(await hasStoredImage(page, mode, fileIds[0]!)).toBe(true)
 
   await page.reload()
-  await expect
-    .poll(async () => (await centrePixel(editorCanvas(page)))[0])
-    .toBeGreaterThan(200)
-  expectRed(await centrePixel(editorCanvas(page)))
+  await expectRedCentre(editorCanvas(page))
 
   // Home's thumbnail draws the picture, not a placeholder.
   await page.getByRole('link', { name: 'Back to Home' }).click()
@@ -90,10 +86,7 @@ test('a pasted image shows, is stored, survives a reload and fills its thumbnail
   const thumbnail = page
     .locator(`a[href="#/d/${id}"]`)
     .locator('.thumbnail-canvas')
-  await expect
-    .poll(async () => (await centrePixel(thumbnail))[0])
-    .toBeGreaterThan(200)
-  expectRed(await centrePixel(thumbnail))
+  await expectRedCentre(thumbnail)
 })
 
 test('an unsupported pasted file is refused with a message', async ({
