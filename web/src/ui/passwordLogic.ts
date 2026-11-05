@@ -34,6 +34,9 @@ export const EDITOR_WINDOW_EVENTS = [
   'cut',
   'paste',
   'wheel',
+  // Safari's pinch zoom.
+  'gesturestart',
+  'gesturechange',
 ] as const
 
 /**
