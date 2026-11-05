@@ -3,7 +3,12 @@
 // server is there instead of being told at build time.
 
 import { HttpDrawingRepository } from './http.ts'
-import { IndexedDbDrawingRepository } from './indexeddb.ts'
+import { HttpImageRepository } from './httpImages.ts'
+import type { ImageRepository } from './images.ts'
+import {
+  IndexedDbDrawingRepository,
+  IndexedDbImageRepository,
+} from './indexeddb.ts'
 import type { DrawingRepository } from './repository.ts'
 
 export type StorageMode = 'hosted' | 'self-hosted'
@@ -50,6 +55,7 @@ export async function detectRepository({
 }: DetectOptions): Promise<{
   mode: StorageMode
   repository: DrawingRepository
+  images: ImageRepository
 }> {
   // Bound for the same reason as in HttpDrawingRepository.
   const boundFetch = fetch.bind(globalThis)
@@ -57,7 +63,12 @@ export async function detectRepository({
     return {
       mode: 'self-hosted',
       repository: new HttpDrawingRepository({ baseUrl, fetch: boundFetch }),
+      images: new HttpImageRepository({ baseUrl, fetch: boundFetch }),
     }
   }
-  return { mode: 'hosted', repository: new IndexedDbDrawingRepository() }
+  return {
+    mode: 'hosted',
+    repository: new IndexedDbDrawingRepository(),
+    images: new IndexedDbImageRepository(),
+  }
 }

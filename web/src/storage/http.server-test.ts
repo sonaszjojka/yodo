@@ -5,6 +5,8 @@ import { expect, inject, test } from 'vitest'
 import { createDocument } from '../core/document/create.ts'
 import { describeRepositoryContract } from './contract.ts'
 import { HttpDrawingRepository } from './http.ts'
+import { HttpImageRepository } from './httpImages.ts'
+import { describeImageContract } from './imageContract.ts'
 
 // `inject('serverUrl')` is typed by web/test/provided-context.d.ts.
 const baseUrl = new URL(inject('serverUrl'))
@@ -38,3 +40,8 @@ test('a new repository instance sees earlier saves', async () => {
   expect(await reopened.get(doc.id)).toEqual(doc)
   expect(await reopened.list()).toEqual([summary])
 })
+
+describeImageContract(
+  'HttpImageRepository',
+  () => new HttpImageRepository({ baseUrl, fetch: fetchWithOrigin }),
+)

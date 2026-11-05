@@ -1,7 +1,11 @@
 import { describe, expect, test, vi } from 'vitest'
 import { detectRepository } from './detect.ts'
 import { HttpDrawingRepository } from './http.ts'
-import { IndexedDbDrawingRepository } from './indexeddb.ts'
+import { HttpImageRepository } from './httpImages.ts'
+import {
+  IndexedDbDrawingRepository,
+  IndexedDbImageRepository,
+} from './indexeddb.ts'
 
 const baseUrl = new URL('https://example.test/yodo/')
 
@@ -12,9 +16,13 @@ function replying(response: () => Response | Promise<Response>) {
 describe('detectRepository', () => {
   test('picks HTTP when the Yodo server answers the health check', async () => {
     const fetch = replying(() => Response.json({ status: 'ok' }))
-    const { mode, repository } = await detectRepository({ baseUrl, fetch })
+    const { mode, repository, images } = await detectRepository({
+      baseUrl,
+      fetch,
+    })
     expect(mode).toBe('self-hosted')
     expect(repository).toBeInstanceOf(HttpDrawingRepository)
+    expect(images).toBeInstanceOf(HttpImageRepository)
   })
 
   test('probes api/health relative to the app base', async () => {
@@ -41,12 +49,13 @@ describe('detectRepository', () => {
     ['JSON null', () => Response.json(null)],
     ['a network error', () => Promise.reject(new TypeError('Failed to fetch'))],
   ])('falls back to IndexedDB on %s', async (_, response) => {
-    const { mode, repository } = await detectRepository({
+    const { mode, repository, images } = await detectRepository({
       baseUrl,
       fetch: replying(response),
     })
     expect(mode).toBe('hosted')
     expect(repository).toBeInstanceOf(IndexedDbDrawingRepository)
+    expect(images).toBeInstanceOf(IndexedDbImageRepository)
   })
 
   test('falls back to IndexedDB when the probe times out', async () => {
