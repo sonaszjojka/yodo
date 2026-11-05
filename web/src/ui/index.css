@@ -357,6 +357,29 @@ body {
   font: inherit;
 }
 
+.import-summary {
+  margin-bottom: 20px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.import-summary p {
+  margin: 0 0 8px;
+}
+
+.import-summary ul {
+  margin: 0 0 12px;
+  padding-left: 20px;
+  color: var(--muted-text);
+}
+
+.import-summary-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .home-notice,
 .home-error {
   color: var(--danger);
