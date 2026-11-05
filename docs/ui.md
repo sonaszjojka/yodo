@@ -15,7 +15,7 @@
 ## Screens (MVP)
 | Screen | Layout |
 |---|---|
-| Home | Left sidebar: logo, **New drawing**, **Import file** (`.yodo` or `.excalidraw`, ADR 0014; for now it is a button in the header that accepts `.yodo` only, and `.excalidraw` follows in 2.9), All drawings, Folders, Trash. Main area: title, search, sort, Settings menu (theme, shortcuts, about; only Theme exists so far, as System / Light / Dark, and the editor follows it without a control of its own); card grid that starts with a **"+ New drawing" tile**. |
+| Home | Left sidebar: logo, **New drawing**, **Import file** (`.yodo` or `.excalidraw`, ADR 0014; for now one **Import file** button in the title row that picks the format by the file's extension), All drawings, Folders, Trash. Main area: title, search, sort, Settings menu (theme, shortcuts, about; only Theme exists so far, as System / Light / Dark, and the editor follows it without a control of its own); card grid that starts with a **"+ New drawing" tile**. |
 | Drawing card | Thumbnail, name, folder icon + name, last edited. **⋯ button and right-click** open the same menu: Open, Open in new tab, Rename, Duplicate, Move to folder, Export as `.yodo`, Move to Trash. |
 | Editor | Top: menu/back + drawing name (left), tool toolbar (centre), style-panel toggle + Export (right). Bottom: undo/redo, zoom, hint, save status, shortcuts. Contextual bar above the selection; style panel on the right. |
 | Trash | Sidebar as on Home. A small bar directly above the list: count + **Empty trash** (with confirm dialog). Rows: Restore (icon + label), delete forever (icon only). |

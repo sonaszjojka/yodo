@@ -37,11 +37,13 @@ const names = (html: string) =>
   [...html.matchAll(/class="drawing-card-name">([^<]*)</g)].map((m) => m[1])
 
 describe('HomeView', () => {
-  test('offers Import file, which accepts .yodo files only', () => {
+  test('offers one Import file button for .yodo and Excalidraw files', () => {
     const html = render()
 
     expect(html).toContain('Import file</button>')
-    expect(html).toMatch(/<input[^>]*type="file"[^>]*accept="\.yodo"/)
+    expect(html).toMatch(
+      /<input[^>]*type="file"[^>]*accept="\.yodo,\.excalidraw,/,
+    )
   })
 
   test('starts the grid with the New drawing tile', () => {
@@ -99,5 +101,23 @@ describe('HomeView', () => {
 
     expect(html).toMatch(/<button[^>]*class="new-drawing-tile"[^>]*disabled=""/)
     expect(html).toMatch(/role="alert">Couldn’t rename</)
+  })
+
+  test('offers Import file, which is busy while importing', () => {
+    expect(render()).toMatch(/<button[^>]*>Import file<\/button>/)
+    expect(render({ importing: true })).toMatch(
+      /<button[^>]*disabled=""[^>]*>Importing…<\/button>/,
+    )
+  })
+
+  test('shows what an import changed, with a link to open the drawing', () => {
+    const html = render({
+      imported: { id: 'new', imported: 1, lines: ['Skipped frames (2)'] },
+    })
+
+    expect(html).toContain('Imported 1 element.')
+    expect(html).toContain('Skipped frames (2)')
+    expect(html).toMatch(/<a class="button-primary" href="#\/d\/new">/)
+    expect(render()).not.toContain('import-summary')
   })
 })

@@ -11,6 +11,7 @@ import {
   exportErrorMessage,
   importErrorMessage,
   importFile,
+  isYodoFile,
 } from './yodoFile.ts'
 
 describe('exportDrawing', () => {
@@ -105,5 +106,17 @@ describe('importFile', () => {
 
     expect(await repository.get(id)).toBeDefined()
     expect(refresh).toHaveBeenCalledExactlyOnceWith(fileId)
+  })
+})
+
+describe('isYodoFile', () => {
+  test.each([
+    ['plan.yodo', true],
+    ['PLAN.YODO', true],
+    ['plan.excalidraw', false],
+    ['plan.json', false],
+    ['yodo', false],
+  ])('%s -> %s', (name, expected) => {
+    expect(isYodoFile({ name })).toBe(expected)
   })
 })

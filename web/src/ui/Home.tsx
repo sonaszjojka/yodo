@@ -1,11 +1,20 @@
-import { Plus, UploadSimple } from '@phosphor-icons/react'
+import { Plus } from '@phosphor-icons/react'
 import { useEffect, useRef, useState } from 'react'
+import {
+  describeSummary,
+  ExcalidrawImportError,
+  hasLosses,
+} from '../core/excalidraw/convert.ts'
 import {
   createDrawing,
   renameDrawing,
   sortDrawings,
   type DrawingSort,
 } from '../storage/drawings.ts'
+import {
+  importExcalidrawFile,
+  MAX_IMPORT_BYTES,
+} from '../storage/importExcalidraw.ts'
 import type { ImageRepository } from '../storage/images.ts'
 import type {
   DrawingRepository,
@@ -14,9 +23,10 @@ import type {
 import type { ImageCache } from './imageCache.ts'
 import { DrawingCard } from './DrawingCard.tsx'
 import { Logo } from './Logo.tsx'
+import { createCanvasMeasure } from './measure.ts'
 import { navigate } from './route.ts'
 import { SettingsMenu } from './SettingsMenu.tsx'
-import { importErrorMessage, importFile } from './yodoFile.ts'
+import { importErrorMessage, importFile, isYodoFile } from './yodoFile.ts'
 
 export type HomeList =
   | { status: 'loading' }
@@ -25,7 +35,7 @@ export type HomeList =
 
 export interface HomeProps {
   repository: DrawingRepository
-  /** Where an imported file's images are stored. */
+  /** Where an import's pictures are stored (ADR 0040). */
   images: ImageRepository
   imageCache: ImageCache
   /** Resolves once the editor that just closed has saved (see Root). */
@@ -47,6 +57,8 @@ export function Home({
   const [sort, setSort] = useState<DrawingSort>('recent')
   const [creating, setCreating] = useState(false)
   const [notice, setNotice] = useState<string>()
+  const [importing, setImporting] = useState(false)
+  const [imported, setImported] = useState<ImportedDrawing>()
   // "Edited 5 min ago" is relative to when the list was loaded; render stays pure.
   const [now, setNow] = useState(Date.now)
 
@@ -83,17 +95,59 @@ export function Home({
     }
   }
 
+  /** A `.yodo` file: recreated as it was, so there is no summary to show (ADR 0013). */
+  async function importYodo(file: File) {
+    if (file.size > MAX_IMPORT_BYTES) {
+      throw new ExcalidrawImportError('That file is larger than 50 MB.')
+    }
+    const text = await file.text()
+    navigate({
+      name: 'drawing',
+      id: await importFile(repository, images, imageCache, text),
+    })
+  }
+
   async function onImport(file: File) {
+    setImporting(true)
     setNotice(undefined)
+    setImported(undefined)
     try {
-      const text = await file.text()
-      navigate({
-        name: 'drawing',
-        id: await importFile(repository, images, imageCache, text),
+      // The file's extension picks the format; anything else is tried as Excalidraw.
+      if (isYodoFile(file)) {
+        await importYodo(file)
+        return
+      }
+      if (file.size > MAX_IMPORT_BYTES) {
+        throw new ExcalidrawImportError('That file is larger than 50 MB.')
+      }
+      const { id, summary } = await importExcalidrawFile(await file.text(), {
+        drawings: repository,
+        images,
+        measure: createCanvasMeasure(),
       })
+      // Anything lost on the way is shown first; a clean import just opens.
+      if (hasLosses(summary)) {
+        setImported({
+          id,
+          imported: summary.imported,
+          lines: describeSummary(summary),
+        })
+        setImporting(false)
+        // The summary links to the drawing only until dismissed; its card must be listed.
+        setAttempt((n) => n + 1)
+      } else {
+        navigate({ name: 'drawing', id })
+      }
     } catch (error) {
       console.error('Could not import the file', error)
-      setNotice(importErrorMessage(error))
+      setNotice(
+        error instanceof ExcalidrawImportError
+          ? error.message
+          : isYodoFile(file)
+            ? importErrorMessage(error)
+            : 'Couldn’t import the file. Try again.',
+      )
+      setImporting(false)
     }
   }
 
@@ -127,8 +181,11 @@ export function Home({
       onSort={setSort}
       creating={creating}
       onCreate={() => void onCreate()}
-      onRename={(id, name) => void onRename(id, name)}
+      importing={importing}
+      imported={imported}
       onImport={(file) => void onImport(file)}
+      onDismissImport={() => setImported(undefined)}
+      onRename={(id, name) => void onRename(id, name)}
       onRetry={() => {
         setList({ status: 'loading' })
         setAttempt((n) => n + 1)
@@ -150,6 +207,13 @@ const SORTS: { value: DrawingSort; label: string }[] = [
   { value: 'created', label: 'Date created' },
 ]
 
+/** What an import left out, shown before the new drawing opens. */
+export interface ImportedDrawing {
+  id: string
+  imported: number
+  lines: string[]
+}
+
 export interface HomeViewProps {
   repository: DrawingRepository
   imageCache: ImageCache
@@ -158,9 +222,11 @@ export interface HomeViewProps {
   onSort(sort: DrawingSort): void
   creating: boolean
   onCreate(): void
+  importing?: boolean
+  imported?: ImportedDrawing
+  onImport?(file: File): void
+  onDismissImport?(): void
   onRename(id: string, name: string): void
-  /** The user chose a `.yodo` file to import. */
-  onImport(file: File): void
   onRetry(): void
   notice?: string
   now: number
@@ -175,24 +241,46 @@ export function HomeView({
   onSort,
   creating,
   onCreate,
-  onRename,
+  importing = false,
+  imported,
   onImport,
+  onDismissImport,
+  onRename,
   onRetry,
   notice,
   now,
 }: HomeViewProps) {
+  const fileInput = useRef<HTMLInputElement>(null)
   return (
     <div className="home">
       <header className="home-header">
         <Logo />
-        <div className="home-actions">
-          <ImportButton onImport={onImport} />
-          <SettingsMenu />
-        </div>
+        <SettingsMenu />
       </header>
       <main className="home-main">
         <div className="home-title-row">
           <h1>All drawings</h1>
+          <button
+            type="button"
+            className="button"
+            disabled={importing}
+            onClick={() => fileInput.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import file'}
+          </button>
+          <input
+            ref={fileInput}
+            type="file"
+            accept=".yodo,.excalidraw,.json,application/json"
+            hidden
+            aria-label="File to import"
+            data-testid="import-file"
+            onChange={(event) => {
+              const file = event.target.files?.[0]
+              event.target.value = ''
+              if (file) onImport?.(file)
+            }}
+          />
           <label className="home-sort">
             Sort by
             <select
@@ -211,6 +299,32 @@ export function HomeView({
           <p className="home-notice" role="alert">
             {notice}
           </p>
+        )}
+        {imported && (
+          <section className="import-summary" aria-label="Import summary">
+            <p>
+              Imported {imported.imported}{' '}
+              {imported.imported === 1 ? 'element' : 'elements'}. Some things
+              changed on the way:
+            </p>
+            <ul>
+              {imported.lines.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+            <div className="import-summary-actions">
+              <a className="button-primary" href={`#/d/${imported.id}`}>
+                Open drawing
+              </a>
+              <button
+                type="button"
+                className="button"
+                onClick={onDismissImport}
+              >
+                Dismiss
+              </button>
+            </div>
+          </section>
         )}
         {list.status === 'error' ? (
           <div className="home-error" role="alert">
@@ -247,35 +361,5 @@ export function HomeView({
         )}
       </main>
     </div>
-  )
-}
-
-/** "Import file": a button that opens a hidden file picker (`.yodo` for now). */
-function ImportButton({ onImport }: { onImport(file: File): void }) {
-  const input = useRef<HTMLInputElement>(null)
-  return (
-    <>
-      <button
-        type="button"
-        className="button"
-        onClick={() => input.current?.click()}
-      >
-        <UploadSimple size={18} aria-hidden />
-        Import file
-      </button>
-      <input
-        ref={input}
-        type="file"
-        accept=".yodo"
-        hidden
-        aria-label="Yodo file to import"
-        onChange={(event) => {
-          const file = event.target.files?.[0]
-          // Cleared so choosing the same file again still fires a change.
-          event.target.value = ''
-          if (file) onImport(file)
-        }}
-      />
-    </>
   )
 }

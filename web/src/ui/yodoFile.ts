@@ -43,6 +43,11 @@ export async function importFile(
   return id
 }
 
+/** Whether the file is a Yodo export, going by its extension. */
+export function isYodoFile(file: { name: string }): boolean {
+  return file.name.toLowerCase().endsWith('.yodo')
+}
+
 const IMPORT_MESSAGES: Record<DocumentError['code'], string> = {
   'invalid-json': 'That file isn’t a Yodo file.',
   'not-yodo': 'That file isn’t a Yodo file.',

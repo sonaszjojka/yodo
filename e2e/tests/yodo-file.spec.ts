@@ -34,7 +34,7 @@ test('a drawing exported to a .yodo file imports as a new, identical drawing', a
 
   await expect.poll(() => storedElements(page, mode, id)).toBe(1)
   await page.getByRole('link', { name: 'Back to Home' }).click()
-  await page.getByLabel('Yodo file to import').setInputFiles(file)
+  await page.getByTestId('import-file').setInputFiles(file)
 
   // The import opens the new drawing, which has the rectangle and its own id.
   await page.waitForURL(
@@ -68,7 +68,7 @@ test('a drawing with a pasted image keeps the picture through export and import'
   await download.saveAs(file)
 
   await page.getByRole('link', { name: 'Back to Home' }).click()
-  await page.getByLabel('Yodo file to import').setInputFiles(file)
+  await page.getByTestId('import-file').setInputFiles(file)
 
   await page.waitForURL(
     (url) => /^#\/d\/[^/]+$/.test(url.hash) && url.hash !== `#/d/${id}`,
@@ -80,7 +80,7 @@ test('importing something that is not a Yodo file shows a message', async ({
   page,
 }) => {
   await page.goto('./')
-  await page.getByLabel('Yodo file to import').setInputFiles({
+  await page.getByTestId('import-file').setInputFiles({
     name: 'notes.yodo',
     mimeType: 'application/json',
     buffer: Buffer.from('not json'),
