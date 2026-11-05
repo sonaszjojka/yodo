@@ -7,6 +7,11 @@ import type { Handle } from '../core/geometry/resize.ts'
 import { wheelZoomFactor } from '../core/geometry/viewport.ts'
 import { canvasSize, renderScene, type Surface } from '../core/render/render.ts'
 import { getThemeStore } from './useTheme.ts'
+import {
+  handleClipboardEvent,
+  handleEditShortcut,
+  isEditable,
+} from './editShortcuts.ts'
 import { pointerSamples } from './pointerSamples.ts'
 import { TOOL_KEYS } from './tools.ts'
 
@@ -44,16 +49,6 @@ function cursorFor(state: EditorState) {
   if (move) return 'move'
   if (tool === 'text') return 'text'
   return tool === 'select' ? 'default' : 'crosshair'
-}
-
-/** Typing in a field must not trigger canvas shortcuts. */
-function isEditable(target: EventTarget | null) {
-  return (
-    target instanceof HTMLElement &&
-    (target.isContentEditable ||
-      target.tagName === 'INPUT' ||
-      target.tagName === 'TEXTAREA')
-  )
 }
 
 /**
@@ -145,6 +140,8 @@ export function Canvas({ editor }: { editor: Editor }) {
         // Backspace would otherwise navigate back in some browsers.
         event.preventDefault()
         editor.deleteSelected()
+      } else if (handleEditShortcut(editor, event)) {
+        // Select all (Ctrl/Cmd+A) or duplicate (Ctrl/Cmd+D).
       } else if (mod && !event.altKey && event.key.toLowerCase() === 'z') {
         // `key`, not `code`, so it follows the layout (Z sits elsewhere on
         // AZERTY). preventDefault stops the browser's own undo.
@@ -168,6 +165,23 @@ export function Canvas({ editor }: { editor: Editor }) {
         if (tool) editor.setTool(tool)
       }
     }
+
+    // The visible part of the canvas in world coordinates, for pasting.
+    function visibleWorld() {
+      const { viewport } = editor.store.getState()
+      return {
+        x: viewport.x,
+        y: viewport.y,
+        width: surface.width / viewport.zoom,
+        height: surface.height / viewport.zoom,
+      }
+    }
+    const onCopy = (event: ClipboardEvent) =>
+      handleClipboardEvent(editor, 'copy', event, visibleWorld())
+    const onCut = (event: ClipboardEvent) =>
+      handleClipboardEvent(editor, 'cut', event, visibleWorld())
+    const onPaste = (event: ClipboardEvent) =>
+      handleClipboardEvent(editor, 'paste', event, visibleWorld())
 
     // A keyup that happens while the window is unfocused never arrives.
     function onBlur() {
@@ -225,6 +239,9 @@ export function Canvas({ editor }: { editor: Editor }) {
     window.addEventListener('keydown', onKey)
     window.addEventListener('keyup', onKey)
     window.addEventListener('blur', onBlur)
+    window.addEventListener('copy', onCopy)
+    window.addEventListener('cut', onCut)
+    window.addEventListener('paste', onPaste)
     // React's onWheel is passive and cannot preventDefault, hence addEventListener.
     window.addEventListener('wheel', onWheel, { passive: false })
     window.addEventListener('gesturestart', onGestureStart)
@@ -240,6 +257,9 @@ export function Canvas({ editor }: { editor: Editor }) {
       window.removeEventListener('keydown', onKey)
       window.removeEventListener('keyup', onKey)
       window.removeEventListener('blur', onBlur)
+      window.removeEventListener('copy', onCopy)
+      window.removeEventListener('cut', onCut)
+      window.removeEventListener('paste', onPaste)
       window.removeEventListener('wheel', onWheel)
       window.removeEventListener('gesturestart', onGestureStart)
       window.removeEventListener('gesturechange', onGestureChange)

@@ -46,6 +46,11 @@ import {
   selectedOf,
   topmostHit,
 } from './selection.ts'
+import {
+  parseClipboard,
+  pasteElements,
+  serializeClipboard,
+} from './clipboard.ts'
 import { arrange, type LayerOrder } from './layers.ts'
 import {
   applyDefaults,
@@ -214,6 +219,22 @@ export interface Editor {
   arrange(order: LayerOrder): void
   /** Adds offset copies of the selection and selects them; one undo step. */
   duplicateSelected(): void
+  /**
+   * The clipboard payload for the selection (ADR 0039), or null with nothing
+   * selected. Changes nothing, so a drag in progress carries on.
+   */
+  copySelected(): string | null
+  /** Like `copySelected`, then deletes the selection; one undo step. */
+  cutSelected(): string | null
+  /**
+   * Adds the elements of a Yodo clipboard payload and selects them; one undo
+   * step. `view` is the visible part of the canvas in world coordinates: the
+   * copies stay where they were if any of them is in view, else they go to its
+   * centre. Returns false, changing nothing, when `text` isn't ours.
+   */
+  paste(text: string, view: Bounds): boolean
+  /** Selects every element and switches to the Select tool; no document change. */
+  selectAll(): void
   /** Keeps the style the selection shares (no mixed values) for pasting. */
   copyStyle(): void
   /** Applies the copied style to the selection, where it fits; one undo step. */
@@ -745,6 +766,27 @@ export function createEditor(
     })
   }
 
+  /**
+   * Ends whatever a selection edit would otherwise leave running: text being
+   * edited, a draw or eraser drag, and a select drag (without committing it:
+   * its release applies to whichever elements are selected by then). Used
+   * before changing the selection or the document from the keyboard.
+   */
+  function endGestures() {
+    commitText()
+    drawTool.cancel()
+    eraserTool.cancel()
+    gesture = null
+    store.setState((prev) =>
+      prev.move || prev.resize || prev.marquee
+        ? { ...prev, move: null, resize: null, marquee: null }
+        : prev,
+    )
+  }
+
+  /** How many times in a row the same payload was pasted, for the offset. */
+  let lastPaste: { text: string; count: number } | null = null
+
   /** The eraser drag: its pointer and last sample, outside the store like `drag`. */
   let erase: {
     pointerId: number
@@ -902,6 +944,31 @@ export function createEditor(
     )
   }
 
+  function deleteSelected() {
+    // End a select drag without cancel(): cancel restores the selection from
+    // before a box drag, but Delete removes what is highlighted now.
+    gesture = null
+    store.setState((prev) => {
+      // Drop a move or resize preview or a box; a no-op Delete with none is
+      // no change.
+      const ended =
+        prev.move || prev.resize || prev.marquee
+          ? { ...prev, move: null, resize: null, marquee: null }
+          : prev
+      if (ended.selectedIds.length === 0) return ended
+      const elements = deleteElements(
+        ended.document.elements,
+        new Set(ended.selectedIds),
+      )
+      return {
+        ...ended,
+        selectedIds: [],
+        hoverHandle: null,
+        document: { ...ended.document, elements },
+      }
+    })
+  }
+
   return {
     store,
     drawTool,
@@ -997,30 +1064,7 @@ export function createEditor(
       eraserTool.cancel()
       refreshHover()
     },
-    deleteSelected() {
-      // End a select drag without cancel(): cancel restores the selection from
-      // before a box drag, but Delete removes what is highlighted now.
-      gesture = null
-      store.setState((prev) => {
-        // Drop a move or resize preview or a box; a no-op Delete with none is
-        // no change.
-        const ended =
-          prev.move || prev.resize || prev.marquee
-            ? { ...prev, move: null, resize: null, marquee: null }
-            : prev
-        if (ended.selectedIds.length === 0) return ended
-        const elements = deleteElements(
-          ended.document.elements,
-          new Set(ended.selectedIds),
-        )
-        return {
-          ...ended,
-          selectedIds: [],
-          hoverHandle: null,
-          document: { ...ended.document, elements },
-        }
-      })
-    },
+    deleteSelected,
     setStyle(patch, { selection } = {}) {
       store.setState((prev) => {
         if (selection && selection !== prev.selectedIds) return prev
@@ -1050,6 +1094,7 @@ export function createEditor(
       })
     },
     duplicateSelected() {
+      endGestures()
       store.setState((prev) => {
         const { elements, ids } = duplicateElements(
           prev.document.elements,
@@ -1064,6 +1109,51 @@ export function createEditor(
               hoverHandle: null,
               document: { ...prev.document, elements },
             }
+      })
+    },
+    copySelected() {
+      const selected = selectedNow(store.getState())
+      return selected.length === 0 ? null : serializeClipboard(selected)
+    },
+    cutSelected() {
+      endGestures()
+      const selected = selectedNow(store.getState())
+      if (selected.length === 0) return null
+      const text = serializeClipboard(selected)
+      deleteSelected()
+      return text
+    },
+    paste(text, view) {
+      const copied = parseClipboard(text)
+      if (!copied || copied.length === 0) return false
+      endGestures()
+      const { document } = store.getState()
+      const present = new Set(document.elements.map((element) => element.id))
+      // Pasting on top of the original would hide it; step away from it. The
+      // same payload pasted again steps once more each time.
+      const repeats = lastPaste?.text === text ? lastPaste.count : 0
+      const steps = (copied.some((e) => present.has(e.id)) ? 1 : 0) + repeats
+      lastPaste = { text, count: repeats + 1 }
+      const copies = pasteElements(copied, view, steps, randomId)
+      store.setState((prev) => ({
+        ...prev,
+        tool: 'select',
+        selectedIds: copies.map((element) => element.id),
+        hoverHandle: null,
+        document: {
+          ...prev.document,
+          elements: [...prev.document.elements, ...copies],
+        },
+      }))
+      return true
+    },
+    selectAll() {
+      endGestures()
+      store.setState((prev) => {
+        const all = prev.document.elements.map((element) => element.id)
+        return all.length === 0 && prev.tool === 'select'
+          ? prev
+          : { ...prev, tool: 'select', selectedIds: all, hoverHandle: null }
       })
     },
     copyStyle() {
