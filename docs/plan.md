@@ -9,9 +9,9 @@ Rule: every stage ends with a **file of decisions**, not just a conversation. Co
 
 ## Status (2026-11-05)
 Read this section, not the whole file; finished work is logged in `docs/history.md`.
-- **Last done:** roadmap 2.5 (issue #81): copy / paste / duplicate (ADR 0039). Ctrl/Cmd+C, X and V go through the system clipboard as a validated JSON payload, so elements move between drawings, tabs and reloads; Ctrl/Cmd+A selects all and Ctrl/Cmd+D duplicates.
+- **Last done:** roadmap 2.6 (issue #82): images (ADR 0040). A pasted image file is stored by its SHA-256 in IndexedDB (hosted) or under `<YODO_DATA_DIR>/images` (self-hosted) and shown as an `image` element that keeps its proportions when resized.
 - Open items: `review` issues from the 1.14, 1.15, 1.16, 2.2a, 2.2b and 2.3 reviews.
-- **Next step:** roadmap 2.6 (issue #82): images.
+- **Next step:** roadmap 2.7 (issue #83): export PNG / SVG.
 
 ## Working mode: an educational project
 The goal is both the app and learning how to program with Claude as effectively as possible, so that the knowledge stays with you. The rules (you decide and I explain, no silent automation, features introduced on first use, a short recap after each task, "just do it" to skip explanations) live in the global `~/.claude/CLAUDE.md` and the `educational-working-mode` memory, so they apply in every session.
