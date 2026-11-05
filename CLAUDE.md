@@ -32,6 +32,7 @@ Node 24 (`web/.nvmrc`, `nvm use`), Go 1.27. golangci-lint 2.15 is a separate bin
 | Tests | `npm test` (builds web and server, then runs every project) · one project: `npx playwright test --project self-hosted-chromium` (reuses the last build) |
 | Lint / format / type-check | `npm run lint` · `npm run format:check` · `npm run typecheck` |
 | Performance benchmark | `npm run perf` (on demand, headed system Chrome; `PERF_RECORD=1` appends to `docs/perf/results.jsonl`; ADR 0042, `docs/perf/README.md`) |
+| Export visual baselines | `npm run test:visual` · update after a deliberate rendering change: `npm run test:visual:update`, then review the image diff (needs Docker; runs in the pinned Playwright image, same as CI's `visual` job; ADR 0044) |
 
 **Docker image** (run from the repo root): `docker build -t yodo .`, then `docker run -p 127.0.0.1:8080:8080 -v yodo-data:/data yodo`. The build copies `web/dist` into `server/internal/webui/dist/` for `go:embed` (ADR 0019).
 

@@ -24,7 +24,9 @@
   "include": [
     "playwright.config.ts",
     "playwright.perf.config.ts",
+    "playwright.visual.config.ts",
     "perf/**/*.ts",
+    "visual/**/*.ts",
     "scripts/**/*.ts",
     "tests/**/*.ts"
   ]

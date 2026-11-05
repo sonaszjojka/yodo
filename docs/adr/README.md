@@ -54,3 +54,4 @@ Why Yodo is built the way it is. See [0001](0001-record-architecture-decisions.m
 | [0041](0041-export-images-by-re-rendering-on-an-offscreen-canvas.md) | Export PNG by re-rendering the scene on an offscreen canvas at the chosen scale, theme and background | Accepted |
 | [0042](0042-performance-benchmark-on-demand-results-in-git.md) | Track performance with an on-demand Playwright benchmark whose results are committed as JSONL | Accepted |
 | [0043](0043-export-svg-with-a-parallel-pure-svg-renderer.md) | Export SVG with a parallel pure SVG renderer (rough.js generator, same seeds) and embedded fonts | Accepted |
+| [0044](0044-export-visual-regression-baseline.md) | Guard the export with visual baselines made and checked in one pinned Playwright image | Accepted |
