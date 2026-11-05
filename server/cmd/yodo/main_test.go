@@ -53,3 +53,14 @@ func TestRunCreatesDatabase(t *testing.T) {
 		t.Errorf("database not created: %v", err)
 	}
 }
+
+// YODO_PASSWORD must reach the server: the process starts fine with it set.
+func TestRunAcceptsPassword(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "data")
+	env := map[string]string{"YODO_ADDR": "127.0.0.1:0", "YODO_DATA_DIR": dir, "YODO_PASSWORD": "secret"}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := run(ctx, func(k string) string { return env[k] }); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+}

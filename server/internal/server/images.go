@@ -32,6 +32,9 @@ var imageTypes = map[string]bool{
 // image named by its hash under dir (ADR 0040).
 type imagesAPI struct {
 	dir string
+	// private keeps shared caches from serving the bytes to someone who has
+	// not logged in (ADR 0020).
+	private bool
 }
 
 func (a imagesAPI) register(mux *http.ServeMux) {
@@ -114,6 +117,11 @@ func (a imagesAPI) get(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", http.DetectContentType(body))
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	// The URL is the content's hash, so the bytes behind it never change.
-	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	if a.private {
+		w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
+		w.Header().Set("Vary", "Cookie")
+	} else {
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	}
 	_, _ = w.Write(body)
 }

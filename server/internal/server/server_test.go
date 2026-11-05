@@ -36,7 +36,7 @@ func TestHandler(t *testing.T) {
 			// httptest requests use Host example.com.
 			req := httptest.NewRequest(tt.method, tt.path, nil)
 			req.Header.Set("Origin", "http://example.com")
-			New(tt.static, mustParse(t, "http://example.com"), nil, t.TempDir()).ServeHTTP(rec, req)
+			New(tt.static, mustParse(t, "http://example.com"), nil, t.TempDir(), nil).ServeHTTP(rec, req)
 
 			if rec.Code != tt.wantStatus {
 				t.Fatalf("status = %d, want %d", rec.Code, tt.wantStatus)
@@ -57,7 +57,7 @@ func TestHandlerChecksOrigin(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/health", nil)
 	req.Host = "evil.example"
-	New(builtFS, mustParse(t, "http://example.com"), nil, t.TempDir()).ServeHTTP(rec, req)
+	New(builtFS, mustParse(t, "http://example.com"), nil, t.TempDir(), nil).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
