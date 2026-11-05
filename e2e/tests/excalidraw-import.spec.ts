@@ -40,7 +40,7 @@ test('importing an Excalidraw file shows what was skipped and opens the drawing'
   page,
 }) => {
   await page.goto('./')
-  await page.getByTestId('import-excalidraw').setInputFiles({
+  await page.getByTestId('import-file').setInputFiles({
     name: 'sample.excalidraw',
     mimeType: 'application/json',
     buffer: Buffer.from(file),
@@ -70,7 +70,7 @@ test('a file that is not Excalidraw is refused with a message', async ({
   page,
 }) => {
   await page.goto('./')
-  await page.getByTestId('import-excalidraw').setInputFiles({
+  await page.getByTestId('import-file').setInputFiles({
     name: 'other.json',
     mimeType: 'application/json',
     buffer: Buffer.from('{"hello":"world"}'),

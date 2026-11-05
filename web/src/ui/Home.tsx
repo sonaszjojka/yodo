@@ -26,6 +26,7 @@ import { Logo } from './Logo.tsx'
 import { createCanvasMeasure } from './measure.ts'
 import { navigate } from './route.ts'
 import { SettingsMenu } from './SettingsMenu.tsx'
+import { importErrorMessage, importFile, isYodoFile } from './yodoFile.ts'
 
 export type HomeList =
   | { status: 'loading' }
@@ -94,11 +95,28 @@ export function Home({
     }
   }
 
+  /** A `.yodo` file: recreated as it was, so there is no summary to show (ADR 0013). */
+  async function importYodo(file: File) {
+    if (file.size > MAX_IMPORT_BYTES) {
+      throw new ExcalidrawImportError('That file is larger than 50 MB.')
+    }
+    const text = await file.text()
+    navigate({
+      name: 'drawing',
+      id: await importFile(repository, images, imageCache, text),
+    })
+  }
+
   async function onImport(file: File) {
     setImporting(true)
     setNotice(undefined)
     setImported(undefined)
     try {
+      // The file's extension picks the format; anything else is tried as Excalidraw.
+      if (isYodoFile(file)) {
+        await importYodo(file)
+        return
+      }
       if (file.size > MAX_IMPORT_BYTES) {
         throw new ExcalidrawImportError('That file is larger than 50 MB.')
       }
@@ -125,7 +143,9 @@ export function Home({
       setNotice(
         error instanceof ExcalidrawImportError
           ? error.message
-          : 'Couldn’t import the file. Try again.',
+          : isYodoFile(file)
+            ? importErrorMessage(error)
+            : 'Couldn’t import the file. Try again.',
       )
       setImporting(false)
     }
@@ -246,14 +266,15 @@ export function HomeView({
             disabled={importing}
             onClick={() => fileInput.current?.click()}
           >
-            {importing ? 'Importing…' : 'Import Excalidraw'}
+            {importing ? 'Importing…' : 'Import file'}
           </button>
           <input
             ref={fileInput}
             type="file"
-            accept=".excalidraw,.json,application/json"
+            accept=".yodo,.excalidraw,.json,application/json"
             hidden
-            data-testid="import-excalidraw"
+            aria-label="File to import"
+            data-testid="import-file"
             onChange={(event) => {
               const file = event.target.files?.[0]
               event.target.value = ''

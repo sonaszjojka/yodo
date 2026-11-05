@@ -12,6 +12,7 @@ import {
 import type { ImageRepository } from '../storage/images.ts'
 import type { DrawingRepository } from '../storage/repository.ts'
 import { Canvas } from './Canvas.tsx'
+import { ExportButton } from './ExportButton.tsx'
 import { HistoryControl } from './HistoryControl.tsx'
 import type { ImageCache } from './imageCache.ts'
 import { createImagePaster } from './imagePaster.ts'
@@ -116,6 +117,7 @@ export function App({
       />
       <StylePanel editor={editor} panel={panel} />
       <div className="top-right">
+        <ExportButton editor={editor} images={images} onError={setNotice} />
         <StylePanelToggle panel={panel} />
       </div>
       <Toolbar editor={editor} />

@@ -123,7 +123,7 @@ export interface IngestOptions {
   decode?: (file: Blob) => Promise<{ width: number; height: number }>
 }
 
-async function decodeSize(file: Blob) {
+export async function decodeSize(file: Blob) {
   const bitmap = await createImageBitmap(file)
   const { width, height } = bitmap
   bitmap.close()
