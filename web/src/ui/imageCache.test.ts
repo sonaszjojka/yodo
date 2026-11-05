@@ -111,4 +111,35 @@ describe('createImageCache', () => {
 
     expect(cache.get(id)).toBeUndefined()
   })
+
+  test('retryMissing loads the missing pictures again, e.g. after a login', async () => {
+    const repo = new InMemoryImageRepository()
+    const hash = await new InMemoryImageRepository().put(pngBlob())
+    const cache = createImageCache(repo, decode)
+    const redraw = vi.fn(() => cache.get(hash))
+    cache.subscribe(redraw)
+    cache.get(hash)
+    await tick()
+    expect(cache.get(hash)).toBeUndefined()
+
+    await repo.put(pngBlob())
+    cache.retryMissing()
+    await tick()
+
+    expect(cache.get(hash)).toBe(picture)
+  })
+
+  test('retryMissing does not redraw when nothing is missing', async () => {
+    const repo = new InMemoryImageRepository()
+    const id = await repo.put(pngBlob())
+    const cache = createImageCache(repo, decode)
+    cache.get(id)
+    await tick()
+    const listener = vi.fn()
+    cache.subscribe(listener)
+
+    cache.retryMissing()
+
+    expect(listener).not.toHaveBeenCalled()
+  })
 })

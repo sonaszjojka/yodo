@@ -50,9 +50,9 @@ Goal: open Yodo, draw basic shapes, close the browser, come back to the same dra
 | 2.7b | Export SVG ([#116](https://github.com/sonaszjojka/yodo/issues/116)) | SVG output and tab in the export dialog, same options (scale excepted). **ADR:** how the SVG is generated. |
 | 2.7c | Export visual regression baseline ([#117](https://github.com/sonaszjojka/yodo/issues/117)) | Visual regression baseline for a few scenes, each in light and dark (2.3 checks the dark colours by pixel, ADR 0015). |
 | 2.8 | `.yodo` export / import ([#84](https://github.com/sonaszjojka/yodo/issues/84)) | Export inlines images as base64; import recreates the drawing exactly, also from an older-version fixture. |
-| 2.9 | Excalidraw import ([#85](https://github.com/sonaszjojka/yodo/issues/85)) | Converter for shapes, text, arrows, pencil, images; summary of skipped features (ADR 0014). |
+| 2.9 | Excalidraw import ✓ (PR [#111](https://github.com/sonaszjojka/yodo/pull/111)) ([#85](https://github.com/sonaszjojka/yodo/issues/85)) | Converter for shapes, text, arrows, pencil, images; summary of skipped features (ADR 0014). |
 | 2.10 | Shortcuts modal ([#86](https://github.com/sonaszjojka/yodo/issues/86)) | Searchable, grouped list of every shortcut. |
-| 2.11 | Optional password ([#87](https://github.com/sonaszjojka/yodo/issues/87)) | `YODO_PASSWORD` + session cookie + password screen (ADR 0020); tests for locked/unlocked/wrong password. |
+| 2.11 | Optional password ✓ ([#87](https://github.com/sonaszjojka/yodo/issues/87)) | `YODO_PASSWORD` + session cookie + password screen (ADR 0020); tests for locked/unlocked/wrong password. |
 | 2.12 | Performance benchmark ([#88](https://github.com/sonaszjojka/yodo/issues/88)) | Playwright perf test on the generated reference board (`docs/product.md`); results recorded, tracked over time. Fix anything below target. |
 
 ## M3 — Organise
@@ -61,7 +61,7 @@ Goal: open Yodo, draw basic shapes, close the browser, come back to the same dra
 | 3.1 | Folders ([#89](https://github.com/sonaszjojka/yodo/issues/89)) | Create, rename, delete folders with icon + colour picker; move drawings into folders; sidebar list. Works in both modes. |
 | 3.2 | Trash ([#90](https://github.com/sonaszjojka/yodo/issues/90)) | Delete moves to Trash; restore, delete forever, empty with confirm. |
 | 3.3 | Search ([#91](https://github.com/sonaszjojka/yodo/issues/91)) | Finds drawings by name and canvas text (`search_text`, ADR 0013); results split as in `docs/ui.md`. |
-| 3.4 | Attached arrows ([#92](https://github.com/sonaszjojka/yodo/issues/92)) | Arrows bound to shapes follow when either shape moves or resizes. |
+| 3.4 | Attached arrows ([#92](https://github.com/sonaszjojka/yodo/issues/92)) | Arrows bound to shapes follow when either shape moves or resizes. The Excalidraw import (2.9) drops arrow bindings, so map them here too. |
 | 3.5 | Card menus ([#93](https://github.com/sonaszjojka/yodo/issues/93)) | ⋯ and right-click menu with every action from `docs/ui.md` (duplicate, open in new tab, export, …). |
 | 3.6 | MVP e2e + release ([#94](https://github.com/sonaszjojka/yodo/issues/94)) | Playwright covers the 3–5 key flows in both modes; tagged `v1.0.0` image on GHCR; README documents both usage modes. |
 

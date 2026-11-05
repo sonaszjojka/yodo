@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { Session } from '../storage/session.ts'
 import { loadDrawing, type LoadResult } from '../storage/drawings.ts'
 import type { ImageRepository } from '../storage/images.ts'
 import type { DrawingRepository } from '../storage/repository.ts'
@@ -12,14 +13,23 @@ import { useRoute } from './route.ts'
 export function Root({
   repository,
   images,
+  session,
 }: {
   repository: DrawingRepository
   images: ImageRepository
+  /** The server's password, if it has one (ADR 0020). */
+  session?: Session
 }) {
   const route = useRoute()
   // One cache for the whole app, so a picture decoded in the editor is ready
   // for Home's thumbnails (ADR 0040).
   const imageCache = useMemo(() => createImageCache(images), [images])
+  // Pictures that failed with 401 while the session was over load again once
+  // the password was entered.
+  useEffect(
+    () => session?.onUnlocked(() => imageCache.retryMissing()),
+    [session, imageCache],
+  )
   // The closing editor's last save. React runs the old screen's cleanup before
   // the new screen's effects, so the next screen's first read can wait for it:
   // Home's list(), or the editor's get() after Back then Forward.
@@ -35,6 +45,7 @@ export function Root({
   return route.name === 'home' ? (
     <Home
       repository={repository}
+      images={images}
       imageCache={imageCache}
       waitForEditor={waitForEditor}
       lastSaveFailed={lastSaveFailed}

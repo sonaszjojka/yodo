@@ -9,9 +9,11 @@ Rule: every stage ends with a **file of decisions**, not just a conversation. Co
 
 ## Status (2026-11-05)
 Read this section, not the whole file; finished work is logged in `docs/history.md`.
+- Done before: roadmap 2.9 (issue #85): Excalidraw import (ADR 0014). **Import Excalidraw** on Home converts a `.excalidraw` file into a new drawing (shapes, text, arrows, pencil, images) and lists what was skipped or simplified.
+- Done before: roadmap 2.11 (issue #87): optional password. `YODO_PASSWORD` locks the API behind a login (in-memory sessions, httpOnly SameSite=Strict cookie, "Remember this browser" for 30 days); the app shows a password screen first, or a dialog over the inert drawing if the session ends mid-edit (ADR 0020).
 - **Last done:** roadmap 2.7a (issue #83, with 2.7b and 2.7c split off): PNG export (ADR 0041). An Export button (top right, Shift+Ctrl/Cmd+E) opens a dialog: whole drawing or selection, background on/off, dark version, 1x/2x/3x scale, file name, Copy and Download. The scene is drawn again with `renderScene` on an offscreen canvas, so pasted images export too.
 - Open items: `review` issues from the 1.14, 1.15, 1.16, 2.2a, 2.2b and 2.3 reviews, and #118 from 2.7a.
-- **Next step:** roadmap 2.7b (issue #116): SVG export (needs its ADR for how the SVG is generated).
+- **Next step:** roadmap 2.7b (issue #116): SVG export (needs its ADR for how the SVG is generated); 2.8, `.yodo` export / import, is also open.
 
 ## Working mode: an educational project
 The goal is both the app and learning how to program with Claude as effectively as possible, so that the knowledge stays with you. The rules (you decide and I explain, no silent automation, features introduced on first use, a short recap after each task, "just do it" to skip explanations) live in the global `~/.claude/CLAUDE.md` and the `educational-working-mode` memory, so they apply in every session.
