@@ -10,6 +10,12 @@ import {
   IndexedDbImageRepository,
 } from './indexeddb.ts'
 import type { DrawingRepository } from './repository.ts'
+import {
+  createSession,
+  getSessionState,
+  sendPassword,
+  type Session,
+} from './session.ts'
 
 export type StorageMode = 'hosted' | 'self-hosted'
 
@@ -56,14 +62,33 @@ export async function detectRepository({
   mode: StorageMode
   repository: DrawingRepository
   images: ImageRepository
+  /** The optional password (ADR 0020); only a Yodo server has one. */
+  session?: Session
 }> {
   // Bound for the same reason as in HttpDrawingRepository.
   const boundFetch = fetch.bind(globalThis)
   if (await serverAnswers(baseUrl, boundFetch, timeoutMs)) {
+    // If the probe fails, carry on as if no password were needed: a server
+    // that wants one answers the first request with 401, which opens the
+    // password dialog. Better than a blank page on a slow restart.
+    const state = await getSessionState(baseUrl, boundFetch, timeoutMs).catch(
+      () => ({ passwordRequired: false, unlocked: true }),
+    )
+    const session = createSession(state, (password, remember) =>
+      sendPassword(baseUrl, boundFetch, password, remember),
+    )
+    // A 401 means the session ended: show the password screen, and still give
+    // the caller the response so it fails as usual.
+    const guardedFetch: typeof globalThis.fetch = async (input, init) => {
+      const response = await boundFetch(input, init)
+      if (response.status === 401) session.lock()
+      return response
+    }
     return {
       mode: 'self-hosted',
-      repository: new HttpDrawingRepository({ baseUrl, fetch: boundFetch }),
-      images: new HttpImageRepository({ baseUrl, fetch: boundFetch }),
+      repository: new HttpDrawingRepository({ baseUrl, fetch: guardedFetch }),
+      images: new HttpImageRepository({ baseUrl, fetch: guardedFetch }),
+      session,
     }
   }
   return {

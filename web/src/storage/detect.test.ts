@@ -75,4 +75,89 @@ describe('detectRepository', () => {
     })
     expect(mode).toBe('hosted')
   })
+
+  describe('the optional password', () => {
+    function serverWithPassword(drawingsStatus: number) {
+      return vi.fn<typeof fetch>(async (input) => {
+        const path = new URL(String(input)).pathname
+        if (path.endsWith('/api/health')) return Response.json({ status: 'ok' })
+        if (path.endsWith('/api/session')) {
+          return Response.json({ passwordRequired: true, unlocked: false })
+        }
+        return new Response('x', { status: drawingsStatus })
+      })
+    }
+
+    test('a self-hosted server brings its session state', async () => {
+      const { session } = await detectRepository({
+        baseUrl,
+        fetch: serverWithPassword(401),
+      })
+      expect(session?.getSnapshot()).toEqual({
+        locked: true,
+        appVisible: false,
+      })
+    })
+
+    test('the hosted app has no session', async () => {
+      const { session } = await detectRepository({
+        baseUrl,
+        fetch: replying(() => new Response('', { status: 404 })),
+      })
+      expect(session).toBeUndefined()
+    })
+
+    test('a 401 from the API locks the session and still reaches the caller', async () => {
+      const { session, repository } = await detectRepository({
+        baseUrl,
+        fetch: vi.fn<typeof fetch>(async (input) => {
+          const path = new URL(String(input)).pathname
+          if (path.endsWith('/api/health'))
+            return Response.json({ status: 'ok' })
+          if (path.endsWith('/api/session')) {
+            return Response.json({ passwordRequired: true, unlocked: true })
+          }
+          return new Response('unauthorized', { status: 401 })
+        }),
+      })
+      expect(session?.getSnapshot().locked).toBe(false)
+
+      await expect(repository.list()).rejects.toMatchObject({ status: 401 })
+
+      expect(session?.getSnapshot()).toEqual({ locked: true, appVisible: true })
+    })
+
+    test('if the session probe fails the app still starts, unlocked', async () => {
+      const { mode, session } = await detectRepository({
+        baseUrl,
+        fetch: vi.fn<typeof fetch>(async (input) =>
+          new URL(String(input)).pathname.endsWith('/api/health')
+            ? Response.json({ status: 'ok' })
+            : new Response('x', { status: 503 }),
+        ),
+      })
+      expect(mode).toBe('self-hosted')
+      expect(session?.getSnapshot()).toEqual({
+        locked: false,
+        appVisible: true,
+      })
+    })
+
+    test('unlock posts the password to api/session', async () => {
+      const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+        const path = new URL(String(input)).pathname
+        if (path.endsWith('/api/health')) return Response.json({ status: 'ok' })
+        if (init?.method === 'POST') return new Response(null, { status: 204 })
+        return Response.json({ passwordRequired: true, unlocked: false })
+      })
+      const { session } = await detectRepository({ baseUrl, fetch })
+
+      await expect(session?.unlock('pw', true)).resolves.toBe('ok')
+
+      expect(session?.getSnapshot()).toEqual({
+        locked: false,
+        appVisible: true,
+      })
+    })
+  })
 })
