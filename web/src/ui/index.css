@@ -558,7 +558,9 @@ a.drawing-card-body:focus-visible,
   outline: none;
 }
 
-/* The style bar's "more" menu; StyleBar places it (menuOffset, barPosition.ts). */
+/* The style bar's "more" menu; StyleBar places it (menuOffset, barPosition.ts).
+   Width, item height (36 px, `.menu [role='menuitem']`), padding and border
+   are mirrored by menuSize there; change them together. */
 .style-menu {
   right: auto;
   bottom: auto;

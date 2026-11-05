@@ -71,16 +71,23 @@ export function popoverOffset(
   return offsetFor(bar, index, popoverSize(count), window)
 }
 
-/** The "more" menu's size (`.style-menu` in index.css): 5 rows of 36 px. */
-export const MENU_SIZE: Size = { width: 180, height: 5 * 36 + 2 * 4 + 2 }
+/** The "more" menu (`.menu` and `.style-menu` in index.css): width, item height, padding and border. */
+const MENU_WIDTH = 180
+const MENU_ITEM = 36
+
+/** The "more" menu's size for `count` items, so it can be placed before layout. */
+export function menuSize(count: number): Size {
+  return { width: MENU_WIDTH, height: count * MENU_ITEM + 2 * 4 + 2 }
+}
 
 /** Where the "more" menu of the control at `index` goes, like a popover. */
 export function menuOffset(
   bar: { left: number; top: number },
   index: number,
+  count: number,
   window: Size,
 ): { left: number; top: number } {
-  return offsetFor(bar, index, MENU_SIZE, window)
+  return offsetFor(bar, index, menuSize(count), window)
 }
 
 function offsetFor(

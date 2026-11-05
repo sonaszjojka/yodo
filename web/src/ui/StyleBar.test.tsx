@@ -9,10 +9,11 @@ import type { YodoElement } from '../core/document/types.ts'
 import { createEditor } from '../core/editor/editor.ts'
 import {
   barPosition,
-  MENU_SIZE,
   menuOffset,
+  menuSize,
   popoverOffset,
 } from './barPosition.ts'
+import { MORE_ITEMS } from './moreItems.tsx'
 import { MoreMenu, StyleBar } from './StyleBar.tsx'
 
 /** An editor with `elements`, Select active and the elements at `selected` selected. */
@@ -131,27 +132,47 @@ describe('MoreMenu', () => {
     ])
   })
 
+  test('renders one menu item per MORE_ITEMS entry', () => {
+    const items = menu(true).match(/role="menuitem"/g)
+    expect(items).toHaveLength(MORE_ITEMS.length)
+  })
+
   test('Paste style is disabled until a style is copied', () => {
     expect(menu(false)).toMatch(/<button[^>]*disabled=""[^>]*>/)
     expect(menu(true)).not.toContain('disabled')
   })
 })
 
+describe('menuSize', () => {
+  test('grows by one 36 px row per item', () => {
+    expect(menuSize(6).height - menuSize(5).height).toBe(36)
+    expect(menuSize(5).height).toBe(5 * 36 + 2 * 4 + 2)
+  })
+})
+
 describe('menuOffset', () => {
   const window = { width: 1000, height: 800 }
+  const count = 5
 
   test('opens below the bar when it fits, above near the bottom', () => {
-    expect(menuOffset({ left: 100, top: 300 }, 0, window).top).toBe(50)
-    expect(menuOffset({ left: 100, top: 700 }, 0, window).top).toBe(
-      -MENU_SIZE.height - 10,
+    expect(menuOffset({ left: 100, top: 300 }, 0, count, window).top).toBe(50)
+    expect(menuOffset({ left: 100, top: 700 }, 0, count, window).top).toBe(
+      -menuSize(count).height - 10,
     )
+  })
+
+  test('flips sooner when the menu has more items', () => {
+    // Bar at 520: five items end at 765 (limit 792) and fit below; six end at 801.
+    const bar = { left: 100, top: 520 }
+    expect(menuOffset(bar, 0, 5, window).top).toBe(50)
+    expect(menuOffset(bar, 0, 6, window).top).toBe(-menuSize(6).height - 10)
   })
 
   test('stays inside the window at its right edge', () => {
     // Control 5 of a bar at 900: the menu shifts left to end 8 px from the edge.
-    const { left } = menuOffset({ left: 900, top: 300 }, 5, window)
+    const { left } = menuOffset({ left: 900, top: 300 }, 5, count, window)
     const control = 900 + 5 + 5 * 42
-    expect(control + left + MENU_SIZE.width).toBe(1000 - 8)
+    expect(control + left + menuSize(count).width).toBe(1000 - 8)
   })
 })
 

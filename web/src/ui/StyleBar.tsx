@@ -1,13 +1,8 @@
 import {
-  ArrowLineUp,
-  ClipboardText,
-  Copy,
-  CopySimple,
   DotsThree,
   LineSegment,
   Scribble,
   SlidersHorizontal,
-  Trash,
 } from '@phosphor-icons/react'
 import {
   useEffect,
@@ -37,6 +32,7 @@ import {
   popoverOffset,
 } from './barPosition.ts'
 import { nextMenuIndex } from './menuKeys.ts'
+import { MORE_ITEMS } from './moreItems.tsx'
 import { isOutside } from './outsidePress.ts'
 import {
   FILLS,
@@ -203,19 +199,6 @@ export interface MoreMenuProps {
  * selection, each one undo step except copying a style.
  */
 export function MoreMenu({ editor, canPaste, onDone, style }: MoreMenuProps) {
-  const item = (label: string, icon: ReactNode, run: () => void) => (
-    <button
-      type="button"
-      role="menuitem"
-      onClick={() => {
-        onDone()
-        run()
-      }}
-    >
-      {icon}
-      {label}
-    </button>
-  )
   return (
     <div
       className="menu style-menu"
@@ -225,30 +208,21 @@ export function MoreMenu({ editor, canPaste, onDone, style }: MoreMenuProps) {
       aria-label="More"
       style={style}
     >
-      {item('Duplicate', <CopySimple size={18} aria-hidden />, () =>
-        editor.duplicateSelected(),
-      )}
-      {item('Copy style', <Copy size={18} aria-hidden />, () =>
-        editor.copyStyle(),
-      )}
-      <button
-        type="button"
-        role="menuitem"
-        disabled={!canPaste}
-        onClick={() => {
-          onDone()
-          editor.pasteStyle()
-        }}
-      >
-        <ClipboardText size={18} aria-hidden />
-        Paste style
-      </button>
-      {item('Bring to front', <ArrowLineUp size={18} aria-hidden />, () =>
-        editor.arrange('front'),
-      )}
-      {item('Delete', <Trash size={18} aria-hidden />, () =>
-        editor.deleteSelected(),
-      )}
+      {MORE_ITEMS.map(({ label, icon, run, disabled }) => (
+        <button
+          key={label}
+          type="button"
+          role="menuitem"
+          disabled={disabled?.(canPaste)}
+          onClick={() => {
+            onDone()
+            run(editor)
+          }}
+        >
+          {icon}
+          {label}
+        </button>
+      ))}
     </div>
   )
 }
@@ -448,7 +422,12 @@ export function StyleBar({ editor, onAllStyles }: StyleBarProps) {
             editor={editor}
             canPaste={canPaste}
             onDone={closeMenu}
-            style={menuOffset({ left, top }, controls.length + 1, size)}
+            style={menuOffset(
+              { left, top },
+              controls.length + 1,
+              MORE_ITEMS.length,
+              size,
+            )}
           />
         )}
       </div>
