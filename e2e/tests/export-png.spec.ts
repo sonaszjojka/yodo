@@ -95,11 +95,11 @@ test('exports the drawing as a PNG: size, background, dark version', async ({
   await page.getByRole('button', { name: 'Export' }).click()
   const dialog = page.getByRole('dialog', { name: 'Export image' })
   await expect(dialog).toBeVisible()
-  await dialog.getByLabel('File name').fill('my sketch')
+  await dialog.getByLabel('File name').fill('my-sketch')
 
   // Light with a background, at the default 2x: (220 + 2 * 16) x (160 + 2 * 16).
   const light = await download(page)
-  expect(light.name).toBe('my sketch.png')
+  expect(light.name).toBe('my-sketch.png')
   const lightPng = await inspectPng(page, light.path, INK_LIGHT)
   expect(Math.abs(lightPng.width - 504)).toBeLessThanOrEqual(4)
   expect(Math.abs(lightPng.height - 384)).toBeLessThanOrEqual(4)
