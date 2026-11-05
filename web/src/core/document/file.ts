@@ -25,9 +25,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-// Standard base64, padded: whole groups of four characters.
-const BASE64 =
-  /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
+// Standard base64: the alphabet, then up to two "=" of padding. Kept flat (no
+// repeated group) because the engine recurses per repetition and overflows the
+// stack on multi-megabyte images; the length check makes it whole groups of 4.
+const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/
+
+function isBase64(data: string): boolean {
+  return data.length % 4 === 0 && BASE64.test(data)
+}
 
 function isFileEntry(value: unknown): value is YodoFileEntry {
   return (
@@ -35,7 +40,7 @@ function isFileEntry(value: unknown): value is YodoFileEntry {
     typeof value.mimeType === 'string' &&
     value.mimeType.startsWith('image/') &&
     typeof value.data === 'string' &&
-    BASE64.test(value.data)
+    isBase64(value.data)
   )
 }
 

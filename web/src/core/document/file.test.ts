@@ -156,6 +156,17 @@ describe('parseYodoFile', () => {
     expect(errorCode(() => parseYodoFile(text))).toBe(code)
   })
 
+  test('reads a multi-megabyte image', () => {
+    // 6 MB of base64 (about 4.5 MB of image): a regex that repeats a group
+    // overflows the stack on input this size.
+    const big = { mimeType: 'image/png', data: 'AAAA'.repeat(1_500_000) }
+    const doc = { ...everyElement, fileIds: ['big'] }
+
+    const text = serializeYodoFile(doc, { big })
+
+    expect(parseYodoFile(text).files).toEqual({ big })
+  })
+
   test('accepts more elements than a clipboard paste may carry', () => {
     const template = everyElement.elements[0]!
     const elements = Array.from({ length: 10_001 }, (_, i) => ({
