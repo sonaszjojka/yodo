@@ -6,6 +6,7 @@ import {
   Eraser,
   Hand,
   LineSegment,
+  Note,
   PencilSimple,
   Square,
   TextT,
@@ -36,6 +37,7 @@ export const TOOLS: readonly ToolEntry[] = [
   { tool: 'line', label: 'Line', key: 'L', Icon: LineSegment },
   { tool: 'pencil', label: 'Pencil', key: 'P', Icon: PencilSimple },
   { tool: 'text', label: 'Text', key: 'T', Icon: TextT },
+  { tool: 'note', label: 'Note', key: 'N', Icon: Note },
   { tool: 'eraser', label: 'Eraser', key: 'E', Icon: Eraser },
 ]
 

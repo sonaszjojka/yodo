@@ -147,6 +147,29 @@
       "fontFamily": "hand",
       "fontSize": 20,
       "textAlign": "left"
+    },
+    {
+      "type": "note",
+      "id": "el-note",
+      "x": 0,
+      "y": 300,
+      "width": 200,
+      "height": 200,
+      "angle": 0,
+      "seed": 108,
+      "strokeColor": "#1E1F22",
+      "backgroundColor": "#F9EBD6",
+      "fillStyle": "solid",
+      "strokeWidth": 0,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "label": {
+        "text": "Remember",
+        "fontFamily": "hand",
+        "fontSize": 20,
+        "textAlign": "center"
+      }
     }
   ],
   "appState": {

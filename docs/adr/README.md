@@ -48,3 +48,4 @@ Why Yodo is built the way it is. See [0001](0001-record-architecture-decisions.m
 | [0035](0035-e2e-playwright-package-both-modes.md) | E2E: Playwright in `e2e/`, both modes served from one build, three browsers | Accepted |
 | [0036](0036-style-defaults-and-panel-as-browser-preferences.md) | Style defaults and the style panel's place are per-browser preferences in `localStorage`, outside the document | Accepted |
 | [0037](0037-orca-deliver-pipeline-with-codex-review.md) | Deliver features through an Orca pipeline with Codex reviewing the plan and code and retesting in a browser | Accepted |
+| [0038](0038-sticky-notes-as-note-element.md) | Sticky notes are a `note` element with a label, a fixed default colour and a clean look | Accepted |

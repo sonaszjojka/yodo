@@ -62,7 +62,7 @@ Between the gates, don't ask "shall I continue?". Give a one-line status at the 
 ## 2. Plan review (Codex worker)
 Write the spec file with the following content (fill in the placeholders; paste the full plan), then start the worker with the plan-review model and end your turn:
 
-> You are the adversarial plan reviewer for the Yodo repo at `<repo path>`. Follow `.agents/skills/review/SKILL.md`, section "Plan review", and its Rules and Output sections. Read `AGENTS.md` first. The task is `<roadmap id and title>`. Its done-when criterion is: `<quoted criterion>`. Nothing has been implemented yet, and `main` is checked out. Don't edit anything. Report with `worker_done`. Its body is the Output block from the review skill. Plan:
+> You are the adversarial plan reviewer for the Yodo repo at `<repo path>`. Follow `.agents/skills/review/SKILL.md`, section "Plan review", and its Rules and Output sections. Read `AGENTS.md` first. The task is `<roadmap id and title>`. Its done-when criterion is: `<quoted criterion>`. Nothing has been implemented yet, and `main` is checked out. Don't edit anything. Report with `worker_done`, sent as one plain `orca orchestration send …` shell command (no script, heredoc or variable around it), so the Codex allow rule can match. Its body is the Output block from the review skill. Plan:
 > `<the full plan>`
 
 Don't add your own reasoning or doubts to the spec. The reviewer judges the plan as written.
@@ -80,7 +80,7 @@ Don't add your own reasoning or doubts to the spec. The reviewer judges the plan
 ## 5. Code review round 1 (Codex worker)
 Note `git status --short`, write the spec, start the worker with the code-review model, and end your turn:
 
-> You are the code reviewer for branch `<branch>` of the Yodo repo at `<repo path>` (checked out). Follow `.agents/skills/review/SKILL.md`, section "Code review", and its Rules and Output sections. Read `AGENTS.md` first. Review `git diff main...<branch>` (commits `main..<authoring-sha>`). The task is `<roadmap id and title>`. Its done-when criterion is: `<quoted criterion>`. Don't edit, commit or push anything. Report with `worker_done`. Its body is the Output block from the review skill.
+> You are the code reviewer for branch `<branch>` of the Yodo repo at `<repo path>` (checked out). Follow `.agents/skills/review/SKILL.md`, section "Code review", and its Rules and Output sections. Read `AGENTS.md` first. Review `git diff main...<branch>` (commits `main..<authoring-sha>`). The task is `<roadmap id and title>`. Its done-when criterion is: `<quoted criterion>`. Don't edit, commit or push anything. Report with `worker_done`, sent as one plain `orca orchestration send …` shell command (no script, heredoc or variable around it), so the Codex allow rule can match. Its body is the Output block from the review skill.
 
 Don't add a summary of the implementation. The reviewer must not see the author's reasoning.
 
@@ -114,7 +114,7 @@ An independent acceptance check in a fresh session. It always runs, with or with
 
 Note `git status --short`, write the spec, start the worker with the retest model, and end your turn:
 
-> You are the independent verifier for branch `<branch>` of the Yodo repo at `<repo path>` (checked out). Follow `.agents/skills/retest/SKILL.md`. Read `AGENTS.md` first. The task is `<roadmap id and title>`. Its done-when criterion is: `<quoted criterion, one item per line>`. Review-fix commits to verify: `<sha — one-line claim, per fix>` or `none`. Don't edit, commit or push anything in the repo. Report with `worker_done`. Its body is the Report block from the retest skill.
+> You are the independent verifier for branch `<branch>` of the Yodo repo at `<repo path>` (checked out). Follow `.agents/skills/retest/SKILL.md`. Read `AGENTS.md` first. The task is `<roadmap id and title>`. Its done-when criterion is: `<quoted criterion, one item per line>`. Review-fix commits to verify: `<sha — one-line claim, per fix>` or `none`. Don't edit, commit or push anything in the repo. Report with `worker_done`, sent as one plain `orca orchestration send …` shell command (no script, heredoc or variable around it), so the Codex allow rule can match. Its body is the Report block from the retest skill.
 
 When it reports:
 - **`pass`:** go to stage 9. Carry its CHECKS table into the PR body.

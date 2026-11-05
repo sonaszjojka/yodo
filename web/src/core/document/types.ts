@@ -72,6 +72,17 @@ export interface EllipseElement extends BaseElement {
   label?: TextLabel
 }
 
+/**
+ * A sticky note (roadmap 2.4, ADR 0038): a coloured box with a label. Its
+ * colour is `backgroundColor` (never 'transparent'); `strokeColor` is the
+ * text colour. It has no outline. Added as a new element type, so
+ * schemaVersion stays 1.
+ */
+export interface NoteElement extends BaseElement {
+  type: 'note'
+  label?: TextLabel
+}
+
 export interface LineElement extends BaseElement {
   type: 'line'
   points: Point[]
@@ -101,6 +112,7 @@ export type YodoElement =
   | RectangleElement
   | DiamondElement
   | EllipseElement
+  | NoteElement
   | LineElement
   | ArrowElement
   | PencilElement

@@ -28,6 +28,7 @@
 - **Contextual bar** above the selection:
   - shape: stroke, fill, width, look (hand-drawn / clean), **All styles**, more;
   - text: font, size S/M/L/XL, **All styles**, more;
+  - note (sticky note, tool `N`): text colour and note colour (the 7 fills, never "None"), **All styles**, more; opacity in the panel. A new note is Sand and opens for typing at once (ADR 0038);
   - more (any selection): duplicate, copy/paste style, bring to front, delete.
   - Each control opens one small popover at a time. No bar when nothing is selected.
   - Steps: width Thin 1 / Bold 2 / Extra bold 4 px; look Hand-drawn (roughness 1) / Clean (0); size S 16 / M 20 / L 28 / XL 36 px. A control appears when it fits at least one selected element; different values show as "Mixed".

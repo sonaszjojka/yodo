@@ -5,6 +5,7 @@ import type {
   DiamondElement,
   EllipseElement,
   FontFamily,
+  NoteElement,
   RectangleElement,
 } from '../document/types.ts'
 import type { Bounds } from '../geometry/rect.ts'
@@ -106,11 +107,13 @@ export function layoutText(
   }
 }
 
-type LabelledShape = RectangleElement | DiamondElement | EllipseElement
+type LabelledShape =
+  RectangleElement | DiamondElement | EllipseElement | NoteElement
 
 /** How much of each side of the box the shape's inside can hold text in. */
 const INNER_RATIO: Record<LabelledShape['type'], number> = {
   rectangle: 1,
+  note: 1,
   // The largest rectangle with the box's proportions inside the shape.
   ellipse: Math.SQRT1_2,
   diamond: 0.5,

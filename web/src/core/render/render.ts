@@ -4,6 +4,7 @@ import type { RoughCanvas } from 'roughjs/bin/canvas'
 import type { Options } from 'roughjs/bin/core'
 import type {
   FontFamily,
+  NoteElement,
   PencilElement,
   Point,
   StrokeStyle,
@@ -56,6 +57,9 @@ export type SceneContext = Pick<
   | 'lineCap'
   | 'lineJoin'
   | 'setLineDash'
+  | 'shadowColor'
+  | 'shadowBlur'
+  | 'shadowOffsetY'
 >
 /** The return value (a Drawable) is unused, so fakes may return nothing. */
 export interface SceneRough {
@@ -169,7 +173,10 @@ function contextMeasure(ctx: SceneContext): Measure {
 /** A shape's label, wrapped to its label box and centred in it (ADR 0026). */
 function drawLabel(
   ctx: SceneContext,
-  shape: Extract<YodoElement, { type: 'rectangle' | 'diamond' | 'ellipse' }>,
+  shape: Extract<
+    YodoElement,
+    { type: 'rectangle' | 'diamond' | 'ellipse' | 'note' }
+  >,
   theme: Theme,
 ) {
   const { label } = shape
@@ -197,6 +204,27 @@ function drawLabel(
       width: box.width,
     },
   )
+}
+
+/** The note's corner radius and shadow, in world units (ADR 0038). */
+const NOTE_RADIUS = 4
+const NOTE_SHADOW = { blur: 10, offsetY: 3, color: 'rgba(0, 0, 0, 0.22)' }
+
+/**
+ * A note: a plain rounded box with a soft shadow, no rough.js (ADR 0038). The
+ * shadow is set inside its own save/restore so it never reaches the text.
+ */
+function drawNote(ctx: SceneContext, note: NoteElement, theme: Theme) {
+  ctx.save()
+  ctx.fillStyle = adaptColor(note.backgroundColor, theme, 'fill')
+  ctx.shadowColor = NOTE_SHADOW.color
+  ctx.shadowBlur = NOTE_SHADOW.blur
+  ctx.shadowOffsetY = NOTE_SHADOW.offsetY
+  ctx.beginPath()
+  ctx.roundRect(note.x, note.y, note.width, note.height, NOTE_RADIUS)
+  ctx.fill()
+  ctx.restore()
+  drawLabel(ctx, note, theme)
 }
 
 function drawElement(
@@ -236,6 +264,9 @@ function drawElement(
     case 'ellipse':
       rough.ellipse(x + width / 2, y + height / 2, width, height, options)
       drawLabel(ctx, element, theme)
+      return
+    case 'note':
+      drawNote(ctx, element, theme)
       return
     case 'line':
     case 'arrow': {

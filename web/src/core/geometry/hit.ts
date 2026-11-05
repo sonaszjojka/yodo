@@ -102,6 +102,7 @@ export function hitTest(
 
   switch (element.type) {
     case 'rectangle':
+    case 'note':
     case 'text': {
       const inOuter =
         px >= x - reach &&

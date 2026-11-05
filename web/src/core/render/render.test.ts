@@ -3,6 +3,7 @@ import {
   DEFAULT_LABEL,
   createLinear,
   createPencil,
+  createNote,
   createShape,
   createText,
 } from '../document/create.ts'
@@ -59,6 +60,9 @@ function fakeContext() {
     lineCap: 'butt' as CanvasLineCap,
     lineJoin: 'miter' as CanvasLineJoin,
     setLineDash: vi.fn(),
+    shadowColor: 'rgba(0, 0, 0, 0)',
+    shadowBlur: 0,
+    shadowOffsetY: 0,
   } satisfies SceneContext
 }
 
@@ -569,6 +573,54 @@ describe('text (ADR 0027)', () => {
     expect(rough.rectangle).toHaveBeenCalledOnce()
     // Label box: 5..195 × 5..95; one 25 px line centred in it.
     expect(ctx.fillText).toHaveBeenCalledWith('Hi', 100, 50)
+  })
+
+  test('draws a note as a plain filled box with a shadow, then its label', () => {
+    const ctx = fakeContext()
+    const rough = fakeRough()
+    const made = {
+      ...createNote({ x: 0, y: 0, width: 200, height: 100 }, 1),
+      label: {
+        text: 'Hi',
+        fontFamily: 'hand',
+        fontSize: 20,
+        textAlign: 'center',
+      } as const,
+    }
+    const fills: string[] = []
+    ctx.fill.mockImplementation(() => fills.push(ctx.fillStyle))
+
+    renderScene(ctx, rough, [made], SURFACE, IDENTITY)
+
+    // Not rough.js (ADR 0038): a Canvas rounded box filled in the note's Sand.
+    expect(rough.rectangle).not.toHaveBeenCalled()
+    expect(ctx.roundRect).toHaveBeenCalledWith(
+      0,
+      0,
+      200,
+      100,
+      expect.any(Number),
+    )
+    expect(fills).toEqual(['#F9EBD6'])
+    // The shadow is set for the fill and reset by restore, so text has none.
+    expect(ctx.restore.mock.calls.length).toBeGreaterThanOrEqual(2)
+    expect(ctx.fillText).toHaveBeenCalledWith('Hi', 100, 50)
+  })
+
+  test('fills a note with the dark twin of its colour in dark mode', () => {
+    const ctx = fakeContext()
+    const fills: string[] = []
+    ctx.fill.mockImplementation(() => fills.push(ctx.fillStyle))
+
+    renderScene(
+      ctx,
+      fakeRough(),
+      [createNote({ x: 0, y: 0, width: 10, height: 10 }, 1)],
+      { ...SURFACE, theme: 'dark' },
+      IDENTITY,
+    )
+
+    expect(fills).toEqual(['#3B2F1F'])
   })
 
   test('wraps a label to the label box width', () => {

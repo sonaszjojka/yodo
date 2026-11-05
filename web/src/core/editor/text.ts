@@ -12,6 +12,7 @@ import type {
   EllipseElement,
   FontFamily,
   Point,
+  NoteElement,
   RectangleElement,
   TextAlign,
   TextElement,
@@ -38,13 +39,15 @@ export type TextEdit =
   | { target: 'text'; id: string; text: string }
   | { target: 'label'; id: string; text: string }
 
-export type LabelledShape = RectangleElement | DiamondElement | EllipseElement
+export type LabelledShape =
+  RectangleElement | DiamondElement | EllipseElement | NoteElement
 
 export function isLabelled(element: YodoElement): element is LabelledShape {
   return (
     element.type === 'rectangle' ||
     element.type === 'diamond' ||
-    element.type === 'ellipse'
+    element.type === 'ellipse' ||
+    element.type === 'note'
   )
 }
 

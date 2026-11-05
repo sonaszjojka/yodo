@@ -9,9 +9,9 @@ Rule: every stage ends with a **file of decisions**, not just a conversation. Co
 
 ## Status (2026-11-05)
 Read this section, not the whole file; finished work is logged in `docs/history.md`.
-- **Last done:** roadmap 2.3 (issue #79): dark mode. UI tokens as `light-dark()` pairs, a System/Light/Dark choice in a new Settings menu on Home (kept in `localStorage`, ADR 0036), and drawing colours adapted when rendering dark (ADR 0015): palette twins plus a pure function for custom colours. The canvas, thumbnails, swatches and text editor follow the theme, also live when the OS changes.
+- **Last done:** roadmap 2.4 (issue #80): sticky notes (ADR 0038). A new `note` element that reuses the shape label: the Note tool (`N`) places a 200 px Sand note on click or sizes it by dragging and opens it for typing; it is drawn as a plain rounded box with a soft shadow, moves and resizes like any element, and offers text colour, note colour (never transparent) and opacity.
 - Open items: `review` issues from the 1.14, 1.15, 1.16, 2.2a, 2.2b and 2.3 reviews.
-- **Next step:** roadmap 2.4 (issue #80): sticky notes.
+- **Next step:** roadmap 2.5 (issue #81): copy / paste / duplicate.
 
 ## Working mode: an educational project
 The goal is both the app and learning how to program with Claude as effectively as possible, so that the knowledge stays with you. The rules (you decide and I explain, no silent automation, features introduced on first use, a short recap after each task, "just do it" to skip explanations) live in the global `~/.claude/CLAUDE.md` and the `educational-working-mode` memory, so they apply in every session.

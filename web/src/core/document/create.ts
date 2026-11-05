@@ -5,6 +5,7 @@ import {
   type ArrowElement,
   type BaseElement,
   type LineElement,
+  type NoteElement,
   type PencilElement,
   type Point,
   type RectangleElement,
@@ -131,6 +132,32 @@ export function createShape<T extends ShapeType>(
     YodoElement,
     { type: T }
   >
+}
+
+/** The side of a note placed by a click, in world units. */
+export const NOTE_SIZE = 200
+/** A new note's colour: Sand from the fill palette, whatever the default fill is (ADR 0038). */
+export const NOTE_COLOR = '#F9EBD6'
+
+/**
+ * A new note filling `bounds`: a solid, clean, outline-free box in
+ * `NOTE_COLOR` (ADR 0038), with the text colour of `style`.
+ */
+export function createNote(
+  bounds: Bounds,
+  seed = randomSeed(),
+  style = BUILT_IN_STYLE,
+): NoteElement {
+  return {
+    type: 'note',
+    ...defaults(seed, style),
+    backgroundColor: NOTE_COLOR,
+    fillStyle: 'solid',
+    strokeWidth: 0,
+    strokeStyle: 'solid',
+    roughness: 0,
+    ...bounds,
+  }
 }
 
 /** A new line, or an arrow with an arrowhead at its end. */
