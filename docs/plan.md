@@ -7,11 +7,11 @@ Rule: every stage ends with a **file of decisions**, not just a conversation. Co
 
 **Language:** from now on all communication, code, docs and other output are in English.
 
-## Status (2026-11-04)
+## Status (2026-11-05)
 Read this section, not the whole file; finished work is logged in `docs/history.md`.
-- **Last done:** roadmap 2.2b (issue #96): the style panel's remaining sections. Corners (a new optional `roundness` field on rectangles and diamonds, non-breaking, so still schema v1), layers, copy/paste style and "use as default" in the panel, plus the bar's "more" menu for every selection.
-- Open items: `review` issues from the 1.14, 1.15, 1.16, 2.2a and 2.2b reviews.
-- **Next step:** roadmap 2.3 (issue #79): dark mode.
+- **Last done:** roadmap 2.3 (issue #79): dark mode. UI tokens as `light-dark()` pairs, a System/Light/Dark choice in a new Settings menu on Home (kept in `localStorage`, ADR 0036), and drawing colours adapted when rendering dark (ADR 0015): palette twins plus a pure function for custom colours. The canvas, thumbnails, swatches and text editor follow the theme, also live when the OS changes.
+- Open items: `review` issues from the 1.14, 1.15, 1.16, 2.2a, 2.2b and 2.3 reviews.
+- **Next step:** roadmap 2.4 (issue #80): sticky notes.
 
 ## Working mode: an educational project
 The goal is both the app and learning how to program with Claude as effectively as possible, so that the knowledge stays with you. The rules (you decide and I explain, no silent automation, features introduced on first use, a short recap after each task, "just do it" to skip explanations) live in the global `~/.claude/CLAUDE.md` and the `educational-working-mode` memory, so they apply in every session.

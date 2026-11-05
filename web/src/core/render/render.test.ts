@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from 'vitest'
 import {
+  DEFAULT_LABEL,
   createLinear,
   createPencil,
   createShape,
@@ -588,5 +589,116 @@ describe('text (ADR 0027)', () => {
     renderScene(ctx, fakeRough(), [shape], SURFACE, IDENTITY)
 
     expect(ctx.fillText.mock.calls.map(([line]) => line)).toEqual(['a', 'b'])
+  })
+})
+
+describe('dark theme', () => {
+  const DARK = { ...SURFACE, theme: 'dark' } as const
+
+  /** Rectangle with fill and label, ellipse, pencil stroke and free text. */
+  function referenceScene() {
+    const rect = {
+      ...createShape('rectangle', { x: 0, y: 0, width: 100, height: 60 }, 1),
+      strokeColor: '#C2453D',
+      backgroundColor: '#F7E1DE',
+      label: { ...DEFAULT_LABEL, text: 'Hi' },
+    }
+    const ellipse = {
+      ...createShape('ellipse', { x: 0, y: 0, width: 50, height: 50 }, 2),
+      strokeColor: '#336699',
+      backgroundColor: 'transparent',
+    }
+    const pencil = {
+      ...createPencil(
+        {
+          x: 0,
+          y: 0,
+          points: [
+            [0, 0],
+            [5, 5],
+            [10, 0],
+          ],
+        } as never,
+        3,
+      ),
+      strokeColor: '#3F8F5A',
+    }
+    const text = {
+      ...createText([0, 0], 4),
+      text: 'note',
+      width: 40,
+      height: 20,
+    }
+    return { rect, ellipse, pencil, text }
+  }
+
+  /** The colour the context held at each draw call of a kind. */
+  function colorsAtDraw(ctx: ReturnType<typeof fakeContext>) {
+    const text: string[] = []
+    const stroke: string[] = []
+    ctx.fillText.mockImplementation(() => void text.push(ctx.fillStyle))
+    ctx.stroke.mockImplementation(() => void stroke.push(ctx.strokeStyle))
+    return { text, stroke }
+  }
+
+  test('draws the reference scene with dark-adapted colours', () => {
+    const { rect, ellipse, pencil, text } = referenceScene()
+    const ctx = fakeContext()
+    const rough = fakeRough()
+    const seen = colorsAtDraw(ctx)
+
+    renderScene(ctx, rough, [rect, ellipse, pencil, text], DARK, IDENTITY)
+
+    // Palette colours use their twins; the custom blue goes through the algorithm.
+    expect(rough.rectangle).toHaveBeenCalledWith(
+      0,
+      0,
+      100,
+      60,
+      expect.objectContaining({ stroke: '#F08A80', fill: '#3D2624' }),
+    )
+    const ellipseOptions = rough.ellipse.mock.calls[0][4] as {
+      stroke: string
+      fill?: string
+    }
+    expect(ellipseOptions.fill).toBeUndefined()
+    expect(ellipseOptions.stroke).not.toBe('#336699')
+    // The label follows the shape's stroke; the free text uses its own (Ink).
+    expect(seen.text).toEqual(['#F08A80', '#E4E6E8'])
+    expect(seen.stroke).toContain('#6CC28A')
+  })
+
+  test('light stays as stored, with or without a theme', () => {
+    const { rect } = referenceScene()
+    for (const surface of [SURFACE, { ...SURFACE, theme: 'light' as const }]) {
+      const rough = fakeRough()
+      renderScene(fakeContext(), rough, [rect], surface, IDENTITY)
+      expect(rough.rectangle).toHaveBeenCalledWith(
+        0,
+        0,
+        100,
+        60,
+        expect.objectContaining({ stroke: '#C2453D', fill: '#F7E1DE' }),
+      )
+    }
+  })
+
+  test('draws the selection overlay in the dark tokens', () => {
+    const { rect } = referenceScene()
+    const ctx = fakeContext()
+    const fills: string[] = []
+    ctx.fill.mockImplementation(() => void fills.push(ctx.fillStyle))
+    ctx.fillText.mockImplementation(() => void fills.push(ctx.fillStyle))
+
+    renderScene(ctx, fakeRough(), [rect], DARK, IDENTITY, {
+      selected: [rect],
+      marquee: { x: 0, y: 0, width: 5, height: 5 },
+    })
+
+    // Handles (surface), badge (accent), badge text (on accent), marquee (soft).
+    expect(fills).toContain('#1C1E21')
+    expect(fills).toContain('#4FD1C5')
+    expect(fills).toContain('#062420')
+    expect(fills).toContain('#1D3836')
   })
 })

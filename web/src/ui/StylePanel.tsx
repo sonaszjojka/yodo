@@ -153,13 +153,13 @@ const CHOICES = {
     key: 'strokeColor',
     name: 'Stroke',
     options: STROKES,
-    show: (value) => <Swatch value={value} round />,
+    show: (value) => <Swatch value={value} role="stroke" round />,
   } satisfies Choice<'strokeColor'>,
   backgroundColor: {
     key: 'backgroundColor',
     name: 'Background',
     options: FILLS,
-    show: (value) => <Swatch value={value} />,
+    show: (value) => <Swatch value={value} role="fill" />,
   } satisfies Choice<'backgroundColor'>,
   fillStyle: {
     key: 'fillStyle',

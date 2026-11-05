@@ -19,6 +19,7 @@ import { StylePanel, StylePanelToggle } from './StylePanel.tsx'
 import { TextEditor } from './TextEditor.tsx'
 import { Toolbar } from './Toolbar.tsx'
 import { TopBar } from './TopBar.tsx'
+import { useTheme } from './useTheme.ts'
 import { ZoomControl } from './ZoomControl.tsx'
 
 export interface AppProps {
@@ -43,6 +44,7 @@ export function App({ repository, document, onClose }: AppProps) {
   )
   const [saver] = useState(() => createAutoSaver(editor.store, repository))
   const [panel] = useState(() => createStore(loadPanelLayout()))
+  const { theme } = useTheme()
 
   // Per-browser preferences (ADR 0036): stored whenever they change.
   useEffect(() => {
@@ -82,7 +84,7 @@ export function App({ repository, document, onClose }: AppProps) {
     <>
       <Canvas editor={editor} />
       <TopBar editor={editor} />
-      <TextEditor editor={editor} />
+      <TextEditor editor={editor} theme={theme} />
       <StyleBar
         editor={editor}
         onAllStyles={() =>

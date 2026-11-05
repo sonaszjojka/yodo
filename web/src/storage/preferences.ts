@@ -7,6 +7,10 @@ import type { Bounds } from '../core/geometry/rect.ts'
 
 export const STYLE_DEFAULTS_KEY = 'yodo.styleDefaults'
 export const PANEL_LAYOUT_KEY = 'yodo.stylePanel'
+export const THEME_KEY = 'yodo.theme'
+
+/** The user's choice; `system` follows the OS (ADR 0015, 0036). */
+export type ThemeChoice = 'system' | 'light' | 'dark'
 
 /** The parts of `Storage` used here, so tests can pass a fake. */
 export type PreferenceStorage = Pick<Storage, 'getItem' | 'setItem'>
@@ -120,4 +124,21 @@ export function savePanelLayout(
   storage = browserStorage(),
 ) {
   write(PANEL_LAYOUT_KEY, layout, storage)
+}
+
+export function loadTheme(storage = browserStorage()): ThemeChoice {
+  try {
+    const stored = storage?.getItem(THEME_KEY)
+    return stored === 'light' || stored === 'dark' ? stored : 'system'
+  } catch {
+    return 'system'
+  }
+}
+
+export function saveTheme(choice: ThemeChoice, storage = browserStorage()) {
+  try {
+    storage?.setItem(THEME_KEY, choice)
+  } catch {
+    // Blocked or full storage: the choice is just not remembered.
+  }
 }

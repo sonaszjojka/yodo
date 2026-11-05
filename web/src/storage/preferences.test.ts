@@ -2,11 +2,14 @@ import { describe, expect, test } from 'vitest'
 import { BUILT_IN_STYLE } from '../core/document/create.ts'
 import {
   loadPanelLayout,
+  loadTheme,
   loadStyleDefaults,
   PANEL_LAYOUT_KEY,
   savePanelLayout,
   saveStyleDefaults,
+  saveTheme,
   STYLE_DEFAULTS_KEY,
+  THEME_KEY,
   type PanelLayout,
 } from './preferences.ts'
 
@@ -136,5 +139,32 @@ describe('panel layout', () => {
     })
     expect(loadPanelLayout(blocked)).toEqual({ open: false, place: null })
     expect(() => savePanelLayout(layout, blocked)).not.toThrow()
+  })
+})
+
+describe('theme', () => {
+  test('nothing stored follows the system', () => {
+    expect(loadTheme(fakeStorage())).toBe('system')
+  })
+
+  test.each(['system', 'light', 'dark'] as const)(
+    'round-trips %s',
+    (choice) => {
+      const storage = fakeStorage()
+      saveTheme(choice, storage)
+      expect(loadTheme(storage)).toBe(choice)
+    },
+  )
+
+  test.each(['sepia', '', '"dark"', '{}'])(
+    'an invalid stored value (%j) falls back to the system',
+    (raw) => {
+      expect(loadTheme(fakeStorage({ [THEME_KEY]: raw }))).toBe('system')
+    },
+  )
+
+  test('blocked storage reads as the system and does not throw on save', () => {
+    expect(loadTheme(blocked)).toBe('system')
+    expect(() => saveTheme('dark', blocked)).not.toThrow()
   })
 })
