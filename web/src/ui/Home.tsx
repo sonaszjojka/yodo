@@ -115,6 +115,8 @@ export function Home({
           lines: describeSummary(summary),
         })
         setImporting(false)
+        // The summary links to the drawing only until dismissed; its card must be listed.
+        setAttempt((n) => n + 1)
       } else {
         navigate({ name: 'drawing', id })
       }

@@ -50,7 +50,13 @@ test('importing an Excalidraw file shows what was skipped and opens the drawing'
   await expect(summary).toContainText('Imported 1 element')
   await expect(summary).toContainText('Skipped frames (1)')
 
-  await summary.getByRole('link', { name: 'Open drawing' }).click()
+  // Dismissing the summary leaves the new drawing as a card on Home.
+  const href = await summary
+    .getByRole('link', { name: 'Open drawing' })
+    .getAttribute('href')
+  await summary.getByRole('button', { name: 'Dismiss' }).click()
+  await expect(page.locator(`a[href="${href}"]`)).toBeVisible()
+  await page.locator(`a[href="${href}"]`).click()
   await page.waitForURL(/#\/d\/[^/]+$/)
   // The rectangle is far from the origin; the view opens on it.
   await expectInk(page)
