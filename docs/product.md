@@ -75,7 +75,7 @@ Shipped in usable milestones; the split into milestones and tasks is in `docs/ro
 
 ### Performance (non-functional)
 - Panning, zooming and drawing stay smooth on a board with ~1,000 elements and several images.
-- Benchmark: a generated reference board (1,000 mixed elements: shapes, arrows, pencil strokes, text; plus 5 images of ~2 MP) keeps panning and zooming at **≥ 55 fps** and draws a new shape with **no frame over 32 ms**, in Chrome on an Apple-silicon Mac. Measured by a Playwright performance test, tracked over time rather than gated on every CI run (CI machines vary) (`npm run perf`, `docs/perf/`, ADR 0041).
+- Benchmark: a generated reference board (1,000 mixed elements: shapes, arrows, pencil strokes, text; plus 5 images of ~2 MP) keeps panning and zooming at **≥ 55 fps** and draws a new shape with **no frame over 32 ms**, in Chrome on an Apple-silicon Mac. Measured by a Playwright performance test, tracked over time rather than gated on every CI run (CI machines vary) (`npm run perf`, `docs/perf/`, ADR 0042).
 
 ## Later
 - Real-time collaboration

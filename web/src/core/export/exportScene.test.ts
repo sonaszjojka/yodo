@@ -192,7 +192,10 @@ describe('renderExport', () => {
     const picture = {} as CanvasImageSource
     const images = vi.fn(() => picture)
 
-    renderExport(canvas, rough, [image], frame, {
+    // The image sits mid-view, outside the small shared frame, and the
+    // renderer skips what the frame does not show.
+    const wide = { x: 0, y: 0, width: 1000, height: 1000 }
+    renderExport(canvas, rough, [image], wide, {
       scale: 1,
       theme: 'light',
       background: false,

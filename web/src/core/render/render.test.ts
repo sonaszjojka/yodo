@@ -838,6 +838,8 @@ describe('renderScene background', () => {
     )
 
     expect(ctx.fillRect).not.toHaveBeenCalled()
+  })
+})
 
 describe('viewport culling (roadmap 2.12)', () => {
   function drawn(

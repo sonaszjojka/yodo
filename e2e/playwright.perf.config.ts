@@ -1,6 +1,6 @@
 import { defineConfig } from '@playwright/test'
 
-// The performance benchmark (roadmap 2.12, ADR 0041). It runs on demand with
+// The performance benchmark (roadmap 2.12, ADR 0042). It runs on demand with
 // `npm run perf`, never as part of `npm test` or CI: runners vary, and the
 // target is a real Chrome on an Apple-silicon Mac (docs/product.md).
 const PORT = 4182

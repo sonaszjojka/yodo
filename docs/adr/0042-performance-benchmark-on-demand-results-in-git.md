@@ -1,4 +1,4 @@
-# 0041. Track performance with an on-demand Playwright benchmark whose results are committed as JSONL
+# 0042. Track performance with an on-demand Playwright benchmark whose results are committed as JSONL
 
 - Status: Accepted
 - Date: 2026-11-05

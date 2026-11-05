@@ -52,4 +52,4 @@ Why Yodo is built the way it is. See [0001](0001-record-architecture-decisions.m
 | [0039](0039-copy-paste-through-the-system-clipboard.md) | Copy and paste elements through the system clipboard with a validated JSON payload | Accepted |
 | [0040](0040-images-in-a-content-addressed-image-repository.md) | Images are `image` elements backed by a content-addressed `ImageRepository` (IndexedDB blobs, `/api/images` and files under `/data`) | Accepted |
 | [0041](0041-export-images-by-re-rendering-on-an-offscreen-canvas.md) | Export PNG by re-rendering the scene on an offscreen canvas at the chosen scale, theme and background | Accepted |
-| [0041](0041-performance-benchmark-on-demand-results-in-git.md) | Track performance with an on-demand Playwright benchmark whose results are committed as JSONL | Accepted |
+| [0042](0042-performance-benchmark-on-demand-results-in-git.md) | Track performance with an on-demand Playwright benchmark whose results are committed as JSONL | Accepted |

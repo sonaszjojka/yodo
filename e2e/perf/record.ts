@@ -1,4 +1,4 @@
-// Appends one benchmark run to docs/perf/results.jsonl (ADR 0041), so the
+// Appends one benchmark run to docs/perf/results.jsonl (ADR 0042), so the
 // history lives in git. Only when PERF_RECORD=1; a plain run just reports.
 
 import { execFileSync } from 'node:child_process'

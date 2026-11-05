@@ -1,6 +1,6 @@
 // Roadmap 2.12: the performance benchmark of docs/product.md. On the generated
 // reference board, pan and zoom must keep >= 55 fps and drawing a shape must
-// not produce a frame over 32 ms. Run it with `npm run perf` (ADR 0041).
+// not produce a frame over 32 ms. Run it with `npm run perf` (ADR 0042).
 
 import { createHash } from 'node:crypto'
 import type { Page } from '@playwright/test'
