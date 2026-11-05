@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'vitest'
-import { fittingScale, initialChoices, pngFileName } from './exportChoices.ts'
+import {
+  fittingScale,
+  initialChoices,
+  pngFileName,
+  svgFileName,
+} from './exportChoices.ts'
 
 describe('initialChoices', () => {
   test('exports the selection when there is one, else the whole drawing', () => {
@@ -8,6 +13,10 @@ describe('initialChoices', () => {
       fileName: 'Sketch',
     })
     expect(initialChoices('Sketch', 0).scope).toBe('all')
+  })
+
+  test('opens on the PNG tab', () => {
+    expect(initialChoices('Sketch', 0).format).toBe('png')
   })
 
   test('starts with a light background at 2x', () => {
@@ -50,5 +59,17 @@ describe('pngFileName', () => {
     ['.hidden', 'hidden.png'],
   ])('%j becomes %j', (input, expected) => {
     expect(pngFileName(input)).toBe(expected)
+  })
+})
+
+describe('svgFileName', () => {
+  test.each([
+    ['Sketch', 'Sketch.svg'],
+    ['  My plan.SVG ', 'My plan.svg'],
+    ['plan.png', 'plan.png.svg'],
+    ['a/b\\c:d', 'a-b-c-d.svg'],
+    ['', 'drawing.svg'],
+  ])('%j becomes %j', (input, expected) => {
+    expect(svgFileName(input)).toBe(expected)
   })
 })

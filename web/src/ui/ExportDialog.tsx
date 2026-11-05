@@ -1,5 +1,7 @@
 import rough from 'roughjs'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { buildSvg } from '../core/export/svg/svgScene.ts'
+import { fontFaceCss, neededFontFiles } from '../core/export/svg/fonts.ts'
 import {
   exportElements,
   exportFrame,
@@ -10,19 +12,26 @@ import {
 import type { Editor, EditorState } from '../core/editor/editor.ts'
 import {
   copyPng,
+  copyText,
   canvasToBlob,
   downloadBlob,
   type CopyResult,
+  type DownloadHost,
 } from './exportActions.ts'
 import {
   fittingScale,
   initialChoices,
   pngFileName,
   SCALES,
+  svgFileName,
   type ExportChoices,
+  type ExportFormat,
 } from './exportChoices.ts'
 import type { ImageCache } from './imageCache.ts'
 import { createCanvasMeasure } from './measure.ts'
+import { imageDataUris } from './svgImages.ts'
+import { loadEmbeddedFonts, pageFontsReady } from './svgFonts.ts'
+import type { ImageRepository } from '../storage/images.ts'
 import { useStore } from './useStore.ts'
 
 const selectDocument = (state: EditorState) => state.document
@@ -34,19 +43,48 @@ const COPY_MESSAGES: Record<CopyResult, string> = {
   failed: 'Could not copy the image. Use Download.',
 }
 
+const SVG_COPY_MESSAGES: Record<CopyResult, string> = {
+  copied: 'Copied the SVG code to the clipboard.',
+  unsupported: 'This browser cannot copy text. Use Download.',
+  failed: 'Could not copy the SVG code. Use Download.',
+}
+
+const downloadHost: DownloadHost = {
+  createObjectURL: (blob) => URL.createObjectURL(blob),
+  revokeObjectURL: (url) => URL.revokeObjectURL(url),
+  createLink: () => window.document.createElement('a'),
+}
+
+const FONT_NOTE =
+  'The fonts could not be embedded, so text uses whatever fonts the viewer has.'
+
+/** The SVG tab's result for one `svgJob`: the file, and a blob URL for the preview. */
+interface SvgResult {
+  job: object
+  text: string
+  url: string
+}
+
+const TABS: { format: ExportFormat; label: string }[] = [
+  { format: 'png', label: 'PNG' },
+  { format: 'svg', label: 'SVG' },
+]
+
 /**
- * The export dialog (docs/ui.md, Export dialog): PNG only for now. Mounted
- * only while open, so its options start fresh each time. It draws one canvas
- * with `renderExport` (ADR 0041) and shows that canvas as the preview, so
- * what you see is exactly what Copy and Download give you.
+ * The export dialog (docs/ui.md, Export dialog) with a PNG and an SVG tab.
+ * Mounted only while open, so its options start fresh each time. PNG draws one
+ * canvas with `renderExport` (ADR 0041); SVG builds the file with `buildSvg`
+ * (ADR 0043). Either way the preview is the thing Copy and Download give you.
  */
 export function ExportDialog({
   editor,
   imageCache,
+  images,
   onClose,
 }: {
   editor: Editor
   imageCache: ImageCache
+  images: ImageRepository
   onClose(): void
 }) {
   const document_ = useStore(editor.store, selectDocument)
@@ -63,10 +101,23 @@ export function ExportDialog({
     () => exportElements(document_.elements, selectedIds, choices.scope),
     [document_.elements, selectedIds, choices.scope],
   )
-  const frame = useMemo(
-    () => exportFrame(elements, measure),
-    [elements, measure],
-  )
+  // The canvas measure wraps labels and sizes the frame with the page's fonts,
+  // which may still be loading when the dialog opens. Once they are, the epoch
+  // changes and the frame (and so the layout) is worked out again.
+  const [fontsEpoch, setFontsEpoch] = useState(0)
+  useEffect(() => {
+    let cancelled = false
+    void pageFontsReady(elements, window.document.fonts).then(() => {
+      if (!cancelled) setFontsEpoch((epoch) => epoch + 1)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [elements])
+  const frame = useMemo(() => {
+    void fontsEpoch // only here to re-run the measuring when the fonts arrive
+    return exportFrame(elements, measure)
+  }, [elements, measure, fontsEpoch])
   const scale = frame && fittingScale(frame, choices.scale)
 
   useEffect(() => {
@@ -89,7 +140,7 @@ export function ExportDialog({
   )
   const job = useMemo(
     () =>
-      frame && scale
+      choices.format === 'png' && frame && scale
         ? {
             elements,
             frame,
@@ -99,7 +150,15 @@ export function ExportDialog({
             pictures,
           }
         : null,
-    [elements, frame, scale, choices.dark, choices.background, pictures],
+    [
+      elements,
+      frame,
+      scale,
+      choices.format,
+      choices.dark,
+      choices.background,
+      pictures,
+    ],
   )
   const [drawn, setDrawn] = useState<typeof job>(null)
 
@@ -123,26 +182,106 @@ export function ExportDialog({
     }
   }, [job, imageCache])
 
+  // The SVG tab: build the file once the fonts and pictures it embeds are in.
+  // A new object whenever an input changes, like `job` above.
+  const svgJob = useMemo(
+    () =>
+      choices.format === 'svg' && frame
+        ? {
+            elements,
+            frame,
+            dark: choices.dark,
+            bg: choices.background,
+          }
+        : null,
+    [elements, frame, choices.format, choices.dark, choices.background],
+  )
+  const [svg, setSvg] = useState<SvgResult | null>(null)
+  const svgUrl = useRef<string | null>(null)
+  useEffect(() => {
+    if (!svgJob) return
+    let cancelled = false
+    void (async () => {
+      let fontCss = ''
+      let note = ''
+      try {
+        fontCss = fontFaceCss(
+          await loadEmbeddedFonts(neededFontFiles(svgJob.elements)),
+        )
+      } catch (error) {
+        console.error('Could not load the fonts for the SVG', error)
+        note = FONT_NOTE
+      }
+      const pictures = await imageDataUris(svgJob.elements, images)
+      const text = buildSvg(
+        svgJob.elements,
+        svgJob.frame,
+        { theme: svgJob.dark ? 'dark' : 'light', background: svgJob.bg },
+        {
+          measure,
+          generator: rough.generator(),
+          fontCss,
+          imageData: (fileId) => pictures.get(fileId),
+        },
+      )
+      if (cancelled) return
+      const url = URL.createObjectURL(
+        new Blob([text], { type: 'image/svg+xml' }),
+      )
+      if (svgUrl.current) URL.revokeObjectURL(svgUrl.current)
+      svgUrl.current = url
+      setSvg({ job: svgJob, text, url })
+      if (note) setStatus(note)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [svgJob, images, measure])
+  useEffect(
+    () => () => {
+      if (svgUrl.current) URL.revokeObjectURL(svgUrl.current)
+    },
+    [],
+  )
+  const svgReady = svgJob !== null && svg?.job === svgJob
+
   const update = (patch: Partial<ExportChoices>) => {
     setStatus('')
     setChoices((prev) => ({ ...prev, ...patch }))
   }
-  const size = frame && scale ? exportSize(frame, scale) : undefined
-  const ready = job !== null && drawn === job
+  const isSvg = choices.format === 'svg'
+  const size = isSvg
+    ? frame && {
+        width: Math.ceil(frame.width),
+        height: Math.ceil(frame.height),
+      }
+    : frame && scale
+      ? exportSize(frame, scale)
+      : undefined
+  const ready = isSvg ? svgReady : job !== null && drawn === job
 
   function download() {
+    if (isSvg) {
+      downloadBlob(
+        new Blob([svg!.text], { type: 'image/svg+xml' }),
+        svgFileName(choices.fileName),
+        downloadHost,
+      )
+      return
+    }
     canvasToBlob(canvas.current!).then(
-      (blob) =>
-        downloadBlob(blob, pngFileName(choices.fileName), {
-          createObjectURL: (b) => URL.createObjectURL(b),
-          revokeObjectURL: (url) => URL.revokeObjectURL(url),
-          createLink: () => window.document.createElement('a'),
-        }),
+      (blob) => downloadBlob(blob, pngFileName(choices.fileName), downloadHost),
       () => setStatus('Could not create the image.'),
     )
   }
 
   async function copy() {
+    if (isSvg) {
+      setStatus(
+        SVG_COPY_MESSAGES[await copyText(svg!.text, navigator.clipboard)],
+      )
+      return
+    }
     const blob = canvasToBlob(canvas.current!)
     const Item = (window as { ClipboardItem?: typeof ClipboardItem })
       .ClipboardItem
@@ -168,15 +307,50 @@ export function ExportDialog({
       }}
     >
       <h2 id="export-title">Export image</h2>
+      <div className="export-tabs" role="tablist" aria-label="Format">
+        {TABS.map(({ format, label }) => (
+          <button
+            key={format}
+            type="button"
+            role="tab"
+            aria-selected={choices.format === format}
+            tabIndex={choices.format === format ? 0 : -1}
+            onClick={() => update({ format })}
+            onKeyDown={(event) => {
+              if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')
+                return
+              event.preventDefault()
+              update({ format: format === 'png' ? 'svg' : 'png' })
+              // Focus follows the selected tab (WAI-ARIA tabs pattern).
+              const other =
+                event.currentTarget.parentElement!.querySelector<HTMLElement>(
+                  'button:not([aria-selected="true"])',
+                )
+              other?.focus()
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
       <div className="export-preview" data-transparent={!choices.background}>
+        {/* The canvas stays mounted while the SVG tab is open, so coming back is instant. */}
         {frame && scale ? (
-          <canvas ref={canvas} aria-label="Preview of the exported image" />
-        ) : (
-          <p role="status">
-            {frame
-              ? 'This is too large to export as an image.'
-              : 'Nothing to export.'}
-          </p>
+          <canvas
+            ref={canvas}
+            hidden={isSvg}
+            aria-label="Preview of the exported image"
+          />
+        ) : null}
+        {isSvg && frame && svg && (
+          <img src={svg.url} alt="Preview of the exported SVG" />
+        )}
+        {isSvg && frame && !svgReady && !svg && (
+          <p role="status">Preparing the SVG…</p>
+        )}
+        {!frame && <p role="status">Nothing to export.</p>}
+        {!isSvg && frame && !scale && (
+          <p role="status">This is too large to export as an image.</p>
         )}
       </div>
       {size && (
@@ -225,21 +399,23 @@ export function ExportDialog({
         Dark version
       </label>
 
-      <fieldset>
-        <legend>Scale</legend>
-        {SCALES.map((option) => (
-          <label key={option}>
-            <input
-              type="radio"
-              name="export-scale"
-              checked={scale === option}
-              disabled={!frame || !scaleFits(frame, option)}
-              onChange={() => update({ scale: option })}
-            />
-            {option}x
-          </label>
-        ))}
-      </fieldset>
+      {!isSvg && (
+        <fieldset>
+          <legend>Scale</legend>
+          {SCALES.map((option) => (
+            <label key={option}>
+              <input
+                type="radio"
+                name="export-scale"
+                checked={scale === option}
+                disabled={!frame || !scaleFits(frame, option)}
+                onChange={() => update({ scale: option })}
+              />
+              {option}x
+            </label>
+          ))}
+        </fieldset>
+      )}
 
       <label className="export-name">
         File name

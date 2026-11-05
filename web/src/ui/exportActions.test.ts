@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
-import { copyPng, downloadBlob } from './exportActions.ts'
+import { copyPng, copyText, downloadBlob } from './exportActions.ts'
 
 const blob = new Blob(['x'], { type: 'image/png' })
 
@@ -33,6 +33,24 @@ describe('copyPng', () => {
     expect(await copyPng(Promise.resolve(blob), { write }, () => ({}))).toBe(
       'failed',
     )
+  })
+})
+
+describe('copyText', () => {
+  test('writes the text and reports success', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    expect(await copyText('<svg/>', { writeText })).toBe('copied')
+    expect(writeText).toHaveBeenCalledWith('<svg/>')
+  })
+
+  test('reports an unsupported browser without a clipboard', async () => {
+    expect(await copyText('<svg/>', undefined)).toBe('unsupported')
+  })
+
+  test('reports a rejected write', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const writeText = vi.fn().mockRejectedValue(new Error('denied'))
+    expect(await copyText('<svg/>', { writeText })).toBe('failed')
   })
 })
 

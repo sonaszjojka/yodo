@@ -23,6 +23,25 @@ export async function copyPng(
   }
 }
 
+export interface TextClipboard {
+  writeText(text: string): Promise<void>
+}
+
+/** Copies `text` (the SVG source) as plain text. */
+export async function copyText(
+  text: string,
+  clipboard: TextClipboard | undefined,
+): Promise<CopyResult> {
+  if (!clipboard) return 'unsupported'
+  try {
+    await clipboard.writeText(text)
+    return 'copied'
+  } catch (error) {
+    console.error('Could not copy the SVG', error)
+    return 'failed'
+  }
+}
+
 export interface DownloadHost {
   createObjectURL(blob: Blob): string
   revokeObjectURL(url: string): void
