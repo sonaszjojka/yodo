@@ -218,6 +218,26 @@ describe('HttpDrawingRepository search (ADR 0047)', () => {
     expect(put[1]?.body).toBe('budget')
   })
 
+  test('searchIndex fails when a document needed for the backfill cannot be read', async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>(async (input) =>
+      String(input).endsWith('api/search-index')
+        ? Response.json([{ id: 'a', searchText: null }])
+        : new Response('boom', { status: 500 }),
+    )
+    const repo = new HttpDrawingRepository({ baseUrl, fetch })
+    await expect(repo.searchIndex()).rejects.toThrow(HttpError)
+  })
+
+  test('searchIndex skips a drawing deleted during the backfill', async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>(async (input) =>
+      String(input).endsWith('api/search-index')
+        ? Response.json([{ id: 'a', searchText: null }])
+        : new Response('gone', { status: 404 }),
+    )
+    const repo = new HttpDrawingRepository({ baseUrl, fetch })
+    expect(await repo.searchIndex()).toEqual([{ id: 'a', searchText: '' }])
+  })
+
   test('searchIndex still answers when a backfill request fails', async () => {
     const doc = docWithText('budget')
     const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {

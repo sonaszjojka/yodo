@@ -209,7 +209,9 @@ export class HttpDrawingRepository implements DrawingRepository {
       await Promise.all(
         unindexed.slice(i, i + BACKFILL_BATCH).map(async (at) => {
           const entry = entries[at]!
-          const doc = await this.get(entry.id).catch(() => undefined)
+          // A failure here rejects the whole index, so Home says that text
+          // search is unavailable instead of caching an incomplete answer.
+          const doc = await this.get(entry.id)
           if (!doc) return
           entry.searchText = safeSearchText(doc)
           // ifUnset: a save that landed meanwhile has the newer text.
