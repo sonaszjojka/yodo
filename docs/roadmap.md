@@ -68,7 +68,7 @@ Goal: open Yodo, draw basic shapes, close the browser, come back to the same dra
 ## M4 — Post-1.0 UX fixes
 | # | Task | Done when… |
 |---|---|---|
-| 4.1 | Drawing tool stays active ([#131](https://github.com/sonaszjojka/yodo/issues/131)) | The chosen drawing tool stays active after each element; `Esc` or `V` returns to Select; the new element is not selected (ADR 0050). |
+| 4.1 | Drawing tool stays active ✓ (PR [#140](https://github.com/sonaszjojka/yodo/pull/140)) ([#131](https://github.com/sonaszjojka/yodo/issues/131)) | The chosen drawing tool stays active after each element; `Esc` or `V` returns to Select; the new element is not selected (ADR 0050). |
 
 ## Rules for changing this roadmap
 - Tasks may be split, merged or reordered; record why in the commit message.
