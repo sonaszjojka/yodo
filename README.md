@@ -1,18 +1,38 @@
 # Yodo
 
-A local-first, hand-drawn style drawing app, in the spirit of Excalidraw. Early development: see [`docs/roadmap.md`](docs/roadmap.md).
+A local-first, hand-drawn style drawing app, in the spirit of Excalidraw. Shapes, arrows that stay attached, pencil, text and images on an infinite canvas; folders, search and Trash for your drawings; PNG, SVG and `.yodo` export, and import of `.yodo` and Excalidraw files; light and dark themes. Roadmap and status: [`docs/roadmap.md`](docs/roadmap.md).
 
-## Use it
+## Two ways to use Yodo
 
-**In the browser:** [sonaszjojka.github.io/yodo](https://sonaszjojka.github.io/yodo/). Drawings stay in your browser (IndexedDB).
+The same app runs in two modes. Yodo picks the mode itself when it starts, so you use it the same way in both.
 
-**Self-hosted with Docker:** drawings are stored on disk in the `yodo-data` volume.
+| | Hosted | Self-hosted |
+|---|---|---|
+| Where you open it | [sonaszjojka.github.io/yodo](https://sonaszjojka.github.io/yodo/) | <http://localhost:8080> (or your own address) |
+| Where drawings live | In your browser (IndexedDB) | On your disk, in a SQLite database on the server |
+| Install | None | Docker |
+| Same drawings in every browser | No: each browser has its own | Yes |
+| Survives clearing browser data | No | Yes |
+| Password | None (nothing leaves your browser) | Optional, `YODO_PASSWORD` |
+| Back up | Export drawings as `.yodo` files | Copy the data directory (the Docker volume) |
+
+To move drawings from one mode to the other, export them as `.yodo` files (card menu → Export as .yodo) and use **Import file** on Home in the other mode.
+
+### Hosted
+
+Open [sonaszjojka.github.io/yodo](https://sonaszjojka.github.io/yodo/). Drawings stay in your browser and are never uploaded. Clearing site data for the page deletes them, so export the ones you want to keep.
+
+### Self-hosted with Docker
+
+Drawings are stored on disk in the `yodo-data` volume.
 
 ```sh
-docker run -p 127.0.0.1:8080:8080 -v yodo-data:/data ghcr.io/sonaszjojka/yodo
+docker run -p 127.0.0.1:8080:8080 -v yodo-data:/data ghcr.io/sonaszjojka/yodo:1.0.0
 ```
 
 Then open <http://localhost:8080>. Publishing on `127.0.0.1` keeps the server reachable from this machine only ([ADR 0020](docs/adr/0020-auth-and-origin-checks.md)).
+
+Image tags: `1.0.0` is that exact release, `1.0` follows the latest patch of that minor version, and `latest` is the newest release. `edge` is the current `main`, which may be unreleased ([ADR 0049](docs/adr/0049-releases-semver-tags-publish-the-image.md)).
 
 | Variable | Default | Meaning |
 |---|---|---|
