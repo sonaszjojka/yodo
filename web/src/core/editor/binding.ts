@@ -193,7 +193,8 @@ export function attachEnd(
 /**
  * Fixes up the arrows after the elements in `moved` were moved or resized
  * (`elements` already holds their new geometry):
- * - an end whose shape moved follows it, snapped to the shape's outline;
+ * - an end whose shape moved follows it, snapped to the shape's outline (on
+ *   the mirrored side if `flipped` says the resize flipped that axis);
  * - an end whose shape stayed put while the arrow itself moved is detached;
  * - an end whose shape is gone or cannot be attached to is detached.
  * Elements that need nothing keep their object identity.
@@ -201,6 +202,8 @@ export function attachEnd(
 export function followBindings(
   elements: readonly YodoElement[],
   moved: ReadonlySet<string>,
+  /** Axes a resize mirrored: attachments on them swap sides. */
+  flipped: { x: boolean; y: boolean } = { x: false, y: false },
 ): YodoElement[] {
   if (!elements.some((e) => e.type === 'arrow' && hasBinding(e))) {
     return [...elements]
@@ -222,7 +225,11 @@ export function followBindings(
       } else if (moved.has(element.id) && !moved.has(target.id)) {
         arrow = without(arrow, key)
       } else if (moved.has(target.id)) {
-        const world = snapToOutline(target, pointOf(target, binding.ratio))
+        const ratio: Point = [
+          flipped.x ? 1 - binding.ratio[0] : binding.ratio[0],
+          flipped.y ? 1 - binding.ratio[1] : binding.ratio[1],
+        ]
+        const world = snapToOutline(target, pointOf(target, ratio))
         arrow = withEnd({ ...arrow, [key]: world.binding }, end, world.point)
       }
     }

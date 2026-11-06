@@ -117,6 +117,7 @@ export function resizeElements(
       ids.has(element.id) ? scaleElement(element, t) : element,
     ),
     ids,
+    { x: t.sx < 0, y: t.sy < 0 },
   )
 }
 

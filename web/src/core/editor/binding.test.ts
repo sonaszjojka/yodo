@@ -232,6 +232,24 @@ describe('followBindings', () => {
 describe('followBindings, review fixes', () => {
   const a = createShape('rectangle', { x: 0, y: 0, width: 100, height: 100 })
 
+  test('a flipped resize mirrors the attachment to the other side', () => {
+    const arrow = arrowBetween(a, a, [100, 50], [100, 50])
+    const attached: ArrowElement = {
+      ...createLinear('arrow', lineFromDrag([100, 50], [200, 50], false)),
+      startBinding: arrow.startBinding,
+    }
+    // Flip the selection horizontally around x = 0.
+    const flipped = resizeElements([a, attached], new Set([a.id]), {
+      anchor: [0, 0],
+      sx: -1,
+      sy: 1,
+    })
+    const [shape, result] = flipped as [typeof a, ArrowElement]
+    expect(shape.x).toBe(-100)
+    expect([result.x, result.y]).toEqual([-100, 50])
+    expect(result.startBinding?.ratio).toEqual([0, 0.5])
+  })
+
   test('an arrow with no points is detached instead of crashing', () => {
     const broken = {
       ...createLinear('arrow', lineFromDrag([0, 0], [10, 0], false)),
