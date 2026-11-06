@@ -16,6 +16,9 @@ test.each<[string, Route]>([
   ['#/f/', { name: 'home' }],
   ['#/f/a/b', { name: 'home' }],
   ['#/f/%E0%A4%A', { name: 'home' }],
+  ['#/trash', { name: 'trash' }],
+  ['#/trash/', { name: 'home' }],
+  ['#/trash/x', { name: 'home' }],
 ])('parses %j', (hash, route) => {
   expect(parseRoute(hash)).toEqual(route)
 })
@@ -26,6 +29,7 @@ test.each<Route>([
   { name: 'drawing', id: 'a b/c' },
   { name: 'home', folderId: 'f1' },
   { name: 'home', folderId: 'a b/c' },
+  { name: 'trash' },
 ])('routeHash round-trips %j', (route) => {
   expect(parseRoute(routeHash(route))).toEqual(route)
 })

@@ -19,7 +19,7 @@ function render(props: Partial<HomeViewProps> = {}) {
     <HomeView
       repository={new InMemoryDrawingRepository()}
       imageCache={createImageCache(new InMemoryImageRepository())}
-      list={{ status: 'loaded', drawings, folders: [] }}
+      list={{ status: 'loaded', drawings, trashed: [], folders: [] }}
       sort="recent"
       onSort={() => {}}
       creating={false}
@@ -28,6 +28,10 @@ function render(props: Partial<HomeViewProps> = {}) {
       onSaveFolder={() => {}}
       onDeleteFolder={() => {}}
       onMove={() => {}}
+      onTrash={() => {}}
+      onRestore={() => {}}
+      onDeleteForever={() => {}}
+      onEmptyTrash={() => {}}
       onImport={() => {}}
       onRetry={() => {}}
       now={now}
@@ -143,6 +147,7 @@ describe('HomeView', () => {
     const withFolders = {
       status: 'loaded',
       drawings: inFolder,
+      trashed: [] as DrawingSummary[],
       folders,
     } as const
 
@@ -193,6 +198,80 @@ describe('HomeView', () => {
       const html = render({ list: withFolders })
       expect(html).toContain('href="#/f/f1"')
       expect(html).toMatch(/Work<\/span><span class="sidebar-count">1</)
+    })
+  })
+
+  describe('Trash (ADR 0046)', () => {
+    const trashed: DrawingSummary[] = [
+      {
+        id: 't1',
+        name: 'Old plan',
+        createdAt: 1,
+        updatedAt: 2,
+        deletedAt: now - 120_000,
+      },
+      {
+        id: 't2',
+        name: 'Newer plan',
+        createdAt: 1,
+        updatedAt: 2,
+        deletedAt: now - 5_000,
+      },
+    ]
+    const withTrash = {
+      status: 'loaded',
+      drawings,
+      trashed,
+      folders: [] as Folder[],
+    } as const
+
+    test('the sidebar always links to Trash and shows its count', () => {
+      expect(render()).toMatch(
+        /href="#\/trash"[^>]*>.*Trash<\/span><span class="sidebar-count">0</,
+      )
+      expect(render({ list: withTrash })).toMatch(
+        /Trash<\/span><span class="sidebar-count">2</,
+      )
+    })
+
+    test('the Trash view replaces the cards and marks its link as the page', () => {
+      const html = render({ list: withTrash, view: 'trash' })
+      expect(html).toContain('<h1>Trash</h1>')
+      expect(html).not.toContain('card-grid')
+      expect(html).not.toContain('new-drawing-tile')
+      expect(html).not.toContain('Import file')
+      expect(html).toMatch(/href="#\/trash"[^>]*aria-current="page"/)
+      // Only one link is the current page.
+      expect(html.match(/aria-current="page"/g)).toHaveLength(1)
+    })
+
+    test('lists the drawings in Trash, newest deletion first, with the count and rule', () => {
+      const html = render({ list: withTrash, view: 'trash' })
+      expect(
+        [...html.matchAll(/class="trash-name">([^<]*)</g)].map((m) => m[1]),
+      ).toEqual(['Newer plan', 'Old plan'])
+      expect(html).toContain('2 drawings in Trash')
+      expect(html).toContain('Drawings are deleted forever after 30 days.')
+      expect(html).toContain('Deleted just now')
+      expect(html).toContain('Deleted 2 min ago')
+      expect(html).toContain('aria-label="Restore Old plan"')
+      expect(html).toContain('aria-label="Delete Old plan forever"')
+    })
+
+    test('an empty Trash says so and cannot be emptied', () => {
+      const html = render({ view: 'trash' })
+      expect(html).toContain('Trash is empty')
+      expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Empty trash<\/button>/)
+      expect(html).not.toContain('trash-list')
+    })
+
+    test('trashed drawings are not cards', () => {
+      expect(names(render({ list: withTrash }))).toHaveLength(3)
+    })
+
+    test('the Trash route is not a missing folder', () => {
+      const html = render({ list: withTrash, view: 'trash', folderId: 'gone' })
+      expect(html).not.toContain('doesn’t exist')
     })
   })
 })

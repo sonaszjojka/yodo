@@ -25,6 +25,7 @@ import type {
   DrawingRepository,
   DrawingSummary,
 } from '../storage/repository.ts'
+import { purgeExpiredTrash } from '../storage/trash.ts'
 import type { ImageCache } from './imageCache.ts'
 import { DrawingCard } from './DrawingCard.tsx'
 import type { FolderValues } from './FolderDialog.tsx'
@@ -33,11 +34,18 @@ import { createCanvasMeasure } from './measure.ts'
 import { navigate } from './route.ts'
 import { SettingsMenu } from './SettingsMenu.tsx'
 import { Sidebar } from './Sidebar.tsx'
+import { TrashView } from './TrashView.tsx'
 import { importErrorMessage, importFile, isYodoFile } from './yodoFile.ts'
 
 export type HomeList =
   | { status: 'loading' }
-  | { status: 'loaded'; drawings: DrawingSummary[]; folders: Folder[] }
+  | {
+      status: 'loaded'
+      drawings: DrawingSummary[]
+      /** The drawings in Trash (ADR 0046). */
+      trashed: DrawingSummary[]
+      folders: Folder[]
+    }
   | { status: 'error' }
 
 export interface HomeProps {
@@ -45,6 +53,8 @@ export interface HomeProps {
   folders: FolderRepository
   /** The folder the route names (`#/f/<id>`); undefined shows All drawings. */
   folderId?: string
+  /** `trash` shows the Trash instead of the cards (`#/trash`, ADR 0046). */
+  view?: 'drawings' | 'trash'
   /** Where an import's pictures are stored (ADR 0040). */
   images: ImageRepository
   imageCache: ImageCache
@@ -54,11 +64,21 @@ export interface HomeProps {
   lastSaveFailed?: boolean
 }
 
+/** A summary that is no longer in `folderId` (its folder was deleted). */
+function withoutFolder(folderId: string) {
+  return (summary: DrawingSummary): DrawingSummary => {
+    if (summary.folderId !== folderId) return summary
+    const { folderId: _folder, ...rest } = summary
+    return rest
+  }
+}
+
 /** The Home screen (`docs/ui.md`, Home): every drawing as a card. */
 export function Home({
   repository,
   folders,
   folderId,
+  view = 'drawings',
   images,
   imageCache,
   waitForEditor,
@@ -78,12 +98,25 @@ export function Home({
     let cancelled = false
     // Listing before the closing editor's last save would show it stale.
     waitForEditor()
-      .then(() => Promise.all([repository.list(), folders.list()]))
+      // Before listing, so the lists never show what the sweep just removed.
+      .then(() => purgeExpiredTrash(repository, Date.now()))
+      .then(() =>
+        Promise.all([
+          repository.list(),
+          repository.listTrash(),
+          folders.list(),
+        ]),
+      )
       .then(
-        ([drawings, folderList]) => {
+        ([drawings, trashed, folderList]) => {
           if (cancelled) return
           setNow(Date.now())
-          setList({ status: 'loaded', drawings, folders: folderList })
+          setList({
+            status: 'loaded',
+            drawings,
+            trashed,
+            folders: folderList,
+          })
         },
         (error: unknown) => {
           console.error('Could not list the drawings and folders', error)
@@ -235,16 +268,84 @@ export function Home({
     setNotice(undefined)
     try {
       await folders.delete(folder.id)
-      // Its drawings went with it (ADR 0045).
+      // Its drawings went to Trash, outside the folder (ADR 0046). The time is
+      // this tab's; the next load shows the stored one.
+      const deletedAt = Date.now()
       updateLoaded((c) => ({
         ...c,
         folders: c.folders.filter((f) => f.id !== folder.id),
         drawings: c.drawings.filter((d) => d.folderId !== folder.id),
+        trashed: [
+          ...c.trashed.map(withoutFolder(folder.id)),
+          ...c.drawings
+            .filter((d) => d.folderId === folder.id)
+            .map((d) => ({ ...withoutFolder(folder.id)(d), deletedAt })),
+        ],
       }))
       if (folderId === folder.id) navigate({ name: 'home' })
     } catch (error) {
       console.error('Could not delete the folder', error)
       setNotice('Couldn’t delete the folder. Try again.')
+    }
+  }
+
+  async function onTrash(id: string) {
+    setNotice(undefined)
+    try {
+      const summary = await repository.trash(id)
+      updateLoaded((c) => ({
+        ...c,
+        drawings: c.drawings.filter((d) => d.id !== id),
+        // undefined: the drawing is gone (deleted elsewhere), so just drop it.
+        trashed: summary
+          ? [...c.trashed.filter((d) => d.id !== id), summary]
+          : c.trashed,
+      }))
+    } catch (error) {
+      console.error('Could not move the drawing to Trash', error)
+      setNotice('Couldn’t move the drawing to Trash. Try again.')
+    }
+  }
+
+  async function onRestore(id: string) {
+    setNotice(undefined)
+    try {
+      const summary = await repository.restore(id)
+      updateLoaded((c) => ({
+        ...c,
+        trashed: c.trashed.filter((d) => d.id !== id),
+        drawings: summary
+          ? [...c.drawings.filter((d) => d.id !== id), summary]
+          : c.drawings,
+      }))
+    } catch (error) {
+      console.error('Could not restore the drawing', error)
+      setNotice('Couldn’t restore the drawing. Try again.')
+    }
+  }
+
+  async function onDeleteForever(id: string) {
+    setNotice(undefined)
+    try {
+      await repository.delete(id)
+      updateLoaded((c) => ({
+        ...c,
+        trashed: c.trashed.filter((d) => d.id !== id),
+      }))
+    } catch (error) {
+      console.error('Could not delete the drawing', error)
+      setNotice('Couldn’t delete the drawing. Try again.')
+    }
+  }
+
+  async function onEmptyTrash() {
+    setNotice(undefined)
+    try {
+      await repository.emptyTrash()
+      updateLoaded((c) => ({ ...c, trashed: [] }))
+    } catch (error) {
+      console.error('Could not empty Trash', error)
+      setNotice('Couldn’t empty Trash. Try again.')
     }
   }
 
@@ -280,6 +381,11 @@ export function Home({
       onDismissImport={() => setImported(undefined)}
       onRename={(id, name) => void onRename(id, name)}
       folderId={folderId}
+      view={view}
+      onTrash={(id) => void onTrash(id)}
+      onRestore={(id) => void onRestore(id)}
+      onDeleteForever={(id) => void onDeleteForever(id)}
+      onEmptyTrash={() => void onEmptyTrash()}
       onSaveFolder={(values, existing) => void onSaveFolder(values, existing)}
       onDeleteFolder={(folder) => void onDeleteFolder(folder)}
       onMove={(id, target) => void onMove(id, target)}
@@ -326,9 +432,15 @@ export interface HomeViewProps {
   onRename(id: string, name: string): void
   /** The folder the route names; one that doesn't exist shows All drawings. */
   folderId?: string
+  /** `trash` replaces the cards with the Trash screen (ADR 0046). */
+  view?: 'drawings' | 'trash'
   onSaveFolder(values: FolderValues, existing?: Folder): void
   onDeleteFolder(folder: Folder): void
   onMove(id: string, folderId: string | null): void
+  onTrash(id: string): void
+  onRestore(id: string): void
+  onDeleteForever(id: string): void
+  onEmptyTrash(): void
   onRetry(): void
   notice?: string
   now: number
@@ -349,9 +461,14 @@ export function HomeView({
   onDismissImport,
   onRename,
   folderId,
+  view = 'drawings',
   onSaveFolder,
   onDeleteFolder,
   onMove,
+  onTrash,
+  onRestore,
+  onDeleteForever,
+  onEmptyTrash,
   onRetry,
   notice,
   now,
@@ -361,7 +478,9 @@ export function HomeView({
   const folders = loaded?.folders ?? []
   const current = activeFolder(folders, folderId)
   // A route that names a folder that is gone shows All drawings, and says so.
-  const folderGone = loaded !== undefined && folderId !== undefined && !current
+  const inTrash = view === 'trash'
+  const folderGone =
+    loaded !== undefined && folderId !== undefined && !current && !inTrash
   const message =
     notice ?? (folderGone ? 'That folder doesn’t exist any more.' : undefined)
   return (
@@ -370,7 +489,9 @@ export function HomeView({
         folders={folders}
         counts={folderCounts(loaded?.drawings ?? [])}
         total={loaded?.drawings.length}
-        selectedId={current?.id}
+        selectedId={inTrash ? undefined : current?.id}
+        trashCount={loaded?.trashed.length}
+        trashSelected={inTrash}
         onSaveFolder={onSaveFolder}
         onDeleteFolder={onDeleteFolder}
       />
@@ -380,41 +501,49 @@ export function HomeView({
         </header>
         <main className="home-main">
           <div className="home-title-row">
-            <h1>{current ? current.name : 'All drawings'}</h1>
-            <button
-              type="button"
-              className="button"
-              disabled={importing}
-              onClick={() => fileInput.current?.click()}
-            >
-              {importing ? 'Importing…' : 'Import file'}
-            </button>
-            <input
-              ref={fileInput}
-              type="file"
-              accept=".yodo,.excalidraw,.json,application/json"
-              hidden
-              aria-label="File to import"
-              data-testid="import-file"
-              onChange={(event) => {
-                const file = event.target.files?.[0]
-                event.target.value = ''
-                if (file) onImport?.(file)
-              }}
-            />
-            <label className="home-sort">
-              Sort by
-              <select
-                value={sort}
-                onChange={(event) => onSort(event.target.value as DrawingSort)}
-              >
-                {SORTS.map(({ value, label }) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <h1>
+              {inTrash ? 'Trash' : current ? current.name : 'All drawings'}
+            </h1>
+            {!inTrash && (
+              <>
+                <button
+                  type="button"
+                  className="button"
+                  disabled={importing}
+                  onClick={() => fileInput.current?.click()}
+                >
+                  {importing ? 'Importing…' : 'Import file'}
+                </button>
+                <input
+                  ref={fileInput}
+                  type="file"
+                  accept=".yodo,.excalidraw,.json,application/json"
+                  hidden
+                  aria-label="File to import"
+                  data-testid="import-file"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0]
+                    event.target.value = ''
+                    if (file) onImport?.(file)
+                  }}
+                />
+                <label className="home-sort">
+                  Sort by
+                  <select
+                    value={sort}
+                    onChange={(event) =>
+                      onSort(event.target.value as DrawingSort)
+                    }
+                  >
+                    {SORTS.map(({ value, label }) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            )}
           </div>
           {message && (
             <p className="home-notice" role="alert">
@@ -454,6 +583,16 @@ export function HomeView({
                 Try again
               </button>
             </div>
+          ) : inTrash ? (
+            loaded && (
+              <TrashView
+                trashed={loaded.trashed}
+                now={now}
+                onRestore={onRestore}
+                onDeleteForever={onDeleteForever}
+                onEmptyTrash={onEmptyTrash}
+              />
+            )
           ) : (
             <ul className="card-grid" aria-busy={list.status === 'loading'}>
               <li>
@@ -487,6 +626,7 @@ export function HomeView({
                     showFolder={current === undefined}
                     onRename={(name) => onRename(summary.id, name)}
                     onMove={(target) => onMove(summary.id, target)}
+                    onTrash={() => onTrash(summary.id)}
                   />
                 ))}
             </ul>

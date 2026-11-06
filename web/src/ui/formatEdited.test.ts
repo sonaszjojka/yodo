@@ -27,3 +27,10 @@ test('before today shows the date, with the year only when it differs', () => {
     'Edited 9 Jan 2025',
   )
 })
+
+test('the verb can change, for Trash', () => {
+  expect(formatEdited(minutes(5), now, 'en-GB', 'Deleted')).toBe(
+    'Deleted 5 min ago',
+  )
+  expect(formatEdited(now, now, 'en-GB', 'Deleted')).toBe('Deleted just now')
+})

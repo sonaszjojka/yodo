@@ -36,11 +36,14 @@ export function folderOf(
     : folders.find((f) => f.id === drawing.folderId)
 }
 
-/** The confirmation text for deleting a folder, which deletes its drawings (ADR 0045). */
+/**
+ * The confirmation text for deleting a folder. Its drawings move to Trash, so
+ * they can be restored (ADR 0046).
+ */
 export function deleteFolderMessage(name: string, count: number): string {
   if (count === 0) return `Delete the folder “${name}”? It has no drawings.`
   const drawings = count === 1 ? '1 drawing' : `${count} drawings`
-  return `Delete the folder “${name}” and its ${drawings}? This can’t be undone.`
+  return `Delete the folder “${name}”? Its ${drawings} will move to Trash.`
 }
 
 /** The folder the route names, or undefined for All drawings or a folder that is gone. */

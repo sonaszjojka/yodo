@@ -51,11 +51,11 @@ test('finds the folder of a drawing, if it still exists', () => {
   expect(folderOf(d('c', 'f9'), folders)).toBeUndefined()
 })
 
-test('the delete confirmation says how many drawings go', () => {
+test('the delete confirmation says how many drawings move to Trash', () => {
   expect(deleteFolderMessage('Work', 3)).toBe(
-    'Delete the folder “Work” and its 3 drawings? This can’t be undone.',
+    'Delete the folder “Work”? Its 3 drawings will move to Trash.',
   )
-  expect(deleteFolderMessage('Work', 1)).toContain('its 1 drawing?')
+  expect(deleteFolderMessage('Work', 1)).toContain('Its 1 drawing will move')
   expect(deleteFolderMessage('Work', 0)).toBe(
     'Delete the folder “Work”? It has no drawings.',
   )
