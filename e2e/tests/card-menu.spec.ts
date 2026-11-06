@@ -134,7 +134,8 @@ test('Duplicate saves a copy next to the drawing, in its folder', async ({
 test('Export as .yodo downloads the drawing without opening it', async ({
   page,
 }) => {
-  const name = `Export ${crypto.randomUUID().slice(0, 8)}`
+  // No spaces: WebKit turns them into underscores in the suggested file name.
+  const name = `Export-${crypto.randomUUID().slice(0, 8)}`
   await page.goto('./')
   const id = await newDrawing(page)
   await rename(page, id, name)
