@@ -111,6 +111,15 @@ export class HttpDrawingRepository implements DrawingRepository {
     return (await response.json()) as DrawingSummary[]
   }
 
+  async listTrash(): Promise<DrawingSummary[]> {
+    const response = await this.#request(
+      'GET',
+      'api/drawings?trashed=true',
+      [200],
+    )
+    return (await response.json()) as DrawingSummary[]
+  }
+
   async get(id: string): Promise<YodoDocument | undefined> {
     const response = await this.#request(
       'GET',
@@ -153,6 +162,41 @@ export class HttpDrawingRepository implements DrawingRepository {
     )
     if (response.status === 404) return undefined
     return (await response.json()) as DrawingSummary
+  }
+
+  async #setTrashed(
+    id: string,
+    trashed: boolean,
+  ): Promise<DrawingSummary | undefined> {
+    const response = await this.#request(
+      'PUT',
+      `${this.#drawingPath(id)}/trash`,
+      [200, 404],
+      {
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trashed }),
+      },
+    )
+    if (response.status === 404) return undefined
+    return (await response.json()) as DrawingSummary
+  }
+
+  trash(id: string): Promise<DrawingSummary | undefined> {
+    return this.#setTrashed(id, true)
+  }
+
+  restore(id: string): Promise<DrawingSummary | undefined> {
+    return this.#setTrashed(id, false)
+  }
+
+  async emptyTrash({
+    deletedBefore,
+  }: { deletedBefore?: number } = {}): Promise<void> {
+    const cutoff =
+      deletedBefore === undefined
+        ? ''
+        : `&deletedBefore=${Math.trunc(deletedBefore)}`
+    await this.#request('DELETE', `api/drawings?trashed=true${cutoff}`, [204])
   }
 
   async delete(id: string): Promise<void> {

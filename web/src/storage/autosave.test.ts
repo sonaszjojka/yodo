@@ -37,9 +37,13 @@ function deferredRepository() {
   }[] = []
   const repo: DrawingRepository = {
     list: async () => [],
+    listTrash: async () => [],
     get: async () => undefined,
     delete: async () => {},
     move: async () => undefined,
+    trash: async () => undefined,
+    restore: async () => undefined,
+    emptyTrash: async () => {},
     save: (doc) =>
       new Promise((resolve, reject) => {
         saves.push({

@@ -38,7 +38,15 @@ export class InMemoryDrawingRepository implements DrawingRepository {
   // async so that a throw (e.g. structuredClone's DataCloneError) rejects the
   // promise, as the interface promises, instead of escaping synchronously.
   async list(): Promise<DrawingSummary[]> {
-    return [...this.#summaries.values()].map((s) => ({ ...s }))
+    return [...this.#summaries.values()]
+      .filter((s) => s.deletedAt === undefined)
+      .map((s) => ({ ...s }))
+  }
+
+  async listTrash(): Promise<DrawingSummary[]> {
+    return [...this.#summaries.values()]
+      .filter((s) => s.deletedAt !== undefined)
+      .map((s) => ({ ...s }))
   }
 
   async get(id: string): Promise<YodoDocument | undefined> {
@@ -58,6 +66,9 @@ export class InMemoryDrawingRepository implements DrawingRepository {
       updatedAt: time,
     }
     if (existing?.folderId !== undefined) summary.folderId = existing.folderId
+    // Auto-save must not bring a trashed drawing back (ADR 0046).
+    if (existing?.deletedAt !== undefined)
+      summary.deletedAt = existing.deletedAt
     this.#documents.set(doc.id, structuredClone(doc))
     this.#summaries.set(doc.id, summary)
     return { ...summary }
@@ -77,6 +88,36 @@ export class InMemoryDrawingRepository implements DrawingRepository {
       folderId === null ? rest : { ...rest, folderId }
     this.#summaries.set(id, summary)
     return { ...summary }
+  }
+
+  async trash(id: string): Promise<DrawingSummary | undefined> {
+    const existing = this.#summaries.get(id)
+    if (!existing) return undefined
+    const summary = {
+      ...existing,
+      deletedAt: existing.deletedAt ?? this.#now(),
+    }
+    this.#summaries.set(id, summary)
+    return { ...summary }
+  }
+
+  async restore(id: string): Promise<DrawingSummary | undefined> {
+    const existing = this.#summaries.get(id)
+    if (!existing) return undefined
+    const { deletedAt: _deleted, ...summary } = existing
+    this.#summaries.set(id, summary)
+    return { ...summary }
+  }
+
+  async emptyTrash({
+    deletedBefore,
+  }: { deletedBefore?: number } = {}): Promise<void> {
+    for (const [id, { deletedAt }] of this.#summaries) {
+      if (deletedAt === undefined) continue
+      if (deletedBefore !== undefined && deletedAt >= deletedBefore) continue
+      this.#summaries.delete(id)
+      this.#documents.delete(id)
+    }
   }
 
   async delete(id: string): Promise<void> {
@@ -112,10 +153,15 @@ export class InMemoryFolderRepository implements FolderRepository {
 
   async delete(id: string): Promise<void> {
     this.#data.folders.delete(id)
+    // Its drawings go to Trash and leave the folder (ADR 0046); one already in
+    // Trash keeps its deletedAt.
     for (const [drawingId, summary] of this.#data.summaries) {
       if (summary.folderId !== id) continue
-      this.#data.summaries.delete(drawingId)
-      this.#data.documents.delete(drawingId)
+      const { folderId: _folder, ...rest } = summary
+      this.#data.summaries.set(drawingId, {
+        ...rest,
+        deletedAt: summary.deletedAt ?? this.#now(),
+      })
     }
   }
 }

@@ -118,6 +118,149 @@ export function describeRepositoryContract(
       expect(await repo.get(doc.id)).toEqual(doc)
     })
 
+    describe('Trash (ADR 0046)', () => {
+      test('starts with an empty Trash', async () => {
+        expect(await repo.listTrash()).toEqual([])
+      })
+
+      test('trashing hides a drawing from list and shows it in Trash', async () => {
+        const doc = drawing('Plan')
+        const saved = await repo.save(doc)
+        const trashed = await repo.trash(doc.id)
+
+        expect(trashed).toMatchObject({ id: doc.id, name: 'Plan' })
+        expect(trashed?.deletedAt).toBeGreaterThan(0)
+        // Trashing is not an edit.
+        expect(trashed?.updatedAt).toBe(saved.updatedAt)
+        expect(trashed?.createdAt).toBe(saved.createdAt)
+        expect(await repo.list()).toEqual([])
+        expect(await repo.listTrash()).toEqual([trashed])
+        // The document stays, so a restore brings the drawing back whole.
+        expect(await repo.get(doc.id)).toEqual(doc)
+      })
+
+      test('restoring brings the drawing back, live and unchanged', async () => {
+        const doc = drawing('Plan')
+        const saved = await repo.save(doc)
+        await repo.trash(doc.id)
+        const restored = await repo.restore(doc.id)
+
+        expect(restored).toEqual(saved)
+        expect(restored).not.toHaveProperty('deletedAt')
+        expect(await repo.list()).toEqual([saved])
+        expect(await repo.listTrash()).toEqual([])
+      })
+
+      test('trashing or restoring a missing drawing resolves undefined', async () => {
+        expect(await repo.trash(crypto.randomUUID())).toBeUndefined()
+        expect(await repo.restore(crypto.randomUUID())).toBeUndefined()
+      })
+
+      test('trashing twice keeps the first deletedAt; restoring a live drawing changes nothing', async () => {
+        const doc = drawing('Plan')
+        const saved = await repo.save(doc)
+        expect(await repo.restore(doc.id)).toEqual(saved)
+        const first = await repo.trash(doc.id)
+        const second = await repo.trash(doc.id)
+        expect(second).toEqual(first)
+      })
+
+      test('saving a trashed drawing keeps it in Trash', async () => {
+        const doc = drawing('Draft')
+        await repo.save(doc)
+        const trashed = await repo.trash(doc.id)
+        const saved = await repo.save({ ...doc, name: 'Final' })
+
+        expect(saved).toMatchObject({
+          name: 'Final',
+          deletedAt: trashed?.deletedAt,
+        })
+        expect(await repo.list()).toEqual([])
+        expect(await repo.listTrash()).toEqual([saved])
+      })
+
+      test('delete removes a trashed drawing for good', async () => {
+        const doc = drawing('Gone')
+        await repo.save(doc)
+        await repo.trash(doc.id)
+        await repo.delete(doc.id)
+        expect(await repo.get(doc.id)).toBeUndefined()
+        expect(await repo.listTrash()).toEqual([])
+      })
+
+      test('emptyTrash removes every trashed drawing and no live one', async () => {
+        const live = drawing('Live')
+        const a = drawing('A')
+        const b = drawing('B')
+        const liveSummary = await repo.save(live)
+        for (const d of [a, b]) {
+          await repo.save(d)
+          await repo.trash(d.id)
+        }
+
+        await repo.emptyTrash()
+
+        expect(await repo.listTrash()).toEqual([])
+        expect(await repo.get(a.id)).toBeUndefined()
+        expect(await repo.get(b.id)).toBeUndefined()
+        expect(await repo.list()).toEqual([liveSummary])
+        expect(await repo.get(live.id)).toEqual(live)
+      })
+
+      test('emptying an empty Trash is not an error', async () => {
+        await expect(repo.emptyTrash()).resolves.toBeUndefined()
+      })
+
+      // The retention sweep: the check and the delete are one step, so a
+      // drawing restored or trashed again meanwhile is not lost.
+      test('emptyTrash with a cutoff removes only drawings trashed before it', async () => {
+        const doc = drawing('Plan')
+        await repo.save(doc)
+        const trashed = await repo.trash(doc.id)
+        const at = trashed!.deletedAt!
+
+        await repo.emptyTrash({ deletedBefore: at })
+        expect(await repo.listTrash()).toEqual([trashed])
+
+        await repo.emptyTrash({ deletedBefore: at + 1 })
+        expect(await repo.listTrash()).toEqual([])
+        expect(await repo.get(doc.id)).toBeUndefined()
+      })
+
+      test('a sweep never removes a restored drawing, even with a stale cutoff', async () => {
+        const doc = drawing('Plan')
+        const saved = await repo.save(doc)
+        const trashed = await repo.trash(doc.id)
+        await repo.restore(doc.id)
+
+        await repo.emptyTrash({ deletedBefore: trashed!.deletedAt! + 1 })
+
+        expect(await repo.list()).toEqual([saved])
+        expect(await repo.get(doc.id)).toEqual(doc)
+      })
+
+      test('a sweep skips a drawing trashed again after the cutoff', async () => {
+        const doc = drawing('Plan')
+        await repo.save(doc)
+        const first = await repo.trash(doc.id)
+        await repo.restore(doc.id)
+        // A cutoff that is just before the second trash, whatever its time.
+        const cutoff = first!.deletedAt!
+        const second = await repo.trash(doc.id)
+        expect(second!.deletedAt!).toBeGreaterThanOrEqual(cutoff)
+
+        await repo.emptyTrash({ deletedBefore: cutoff })
+        expect(await repo.listTrash()).toEqual([second])
+      })
+
+      test('moving a trashed drawing keeps it in Trash', async () => {
+        const doc = drawing('Plan')
+        await repo.save(doc)
+        const trashed = await repo.trash(doc.id)
+        expect(await repo.move(doc.id, null)).toEqual(trashed)
+      })
+    })
+
     // Ids are UUIDs when the app creates them, but an imported document
     // carries its own. A URL must not read them as path segments. ("." and
     // ".." can't be path segments at all; HttpDrawingRepository refuses them.)

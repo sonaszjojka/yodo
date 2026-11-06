@@ -29,12 +29,13 @@ function repository(): HttpDrawingRepository {
 async function emptyRepository(): Promise<HttpDrawingRepository> {
   const repo = repository()
   for (const { id } of await repo.list()) await repo.delete(id)
+  await repo.emptyTrash()
   return repo
 }
 
 describeRepositoryContract('HttpDrawingRepository', emptyRepository)
 
-// Deleting every folder also deletes the drawings in them (ADR 0045).
+// Deleting a folder trashes its drawings (ADR 0046); emptyRepository then empties Trash.
 describeFolderContract('Http repositories', async () => {
   const folders = new HttpFolderRepository({ baseUrl, fetch: fetchWithOrigin })
   for (const { id } of await folders.list()) await folders.delete(id)

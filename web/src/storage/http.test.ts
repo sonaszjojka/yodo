@@ -223,3 +223,69 @@ describe('HttpFolderRepository', () => {
     expect(fetch).not.toHaveBeenCalled()
   })
 })
+
+describe('HttpDrawingRepository Trash (ADR 0046)', () => {
+  const trashed = {
+    id: 'a b',
+    name: 'A',
+    createdAt: 1,
+    updatedAt: 2,
+    deletedAt: 3,
+  }
+
+  test('lists the trash from GET api/drawings?trashed=true', async () => {
+    const { fetch, repo } = repoReplying(() => Response.json([trashed]))
+    expect(await repo.listTrash()).toEqual([trashed])
+    expect(request(fetch)).toMatchObject({
+      url: 'https://example.test/yodo/api/drawings?trashed=true',
+      method: 'GET',
+    })
+  })
+
+  test('trash and restore put {trashed} to api/drawings/{id}/trash', async () => {
+    for (const [method, trashedFlag] of [
+      ['trash', true],
+      ['restore', false],
+    ] as const) {
+      const { fetch, repo } = repoReplying(() => Response.json(trashed))
+      expect(await repo[method]('a b')).toEqual(trashed)
+      const { url, init } = request(fetch)
+      expect(url).toBe('https://example.test/yodo/api/drawings/a%20b/trash')
+      expect(init?.method).toBe('PUT')
+      expect(JSON.parse(init!.body as string)).toEqual({
+        trashed: trashedFlag,
+      })
+    }
+  })
+
+  test('trash and restore resolve undefined for a 404 and throw for other errors', async () => {
+    const missing = repoReplying(
+      () => new Response('drawing not found', { status: 404 }),
+    )
+    expect(await missing.repo.trash('a')).toBeUndefined()
+    expect(await missing.repo.restore('a')).toBeUndefined()
+    const broken = repoReplying(() => new Response('x', { status: 400 }))
+    await expect(broken.repo.trash('a')).rejects.toBeInstanceOf(HttpError)
+  })
+
+  test('emptyTrash deletes api/drawings?trashed=true, with the cutoff when given', async () => {
+    const all = repoReplying(() => new Response(null, { status: 204 }))
+    await all.repo.emptyTrash()
+    expect(request(all.fetch)).toMatchObject({
+      url: 'https://example.test/yodo/api/drawings?trashed=true',
+      method: 'DELETE',
+    })
+    const cut = repoReplying(() => new Response(null, { status: 204 }))
+    await cut.repo.emptyTrash({ deletedBefore: 1234.9 })
+    expect(request(cut.fetch).url).toBe(
+      'https://example.test/yodo/api/drawings?trashed=true&deletedBefore=1234',
+    )
+  })
+
+  test('refuses "." and ".." ids without a request', async () => {
+    const { fetch, repo } = repoReplying(() => Response.json({}))
+    await expect(repo.trash('..')).rejects.toThrow(TypeError)
+    await expect(repo.restore('.')).rejects.toThrow(TypeError)
+    expect(fetch).not.toHaveBeenCalled()
+  })
+})
