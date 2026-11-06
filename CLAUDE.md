@@ -51,7 +51,7 @@ Before calling a task done, run the test, lint, format-check and type-check comm
 - **Text** is either a free `text` element or a shape's `label` (ADR 0026), edited in a textarea over the canvas (ADR 0027). Layout is a pure core function with an injected `measure`; fonts are Fontsource packages (ADR 0025).
 - **Export.** PNG export draws the scene again with `renderScene` on an offscreen canvas at the chosen scale and theme (ADR 0041); the pure parts are in `web/src/core/export/`. SVG export is a second, pure path in `web/src/core/export/svg/`: it builds an SVG from the rough.js generator with the same seeds and options, and embeds the fonts it uses (ADR 0043).
 - **Colours** are stored as light-theme values and adapted when rendering in dark mode (ADR 0015).
-- **CI.** `.github/workflows/ci.yml` runs the same commands as above, filtered by path, and deploys `web/dist` to Pages on merge to `main`. `ci` is the only required check, so a new job must be added to its `needs`. Actions are pinned by commit SHA (ADR 0018).
+- **CI.** `.github/workflows/ci.yml` runs the same commands as above, filtered by path, deploys `web/dist` to Pages on merge to `main`, and publishes the Docker image: `edge` from `main`, and `X.Y.Z` plus `latest` when the owner pushes a `vX.Y.Z` tag from `main` (ADR 0049). `ci` is the only required check, so a new job must be added to its `needs`. Actions are pinned by commit SHA (ADR 0018).
 - **Tests** follow the pyramid in ADR 0011: Vitest for core and UI, `httptest` against a real temp SQLite file for Go, and a few Playwright e2e and visual tests.
 
 ## Rules

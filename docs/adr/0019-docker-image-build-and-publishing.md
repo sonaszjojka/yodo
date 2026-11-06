@@ -1,6 +1,6 @@
 # 0019. Build the Docker image with the frontend copied into the Go package, on distroless, published multi-arch from `main`
 
-- Status: Accepted
+- Status: Superseded by [0049](0049-releases-semver-tags-publish-the-image.md) (the Publishing bullet only: `latest` now follows releases, `edge` follows `main`)
 - Date: 2026-11-01
 
 ## Context
