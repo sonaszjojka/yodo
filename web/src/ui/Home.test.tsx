@@ -169,6 +169,21 @@ describe('HomeView', () => {
       expect(html).toMatch(/role="alert">That folder doesn’t exist any more\./)
     })
 
+    // Before the folders load, a new drawing can't be put in the folder the
+    // route names, so it must not be created yet (Codex review round 1, finding 1).
+    test('on a folder route the New drawing tile waits for the folders to load', () => {
+      const tile = /<button[^>]*class="new-drawing-tile"[^>]*>/
+      expect(render({ list: { status: 'loading' }, folderId: 'f1' })).toMatch(
+        /<button[^>]*class="new-drawing-tile"[^>]*disabled=""/,
+      )
+      expect(
+        render({ list: { status: 'loading' } }).match(tile)![0],
+      ).not.toContain('disabled')
+      expect(
+        render({ list: withFolders, folderId: 'f1' }).match(tile)![0],
+      ).not.toContain('disabled')
+    })
+
     test('while loading, a folder route shows no notice yet', () => {
       const html = render({ list: { status: 'loading' }, folderId: 'f1' })
       expect(html).not.toContain('doesn’t exist')

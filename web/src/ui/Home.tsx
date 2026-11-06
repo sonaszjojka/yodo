@@ -460,7 +460,12 @@ export function HomeView({
                 <button
                   type="button"
                   className="new-drawing-tile"
-                  disabled={creating}
+                  // On a folder route the drawing belongs in that folder, which is only
+                  // known once the folders have loaded.
+                  disabled={
+                    creating ||
+                    (folderId !== undefined && list.status === 'loading')
+                  }
                   onClick={onCreate}
                 >
                   <Plus size={28} />
