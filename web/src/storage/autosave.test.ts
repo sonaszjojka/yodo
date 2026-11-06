@@ -38,6 +38,7 @@ function deferredRepository() {
   const repo: DrawingRepository = {
     list: async () => [],
     listTrash: async () => [],
+    searchIndex: async () => [],
     get: async () => undefined,
     delete: async () => {},
     move: async () => undefined,

@@ -1,8 +1,14 @@
 import { describe, expect, test, vi } from 'vitest'
-import { createDocument } from '../core/document/create.ts'
+import { createDocument, createText } from '../core/document/create.ts'
 import v1Fixture from '../core/document/fixtures/v1-every-element.json?raw'
 import { migrate } from '../core/document/migrate.ts'
-import { HttpDrawingRepository, HttpError, toStrictJson } from './http.ts'
+import {
+  HttpDrawingRepository,
+  HttpError,
+  MAX_HEADER_TEXT,
+  SEARCH_TEXT_HEADER,
+  toStrictJson,
+} from './http.ts'
 import { HttpFolderRepository } from './httpFolders.ts'
 
 // The behaviour shared with other repositories is proven against the real
@@ -102,6 +108,121 @@ describe('HttpDrawingRepository', () => {
     const bad = { ...createDocument(), elements: [() => {}] }
     await expect(repo.save(bad as never)).rejects.toThrow(TypeError)
     expect(fetch).not.toHaveBeenCalled()
+  })
+})
+
+function docWithText(...texts: string[]) {
+  return {
+    ...createDocument('Notes'),
+    elements: texts.map((text) => ({ ...createText([0, 0]), text })),
+  }
+}
+
+describe('HttpDrawingRepository search (ADR 0047)', () => {
+  test('save sends the canvas text percent-encoded in a header', async () => {
+    const doc = docWithText('zażółć 😀', 'line 2')
+    const { fetch, repo } = repoReplying(() => Response.json({}))
+    await repo.save(doc)
+
+    expect(fetch).toHaveBeenCalledTimes(1)
+    const sent = new Headers(request(fetch).init?.headers).get(
+      SEARCH_TEXT_HEADER,
+    )
+    expect(decodeURIComponent(sent!)).toBe('zażółć 😀\nline 2')
+    // Header values are Latin-1 only; the encoding keeps them ASCII.
+    expect(sent).toMatch(/^[\x20-\x7e]*$/)
+  })
+
+  test('save sends an empty header for a drawing without text', async () => {
+    const { fetch, repo } = repoReplying(() => Response.json({}))
+    await repo.save(createDocument())
+    const headers = new Headers(request(fetch).init?.headers)
+    expect(headers.get(SEARCH_TEXT_HEADER)).toBe('')
+  })
+
+  test('save cleans a lone surrogate instead of failing', async () => {
+    const { fetch, repo } = repoReplying(() => Response.json({}))
+    await repo.save(docWithText('a\uD800b'))
+    const headers = new Headers(request(fetch).init?.headers)
+    expect(decodeURIComponent(headers.get(SEARCH_TEXT_HEADER)!)).toBe(
+      'a\uFFFDb',
+    )
+  })
+
+  test('text too long for a header follows in a second request, whole', async () => {
+    const long = 'x'.repeat(MAX_HEADER_TEXT + 1)
+    const doc = docWithText(long)
+    const { fetch, repo } = repoReplying(() => Response.json({}))
+    await repo.save(doc)
+
+    expect(fetch).toHaveBeenCalledTimes(2)
+    const [first, second] = fetch.mock.calls
+    expect(new Headers(first![1]?.headers).has(SEARCH_TEXT_HEADER)).toBe(false)
+    expect(String(second![0])).toBe(
+      `https://example.test/yodo/api/drawings/${doc.id}/search-text`,
+    )
+    expect(second![1]).toMatchObject({ method: 'PUT', body: long })
+  })
+
+  test('a failed second request does not fail the save', async () => {
+    const doc = docWithText('x'.repeat(MAX_HEADER_TEXT + 1))
+    let calls = 0
+    const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+      ++calls === 1
+        ? Response.json({ id: doc.id })
+        : new Response('no', { status: 500 }),
+    )
+    const repo = new HttpDrawingRepository({ baseUrl, fetch })
+    await expect(repo.save(doc)).resolves.toMatchObject({ id: doc.id })
+  })
+
+  test('searchIndex reads GET api/search-index', async () => {
+    const rows = [{ id: 'a', searchText: 'budget' }]
+    const { fetch, repo } = repoReplying(() => Response.json(rows))
+    expect(await repo.searchIndex()).toEqual(rows)
+    expect(request(fetch)).toMatchObject({
+      url: 'https://example.test/yodo/api/search-index',
+      method: 'GET',
+    })
+  })
+
+  test('searchIndex indexes drawings the server has no text for, only if still unset', async () => {
+    const doc = docWithText('budget')
+    const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+      const url = String(input)
+      if (url.endsWith('api/search-index'))
+        return Response.json([
+          { id: doc.id, searchText: null },
+          { id: 'done', searchText: 'x' },
+        ])
+      if (init?.method === 'PUT') return Response.json({})
+      return Response.json(doc)
+    })
+    const repo = new HttpDrawingRepository({ baseUrl, fetch })
+
+    expect(await repo.searchIndex()).toEqual([
+      { id: doc.id, searchText: 'budget' },
+      { id: 'done', searchText: 'x' },
+    ])
+    const put = fetch.mock.calls.find(([, init]) => init?.method === 'PUT')!
+    expect(String(put[0])).toBe(
+      `https://example.test/yodo/api/drawings/${doc.id}/search-text?ifUnset=true`,
+    )
+    expect(put[1]?.body).toBe('budget')
+  })
+
+  test('searchIndex still answers when a backfill request fails', async () => {
+    const doc = docWithText('budget')
+    const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+      if (String(input).endsWith('api/search-index'))
+        return Response.json([{ id: doc.id, searchText: null }])
+      if (init?.method === 'PUT') return new Response('no', { status: 500 })
+      return Response.json(doc)
+    })
+    const repo = new HttpDrawingRepository({ baseUrl, fetch })
+    expect(await repo.searchIndex()).toEqual([
+      { id: doc.id, searchText: 'budget' },
+    ])
   })
 })
 

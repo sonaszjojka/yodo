@@ -3,7 +3,7 @@ import 'fake-indexeddb/auto'
 import { IDBFactory } from 'fake-indexeddb'
 import { openDB } from 'idb'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
-import { createDocument } from '../core/document/create.ts'
+import { createDocument, createText } from '../core/document/create.ts'
 import { describeRepositoryContract } from './contract.ts'
 import { describeFolderContract } from './folderContract.ts'
 import { describeImageContract, pngBlob } from './imageContract.ts'
@@ -140,4 +140,52 @@ test('upgrading a populated version-2 database keeps drawings and images and add
   expect(await drawings.list()).toEqual([])
   // Deleting the folder took the drawing, not the image.
   expect(await images.has(hash)).toBe(true)
+})
+
+test('upgrading a populated version-3 database indexes the existing drawings for search', async () => {
+  // A database exactly as the released version 3 created it.
+  const withText = {
+    ...createDocument('Has text'),
+    elements: [
+      { ...createText([0, 0]), text: 'budget' },
+      { ...createText([0, 0]), text: 'a\uD800b' },
+    ],
+  }
+  const plain = createDocument('Plain')
+  const v3 = await openDB(DEFAULT_DB_NAME, 3, {
+    upgrade(db) {
+      db.createObjectStore('drawings', { keyPath: 'id' })
+      db.createObjectStore('documents', { keyPath: 'id' })
+      db.createObjectStore('blobs', { keyPath: 'hash' })
+      db.createObjectStore('folders', { keyPath: 'id' })
+    },
+  })
+  for (const doc of [withText, plain]) {
+    await v3.put('drawings', {
+      id: doc.id,
+      name: doc.name,
+      createdAt: 1,
+      updatedAt: 2,
+    })
+    await v3.put('documents', doc)
+  }
+  // A document the extractor can't read must not stop the database opening.
+  const broken = { ...createDocument('Broken'), elements: [null] }
+  await v3.put('drawings', {
+    id: broken.id,
+    name: 'Broken',
+    createdAt: 1,
+    updatedAt: 2,
+  })
+  await v3.put('documents', broken)
+  v3.close()
+
+  const drawings = new IndexedDbDrawingRepository()
+  const index = new Map(
+    (await drawings.searchIndex()).map((e) => [e.id, e.searchText]),
+  )
+  expect(index.get(withText.id)).toBe('budget\na\uFFFDb')
+  expect(index.get(plain.id)).toBe('')
+  expect(index.get(broken.id)).toBe('')
+  expect(await drawings.get(withText.id)).toEqual(withText)
 })

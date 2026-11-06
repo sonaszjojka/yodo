@@ -28,3 +28,15 @@ export function extractSearchText(doc: YodoDocument): string {
   }
   return parts.join('\n')
 }
+
+/**
+ * `extractSearchText`, or '' when the document is too odd to read. Indexing is
+ * derived data, so it must never block a save or a database upgrade (ADR 0047).
+ */
+export function safeSearchText(doc: YodoDocument): string {
+  try {
+    return extractSearchText(doc)
+  } catch {
+    return ''
+  }
+}

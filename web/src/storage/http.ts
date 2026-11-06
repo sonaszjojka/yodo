@@ -4,7 +4,31 @@
 
 import { migrate } from '../core/document/migrate.ts'
 import type { YodoDocument } from '../core/document/types.ts'
-import type { DrawingRepository, DrawingSummary } from './repository.ts'
+import { safeSearchText } from '../core/search/extract.ts'
+import type {
+  DrawingRepository,
+  DrawingSummary,
+  SearchIndexEntry,
+} from './repository.ts'
+
+/** The header that carries a drawing's canvas text on save (ADR 0047). */
+export const SEARCH_TEXT_HEADER = 'X-Yodo-Search-Text'
+/**
+ * Longest percent-encoded text sent in the header. Proxies commonly cap a
+ * header near 8 KB, so longer text goes to `PUT …/search-text` instead.
+ */
+export const MAX_HEADER_TEXT = 6000
+/** The most characters sent to `PUT …/search-text`; 4 bytes each is 1 MiB. */
+const MAX_INDEX_CHARS = 256 * 1024
+/** Documents fetched at once while backfilling the index. */
+const BACKFILL_BATCH = 4
+
+function clampIndexText(text: string): string {
+  if (text.length <= MAX_INDEX_CHARS) return text
+  const cut = text.slice(0, MAX_INDEX_CHARS)
+  // Do not leave half of a surrogate pair at the end.
+  return /[\uD800-\uDBFF]$/.test(cut) ? cut.slice(0, -1) : cut
+}
 
 /** A response with a status the API doesn't promise for that call. */
 export class HttpError extends Error {
@@ -134,16 +158,77 @@ export class HttpDrawingRepository implements DrawingRepository {
   async save(doc: YodoDocument): Promise<DrawingSummary> {
     // Serialized before the request, so a bad document never reaches the server.
     const body = toStrictJson(doc)
+    const text = safeSearchText(doc)
+    const encoded = encodeURIComponent(text)
+    // Text that fits goes in the same request, so the index and the document
+    // change together. Longer text follows in a second request (ADR 0047).
+    const fits = encoded.length <= MAX_HEADER_TEXT
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    }
+    if (fits) headers[SEARCH_TEXT_HEADER] = encoded
     const response = await this.#request(
       'PUT',
       this.#drawingPath(doc.id),
       [200],
+      { headers, body },
+    )
+    const summary = (await response.json()) as DrawingSummary
+    if (!fits) {
+      // The document is saved; a failure here leaves the drawing unindexed
+      // (NULL), which the next searchIndex() repairs, so it must not fail the save.
+      await this.#putSearchText(doc.id, text, false).catch(() => {})
+    }
+    return summary
+  }
+
+  async #putSearchText(
+    id: string,
+    text: string,
+    onlyIfUnset: boolean,
+  ): Promise<void> {
+    const query = onlyIfUnset ? '?ifUnset=true' : ''
+    await this.#request(
+      'PUT',
+      `${this.#drawingPath(id)}/search-text${query}`,
+      [200, 404],
       {
-        headers: { 'Content-Type': 'application/json' },
-        body,
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+        body: clampIndexText(text),
       },
     )
-    return (await response.json()) as DrawingSummary
+  }
+
+  async searchIndex(): Promise<SearchIndexEntry[]> {
+    const response = await this.#request('GET', 'api/search-index', [200])
+    const rows = (await response.json()) as {
+      id: string
+      searchText: string | null
+    }[]
+    const entries: SearchIndexEntry[] = rows.map((row) => ({
+      id: row.id,
+      searchText: row.searchText ?? '',
+    }))
+    // Drawings saved before search existed have no text on the server yet.
+    // Index them now from their documents (ADR 0047).
+    const unindexed = rows.flatMap((row, at) =>
+      row.searchText === null ? [at] : [],
+    )
+    for (let i = 0; i < unindexed.length; i += BACKFILL_BATCH) {
+      await Promise.all(
+        unindexed.slice(i, i + BACKFILL_BATCH).map(async (at) => {
+          const entry = entries[at]!
+          const doc = await this.get(entry.id).catch(() => undefined)
+          if (!doc) return
+          entry.searchText = safeSearchText(doc)
+          // ifUnset: a save that landed meanwhile has the newer text.
+          await this.#putSearchText(entry.id, entry.searchText, true).catch(
+            () => {},
+          )
+        }),
+      )
+    }
+    return entries
   }
 
   async move(
