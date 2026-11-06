@@ -160,6 +160,16 @@ func TestPutSearchTextSetsTheTextWithoutTouchingUpdatedAt(t *testing.T) {
 	}
 }
 
+// Canvas text can be longer than the old 1 MiB cap; it must be stored whole,
+// tail included, or the end of a long drawing is unsearchable (ADR 0047).
+func TestPutSearchTextStoresTextAboveOneMiBWhole(t *testing.T) {
+	api := newTestAPI(t)
+	wantStatus(t, putWithText(api, docID, nil), http.StatusOK)
+	long := strings.Repeat("a", 2<<20) + "uniqueTail"
+	wantStatus(t, putSearchText(api, docID, "", long), http.StatusNoContent)
+	wantText(t, searchIndex(t, api), docID, long)
+}
+
 func TestPutSearchTextOverwritesExistingText(t *testing.T) {
 	api := newTestAPI(t)
 	wantStatus(t, putWithText(api, docID, str("old")), http.StatusOK)
