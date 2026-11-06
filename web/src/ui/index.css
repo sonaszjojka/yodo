@@ -293,11 +293,21 @@ body {
   margin-top: 24px;
 }
 
-/* Home (docs/ui.md, Home). */
+/* Home (docs/ui.md, Home): sidebar on the left, the rest on the right. */
+.home {
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.home-content {
+  min-width: 0;
+}
+
 .home-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   padding: 20px 32px 0;
 }
 
@@ -319,8 +329,320 @@ body {
   font-weight: 700;
 }
 
-.home-header .logo {
+.sidebar {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  box-sizing: border-box;
+  max-height: 100vh;
+  padding: 20px 12px;
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+}
+
+.sidebar-logo {
+  display: inline-block;
+  margin: 0 8px 20px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.sidebar-logo:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sidebar .logo {
   font-size: 24px;
+}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 8px;
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.sidebar-link:hover {
+  background: var(--raised);
+}
+
+.sidebar-link[aria-current='page'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.sidebar-link:focus-visible,
+.sidebar-add:focus-visible,
+.folder-more:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.sidebar-link-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-count {
+  color: var(--muted-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sidebar-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 20px 0 4px;
+  padding-left: 8px;
+}
+
+.sidebar-heading h2 {
+  margin: 0;
+  color: var(--muted-text);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sidebar-add,
+.folder-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted-text);
+  cursor: pointer;
+}
+
+.sidebar-add:hover,
+.folder-more:hover {
+  background: var(--raised);
+  color: var(--text);
+}
+
+.sidebar-empty {
+  margin: 4px 8px;
+  color: var(--muted-text);
+  font-size: 13px;
+}
+
+.folder-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.folder-row {
+  position: relative;
+}
+
+/* Room on the right for the ⋯ button; it shows on hover, focus or an open menu. */
+.folder-row .sidebar-link {
+  padding-right: 40px;
+}
+
+.folder-row .sidebar-count {
+  position: absolute;
+  right: 10px;
+}
+
+.folder-more {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  opacity: 0;
+}
+
+.folder-row:hover .folder-more,
+.folder-more:focus-visible,
+.folder-more[aria-expanded='true'] {
+  opacity: 1;
+}
+
+.folder-row:hover .sidebar-count,
+.folder-row:focus-within .sidebar-count {
+  visibility: hidden;
+}
+
+.menu.folder-menu {
+  top: calc(100% - 2px);
+  right: 4px;
+  bottom: auto;
+}
+
+.menu .menu-danger {
+  color: var(--danger);
+}
+
+.menu-folder-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.menu-folder-name {
+  flex: 1;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drawing-card-folder {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  vertical-align: bottom;
+}
+
+/* The folder dialogs (FolderDialog.tsx): a native <dialog> in the top layer. */
+.folder-dialog {
+  width: min(420px, calc(100vw - 32px));
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-float);
+}
+
+.folder-dialog::backdrop {
+  background: rgb(0 0 0 / 0.4);
+}
+
+.folder-form h2 {
+  margin: 0 0 12px;
+  font-size: 16px;
+}
+
+.folder-form p {
+  margin: 0 0 16px;
+}
+
+.folder-name-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.folder-name-field input {
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 400;
+}
+
+.folder-form fieldset {
+  margin: 12px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.folder-form legend {
+  padding: 0 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.folder-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* A native radio, drawn as a tile; arrow keys move between tiles as usual. */
+.folder-choice {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.folder-choice input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.folder-choice:hover {
+  background: var(--raised);
+}
+
+.folder-choice:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.folder-choice:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.folder-swatch span {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+}
+
+.folder-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.button-danger {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--danger);
+  border-radius: 10px;
+  background: var(--danger);
+  color: var(--surface);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button-danger:focus-visible {
+  outline: 2px solid var(--danger);
+  outline-offset: 2px;
+}
+
+.button-primary:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .home-main {

@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest'
 import { InMemoryImageRepository } from '../storage/memoryImages.ts'
 import { InMemoryDrawingRepository } from '../storage/memory.ts'
 import { createImageCache } from './imageCache.ts'
+import type { Folder } from '../storage/folders.ts'
 import type { DrawingSummary } from '../storage/repository.ts'
 import { HomeView, type HomeViewProps } from './Home.tsx'
 
@@ -18,12 +19,15 @@ function render(props: Partial<HomeViewProps> = {}) {
     <HomeView
       repository={new InMemoryDrawingRepository()}
       imageCache={createImageCache(new InMemoryImageRepository())}
-      list={{ status: 'loaded', drawings }}
+      list={{ status: 'loaded', drawings, folders: [] }}
       sort="recent"
       onSort={() => {}}
       creating={false}
       onCreate={() => {}}
       onRename={() => {}}
+      onSaveFolder={() => {}}
+      onDeleteFolder={() => {}}
+      onMove={() => {}}
       onImport={() => {}}
       onRetry={() => {}}
       now={now}
@@ -119,5 +123,61 @@ describe('HomeView', () => {
     expect(html).toContain('Skipped frames (2)')
     expect(html).toMatch(/<a class="button-primary" href="#\/d\/new">/)
     expect(render()).not.toContain('import-summary')
+  })
+
+  describe('folders', () => {
+    const folders: Folder[] = [
+      {
+        id: 'f1',
+        name: 'Work',
+        icon: 'briefcase',
+        color: 'teal',
+        createdAt: 1,
+      },
+    ]
+    const inFolder: DrawingSummary[] = [
+      { ...drawings[0]!, folderId: 'f1' },
+      drawings[1]!,
+      drawings[2]!,
+    ]
+    const withFolders = {
+      status: 'loaded',
+      drawings: inFolder,
+      folders,
+    } as const
+
+    test('All drawings lists every drawing and names the folder on its card', () => {
+      const html = render({ list: withFolders })
+      expect(html).toContain('<h1>All drawings</h1>')
+      expect(names(html)).toHaveLength(3)
+      expect(html).toContain('drawing-card-folder')
+    })
+
+    test('a folder lists only its drawings, titled by the folder', () => {
+      const html = render({ list: withFolders, folderId: 'f1' })
+      expect(html).toContain('<h1>Work</h1>')
+      expect(names(html)).toEqual(['Beta'])
+      // The title says which folder; the card doesn't repeat it.
+      expect(html).not.toContain('drawing-card-folder')
+      expect(html).toContain('New drawing</button>')
+    })
+
+    test('a folder that is gone shows All drawings and says so', () => {
+      const html = render({ list: withFolders, folderId: 'gone' })
+      expect(html).toContain('<h1>All drawings</h1>')
+      expect(names(html)).toHaveLength(3)
+      expect(html).toMatch(/role="alert">That folder doesn’t exist any more\./)
+    })
+
+    test('while loading, a folder route shows no notice yet', () => {
+      const html = render({ list: { status: 'loading' }, folderId: 'f1' })
+      expect(html).not.toContain('doesn’t exist')
+    })
+
+    test('the sidebar lists the folders with their counts', () => {
+      const html = render({ list: withFolders })
+      expect(html).toContain('href="#/f/f1"')
+      expect(html).toMatch(/Work<\/span><span class="sidebar-count">1</)
+    })
   })
 })

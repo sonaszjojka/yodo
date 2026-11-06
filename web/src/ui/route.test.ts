@@ -11,6 +11,11 @@ test.each<[string, Route]>([
   ['#/d/a/b', { name: 'home' }],
   ['#/unknown', { name: 'home' }],
   ['#/d/%E0%A4%A', { name: 'home' }],
+  ['#/f/abc-123', { name: 'home', folderId: 'abc-123' }],
+  ['#/f/a%20b', { name: 'home', folderId: 'a b' }],
+  ['#/f/', { name: 'home' }],
+  ['#/f/a/b', { name: 'home' }],
+  ['#/f/%E0%A4%A', { name: 'home' }],
 ])('parses %j', (hash, route) => {
   expect(parseRoute(hash)).toEqual(route)
 })
@@ -19,6 +24,8 @@ test.each<Route>([
   { name: 'home' },
   { name: 'drawing', id: 'abc-123' },
   { name: 'drawing', id: 'a b/c' },
+  { name: 'home', folderId: 'f1' },
+  { name: 'home', folderId: 'a b/c' },
 ])('routeHash round-trips %j', (route) => {
   expect(parseRoute(routeHash(route))).toEqual(route)
 })
@@ -26,4 +33,5 @@ test.each<Route>([
 test('routeHash gives the documented URLs', () => {
   expect(routeHash({ name: 'home' })).toBe('#/')
   expect(routeHash({ name: 'drawing', id: 'x1' })).toBe('#/d/x1')
+  expect(routeHash({ name: 'home', folderId: 'f1' })).toBe('#/f/f1')
 })

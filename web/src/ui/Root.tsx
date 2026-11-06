@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Session } from '../storage/session.ts'
 import { loadDrawing, type LoadResult } from '../storage/drawings.ts'
+import type { FolderRepository } from '../storage/folders.ts'
 import type { ImageRepository } from '../storage/images.ts'
 import type { DrawingRepository } from '../storage/repository.ts'
 import { App } from './App.tsx'
@@ -12,10 +13,12 @@ import { useRoute } from './route.ts'
 /** Picks the screen from the hash route (ADR 0033). */
 export function Root({
   repository,
+  folders,
   images,
   session,
 }: {
   repository: DrawingRepository
+  folders: FolderRepository
   images: ImageRepository
   /** The server's password, if it has one (ADR 0020). */
   session?: Session
@@ -45,6 +48,8 @@ export function Root({
   return route.name === 'home' ? (
     <Home
       repository={repository}
+      folders={folders}
+      folderId={route.folderId}
       images={images}
       imageCache={imageCache}
       waitForEditor={waitForEditor}

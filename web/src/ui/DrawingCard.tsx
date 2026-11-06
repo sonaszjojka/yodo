@@ -1,9 +1,17 @@
-import { DotsThree } from '@phosphor-icons/react'
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { Check, DotsThree } from '@phosphor-icons/react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react'
 import type {
   DrawingRepository,
   DrawingSummary,
 } from '../storage/repository.ts'
+import { sortFolders, type Folder } from '../storage/folders.ts'
+import { FolderGlyph } from './FolderGlyph.tsx'
 import { formatEdited } from './formatEdited.ts'
 import { isOutside } from './outsidePress.ts'
 import { navigate, routeHash } from './route.ts'
@@ -16,22 +24,33 @@ export interface DrawingCardProps {
   imageCache: ImageCache
   /** Epoch milliseconds, for "Edited 5 min ago". */
   now: number
+  /** Every folder, for Move to folder and the folder shown on the card. */
+  folders: readonly Folder[]
+  /** Show the drawing's folder on the card (in All drawings, not inside a folder). */
+  showFolder: boolean
   onRename(name: string): void
+  onMove(folderId: string | null): void
 }
 
 /**
  * One drawing on Home (`docs/ui.md`, Drawing card). The ⋯ button and a
- * right-click open the same menu; only Open and Rename exist so far.
+ * right-click open the same menu; Open, Rename and Move to folder exist so far.
  */
 export function DrawingCard({
   summary,
   repository,
   imageCache,
   now,
+  folders,
+  showFolder,
   onRename,
+  onMove,
 }: DrawingCardProps) {
-  const { id, name, updatedAt } = summary
+  const { id, name, updatedAt, folderId } = summary
+  const folder = folders.find((f) => f.id === folderId)
   const [menuOpen, setMenuOpen] = useState(false)
+  // The menu has a second page that lists the folders (Move to folder).
+  const [movePage, setMovePage] = useState(false)
   const [renaming, setRenaming] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const moreRef = useRef<HTMLButtonElement>(null)
@@ -40,14 +59,17 @@ export function DrawingCard({
   useEffect(() => {
     if (!menuOpen) return
     const menu = menuRef.current!
-    menu.querySelector<HTMLElement>('[role="menuitem"]')?.focus()
+    // Runs again on the move page, so focus follows the page change.
+    menu
+      .querySelector<HTMLElement>('[role="menuitem"], [role="menuitemradio"]')
+      ?.focus()
     // Any press outside the menu and its ⋯ toggle closes it.
     const onPointerDown = (event: PointerEvent) => {
       if (isOutside(event.target, menu, moreRef.current)) setMenuOpen(false)
     }
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
-  }, [menuOpen])
+  }, [menuOpen, movePage])
 
   const thumbnail = (
     <Thumbnail
@@ -58,14 +80,28 @@ export function DrawingCard({
     />
   )
   const edited = (
-    <span className="drawing-card-edited">{formatEdited(updatedAt, now)}</span>
+    <span className="drawing-card-edited">
+      {showFolder && folder && (
+        <span className="drawing-card-folder">
+          <FolderGlyph icon={folder.icon} color={folder.color} size={14} />
+          {folder.name}
+          {' · '}
+        </span>
+      )}
+      {formatEdited(updatedAt, now)}
+    </span>
   )
+  const closeMenu = () => {
+    setMenuOpen(false)
+    setMovePage(false)
+  }
 
   return (
     <li
       className="drawing-card"
       onContextMenu={(event) => {
         event.preventDefault()
+        setMovePage(false)
         setMenuOpen(true)
       }}
     >
@@ -96,7 +132,10 @@ export function DrawingCard({
         title="More actions"
         aria-haspopup="menu"
         aria-expanded={menuOpen}
-        onClick={() => setMenuOpen((open) => !open)}
+        onClick={() => {
+          setMovePage(false)
+          setMenuOpen((open) => !open)
+        }}
       >
         <DotsThree size={20} weight="bold" />
       </button>
@@ -110,22 +149,92 @@ export function DrawingCard({
             if (event.key === 'Escape') setMenuOpen(false)
           }}
         >
-          <button type="button" role="menuitem" onClick={() => navigate(route)}>
-            Open
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              setMenuOpen(false)
-              setRenaming(true)
-            }}
-          >
-            Rename
-          </button>
+          {movePage ? (
+            <>
+              <div className="menu-heading" aria-hidden="true">
+                Move to folder
+              </div>
+              <MoveItem
+                label="No folder"
+                checked={folderId === undefined}
+                onChoose={() => {
+                  closeMenu()
+                  onMove(null)
+                }}
+              />
+              {sortFolders(folders).map((f) => (
+                <MoveItem
+                  key={f.id}
+                  label={f.name}
+                  glyph={
+                    <FolderGlyph icon={f.icon} color={f.color} size={16} />
+                  }
+                  checked={f.id === folderId}
+                  onChoose={() => {
+                    closeMenu()
+                    onMove(f.id)
+                  }}
+                />
+              ))}
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => navigate(route)}
+              >
+                Open
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false)
+                  setRenaming(true)
+                }}
+              >
+                Rename
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                aria-haspopup="menu"
+                onClick={() => setMovePage(true)}
+              >
+                Move to folder…
+              </button>
+            </>
+          )}
         </div>
       )}
     </li>
+  )
+}
+
+function MoveItem({
+  label,
+  glyph,
+  checked,
+  onChoose,
+}: {
+  label: string
+  glyph?: ReactNode
+  checked: boolean
+  onChoose(): void
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitemradio"
+      aria-checked={checked}
+      className="menu-folder-item"
+      onClick={onChoose}
+    >
+      {glyph}
+      <span className="menu-folder-name">{label}</span>
+      {checked && <Check size={16} aria-hidden="true" />}
+    </button>
   )
 }
 

@@ -15,6 +15,11 @@ import {
   importExcalidrawFile,
   MAX_IMPORT_BYTES,
 } from '../storage/importExcalidraw.ts'
+import {
+  createFolder,
+  type Folder,
+  type FolderRepository,
+} from '../storage/folders.ts'
 import type { ImageRepository } from '../storage/images.ts'
 import type {
   DrawingRepository,
@@ -22,19 +27,24 @@ import type {
 } from '../storage/repository.ts'
 import type { ImageCache } from './imageCache.ts'
 import { DrawingCard } from './DrawingCard.tsx'
-import { Logo } from './Logo.tsx'
+import type { FolderValues } from './FolderDialog.tsx'
+import { activeFolder, drawingsInView, folderCounts } from './homeFolders.ts'
 import { createCanvasMeasure } from './measure.ts'
 import { navigate } from './route.ts'
 import { SettingsMenu } from './SettingsMenu.tsx'
+import { Sidebar } from './Sidebar.tsx'
 import { importErrorMessage, importFile, isYodoFile } from './yodoFile.ts'
 
 export type HomeList =
   | { status: 'loading' }
-  | { status: 'loaded'; drawings: DrawingSummary[] }
+  | { status: 'loaded'; drawings: DrawingSummary[]; folders: Folder[] }
   | { status: 'error' }
 
 export interface HomeProps {
   repository: DrawingRepository
+  folders: FolderRepository
+  /** The folder the route names (`#/f/<id>`); undefined shows All drawings. */
+  folderId?: string
   /** Where an import's pictures are stored (ADR 0040). */
   images: ImageRepository
   imageCache: ImageCache
@@ -47,6 +57,8 @@ export interface HomeProps {
 /** The Home screen (`docs/ui.md`, Home): every drawing as a card. */
 export function Home({
   repository,
+  folders,
+  folderId,
   images,
   imageCache,
   waitForEditor,
@@ -66,28 +78,47 @@ export function Home({
     let cancelled = false
     // Listing before the closing editor's last save would show it stale.
     waitForEditor()
-      .then(() => repository.list())
+      .then(() => Promise.all([repository.list(), folders.list()]))
       .then(
-        (drawings) => {
+        ([drawings, folderList]) => {
           if (cancelled) return
           setNow(Date.now())
-          setList({ status: 'loaded', drawings })
+          setList({ status: 'loaded', drawings, folders: folderList })
         },
         (error: unknown) => {
-          console.error('Could not list the drawings', error)
+          console.error('Could not list the drawings and folders', error)
           if (!cancelled) setList({ status: 'error' })
         },
       )
     return () => {
       cancelled = true
     }
-  }, [repository, waitForEditor, attempt])
+  }, [repository, folders, waitForEditor, attempt])
+
+  /** The folder being viewed, if the route names one that still exists. */
+  const current =
+    list.status === 'loaded' ? activeFolder(list.folders, folderId) : undefined
 
   async function onCreate() {
     setCreating(true)
     setNotice(undefined)
     try {
-      navigate({ name: 'drawing', id: await createDrawing(repository) })
+      const id = await createDrawing(repository)
+      if (current) {
+        // Two calls: if the move fails the drawing exists, in All drawings.
+        try {
+          await repository.move(id, current.id)
+        } catch (error) {
+          console.error('Could not put the new drawing in its folder', error)
+          setNotice(
+            'Created the drawing, but couldn’t put it in the folder. It is in All drawings.',
+          )
+          setCreating(false)
+          setAttempt((n) => n + 1)
+          return
+        }
+      }
+      navigate({ name: 'drawing', id })
     } catch (error) {
       console.error('Could not create a drawing', error)
       setNotice('Couldn’t create a drawing. Try again.')
@@ -159,7 +190,7 @@ export function Home({
       setList((current) =>
         current.status === 'loaded'
           ? {
-              status: 'loaded',
+              ...current,
               drawings: current.drawings.map((d) =>
                 d.id === id ? summary : d,
               ),
@@ -169,6 +200,68 @@ export function Home({
     } catch (error) {
       console.error('Could not rename the drawing', error)
       setNotice('Couldn’t rename the drawing. Try again.')
+    }
+  }
+
+  /** Replaces what the list holds, if it has loaded. */
+  function updateLoaded(
+    change: (loaded: Extract<HomeList, { status: 'loaded' }>) => HomeList,
+  ) {
+    setList((c) => (c.status === 'loaded' ? change(c) : c))
+  }
+
+  async function onSaveFolder(values: FolderValues, existing?: Folder) {
+    setNotice(undefined)
+    try {
+      if (existing) {
+        const saved = await folders.save({ id: existing.id, ...values })
+        updateLoaded((c) => ({
+          ...c,
+          folders: c.folders.map((f) => (f.id === saved.id ? saved : f)),
+        }))
+        return
+      }
+      const created = await createFolder(folders, values)
+      if (!created) return
+      updateLoaded((c) => ({ ...c, folders: [...c.folders, created] }))
+      navigate({ name: 'home', folderId: created.id })
+    } catch (error) {
+      console.error('Could not save the folder', error)
+      setNotice('Couldn’t save the folder. Try again.')
+    }
+  }
+
+  async function onDeleteFolder(folder: Folder) {
+    setNotice(undefined)
+    try {
+      await folders.delete(folder.id)
+      // Its drawings went with it (ADR 0045).
+      updateLoaded((c) => ({
+        ...c,
+        folders: c.folders.filter((f) => f.id !== folder.id),
+        drawings: c.drawings.filter((d) => d.folderId !== folder.id),
+      }))
+      if (folderId === folder.id) navigate({ name: 'home' })
+    } catch (error) {
+      console.error('Could not delete the folder', error)
+      setNotice('Couldn’t delete the folder. Try again.')
+    }
+  }
+
+  async function onMove(id: string, target: string | null) {
+    setNotice(undefined)
+    try {
+      const summary = await repository.move(id, target)
+      updateLoaded((c) => ({
+        ...c,
+        // undefined: the drawing is gone (deleted elsewhere), so drop its card.
+        drawings: summary
+          ? c.drawings.map((d) => (d.id === id ? summary : d))
+          : c.drawings.filter((d) => d.id !== id),
+      }))
+    } catch (error) {
+      console.error('Could not move the drawing', error)
+      setNotice('Couldn’t move the drawing. Try again.')
     }
   }
 
@@ -186,6 +279,10 @@ export function Home({
       onImport={(file) => void onImport(file)}
       onDismissImport={() => setImported(undefined)}
       onRename={(id, name) => void onRename(id, name)}
+      folderId={folderId}
+      onSaveFolder={(values, existing) => void onSaveFolder(values, existing)}
+      onDeleteFolder={(folder) => void onDeleteFolder(folder)}
+      onMove={(id, target) => void onMove(id, target)}
       onRetry={() => {
         setList({ status: 'loading' })
         setAttempt((n) => n + 1)
@@ -227,6 +324,11 @@ export interface HomeViewProps {
   onImport?(file: File): void
   onDismissImport?(): void
   onRename(id: string, name: string): void
+  /** The folder the route names; one that doesn't exist shows All drawings. */
+  folderId?: string
+  onSaveFolder(values: FolderValues, existing?: Folder): void
+  onDeleteFolder(folder: Folder): void
+  onMove(id: string, folderId: string | null): void
   onRetry(): void
   notice?: string
   now: number
@@ -246,120 +348,146 @@ export function HomeView({
   onImport,
   onDismissImport,
   onRename,
+  folderId,
+  onSaveFolder,
+  onDeleteFolder,
+  onMove,
   onRetry,
   notice,
   now,
 }: HomeViewProps) {
   const fileInput = useRef<HTMLInputElement>(null)
+  const loaded = list.status === 'loaded' ? list : undefined
+  const folders = loaded?.folders ?? []
+  const current = activeFolder(folders, folderId)
+  // A route that names a folder that is gone shows All drawings, and says so.
+  const folderGone = loaded !== undefined && folderId !== undefined && !current
+  const message =
+    notice ?? (folderGone ? 'That folder doesn’t exist any more.' : undefined)
   return (
     <div className="home">
-      <header className="home-header">
-        <Logo />
-        <SettingsMenu />
-      </header>
-      <main className="home-main">
-        <div className="home-title-row">
-          <h1>All drawings</h1>
-          <button
-            type="button"
-            className="button"
-            disabled={importing}
-            onClick={() => fileInput.current?.click()}
-          >
-            {importing ? 'Importing…' : 'Import file'}
-          </button>
-          <input
-            ref={fileInput}
-            type="file"
-            accept=".yodo,.excalidraw,.json,application/json"
-            hidden
-            aria-label="File to import"
-            data-testid="import-file"
-            onChange={(event) => {
-              const file = event.target.files?.[0]
-              event.target.value = ''
-              if (file) onImport?.(file)
-            }}
-          />
-          <label className="home-sort">
-            Sort by
-            <select
-              value={sort}
-              onChange={(event) => onSort(event.target.value as DrawingSort)}
+      <Sidebar
+        folders={folders}
+        counts={folderCounts(loaded?.drawings ?? [])}
+        total={loaded?.drawings.length}
+        selectedId={current?.id}
+        onSaveFolder={onSaveFolder}
+        onDeleteFolder={onDeleteFolder}
+      />
+      <div className="home-content">
+        <header className="home-header">
+          <SettingsMenu />
+        </header>
+        <main className="home-main">
+          <div className="home-title-row">
+            <h1>{current ? current.name : 'All drawings'}</h1>
+            <button
+              type="button"
+              className="button"
+              disabled={importing}
+              onClick={() => fileInput.current?.click()}
             >
-              {SORTS.map(({ value, label }) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        {notice && (
-          <p className="home-notice" role="alert">
-            {notice}
-          </p>
-        )}
-        {imported && (
-          <section className="import-summary" aria-label="Import summary">
-            <p>
-              Imported {imported.imported}{' '}
-              {imported.imported === 1 ? 'element' : 'elements'}. Some things
-              changed on the way:
-            </p>
-            <ul>
-              {imported.lines.map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-            </ul>
-            <div className="import-summary-actions">
-              <a className="button-primary" href={`#/d/${imported.id}`}>
-                Open drawing
-              </a>
-              <button
-                type="button"
-                className="button"
-                onClick={onDismissImport}
+              {importing ? 'Importing…' : 'Import file'}
+            </button>
+            <input
+              ref={fileInput}
+              type="file"
+              accept=".yodo,.excalidraw,.json,application/json"
+              hidden
+              aria-label="File to import"
+              data-testid="import-file"
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                event.target.value = ''
+                if (file) onImport?.(file)
+              }}
+            />
+            <label className="home-sort">
+              Sort by
+              <select
+                value={sort}
+                onChange={(event) => onSort(event.target.value as DrawingSort)}
               >
-                Dismiss
+                {SORTS.map(({ value, label }) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          {message && (
+            <p className="home-notice" role="alert">
+              {message}
+            </p>
+          )}
+          {imported && (
+            <section className="import-summary" aria-label="Import summary">
+              <p>
+                Imported {imported.imported}{' '}
+                {imported.imported === 1 ? 'element' : 'elements'}. Some things
+                changed on the way:
+              </p>
+              <ul>
+                {imported.lines.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+              <div className="import-summary-actions">
+                <a className="button-primary" href={`#/d/${imported.id}`}>
+                  Open drawing
+                </a>
+                <button
+                  type="button"
+                  className="button"
+                  onClick={onDismissImport}
+                >
+                  Dismiss
+                </button>
+              </div>
+            </section>
+          )}
+          {list.status === 'error' ? (
+            <div className="home-error" role="alert">
+              <p>Couldn’t load your drawings.</p>
+              <button type="button" className="button" onClick={onRetry}>
+                Try again
               </button>
             </div>
-          </section>
-        )}
-        {list.status === 'error' ? (
-          <div className="home-error" role="alert">
-            <p>Couldn’t load your drawings.</p>
-            <button type="button" className="button" onClick={onRetry}>
-              Try again
-            </button>
-          </div>
-        ) : (
-          <ul className="card-grid" aria-busy={list.status === 'loading'}>
-            <li>
-              <button
-                type="button"
-                className="new-drawing-tile"
-                disabled={creating}
-                onClick={onCreate}
-              >
-                <Plus size={28} />
-                New drawing
-              </button>
-            </li>
-            {list.status === 'loaded' &&
-              sortDrawings(list.drawings, sort).map((summary) => (
-                <DrawingCard
-                  key={summary.id}
-                  summary={summary}
-                  repository={repository}
-                  imageCache={imageCache}
-                  now={now}
-                  onRename={(name) => onRename(summary.id, name)}
-                />
-              ))}
-          </ul>
-        )}
-      </main>
+          ) : (
+            <ul className="card-grid" aria-busy={list.status === 'loading'}>
+              <li>
+                <button
+                  type="button"
+                  className="new-drawing-tile"
+                  disabled={creating}
+                  onClick={onCreate}
+                >
+                  <Plus size={28} />
+                  New drawing
+                </button>
+              </li>
+              {loaded &&
+                sortDrawings(
+                  drawingsInView(loaded.drawings, current?.id),
+                  sort,
+                ).map((summary) => (
+                  <DrawingCard
+                    key={summary.id}
+                    summary={summary}
+                    repository={repository}
+                    imageCache={imageCache}
+                    now={now}
+                    folders={folders}
+                    showFolder={current === undefined}
+                    onRename={(name) => onRename(summary.id, name)}
+                    onMove={(target) => onMove(summary.id, target)}
+                  />
+                ))}
+            </ul>
+          )}
+        </main>
+      </div>
     </div>
   )
 }
