@@ -71,6 +71,20 @@ describe('searchDrawings', () => {
     expect(searchDrawings([other], index, '.*').text).toHaveLength(0)
   })
 
+  // "İ".toLowerCase() is two code units, which used to shift the highlight.
+  test('highlights the right characters after one that lowercases longer', () => {
+    const { text } = searchDrawings(
+      [other],
+      [{ id: '3', searchText: 'İ budget' }],
+      'budget',
+    )
+    expect(text[0]!.snippet).toEqual({
+      before: 'İ ',
+      match: 'budget',
+      after: '',
+    })
+  })
+
   test('an empty or blank query matches nothing', () => {
     const index = [{ id: '1', searchText: 'budget' }]
     for (const query of ['', '   ']) {

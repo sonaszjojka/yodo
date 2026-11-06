@@ -30,8 +30,13 @@ export interface SearchResults<T extends Searchable> {
 /** Characters of context kept on each side of the match. */
 const CONTEXT = 40
 
-function fold(value: string): string {
-  return value.toLocaleLowerCase()
+/**
+ * A matcher for `query` as a literal, case-insensitive substring. A pattern
+ * rather than lowercased copies, because lowercasing can change a text's
+ * length ("İ" becomes two code units), which would move the match offsets.
+ */
+function literal(query: string): RegExp {
+  return new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'iu')
 }
 
 /**
@@ -44,10 +49,11 @@ export function searchDrawings<T extends Searchable>(
   index: SearchIndexEntry[],
   query: string,
 ): SearchResults<T> {
-  const needle = fold(query.trim())
-  if (needle === '') return { names: [], text: [] }
+  const trimmed = query.trim()
+  if (trimmed === '') return { names: [], text: [] }
+  const needle = literal(trimmed)
 
-  const names = summaries.filter((s) => fold(s.name).includes(needle))
+  const names = summaries.filter((s) => needle.test(s.name))
   const texts = new Map(index.map((entry) => [entry.id, entry.searchText]))
   const text: SearchResults<T>['text'] = []
   for (const summary of summaries) {
@@ -59,14 +65,14 @@ export function searchDrawings<T extends Searchable>(
 
 function snippetFor(
   searchText: string,
-  needle: string,
+  needle: RegExp,
 ): SearchSnippet | undefined {
-  // Newlines become spaces so a snippet is one line; the length is unchanged,
-  // so positions found in the folded text still fit.
+  // Newlines become spaces so a snippet is one line; the length is unchanged.
   const flat = searchText.replace(/\s/g, ' ')
-  const at = fold(flat).indexOf(needle)
-  if (at < 0) return undefined
-  const end = at + needle.length
+  const found = needle.exec(flat)
+  if (!found) return undefined
+  const at = found.index
+  const end = at + found[0].length
   const from = Math.max(0, at - CONTEXT)
   const to = Math.min(flat.length, end + CONTEXT)
   return {
