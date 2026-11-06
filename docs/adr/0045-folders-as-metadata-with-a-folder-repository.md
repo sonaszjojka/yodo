@@ -1,6 +1,6 @@
 # 0045. Folders are metadata outside the document, behind a `FolderRepository`
 
-- Status: Accepted
+- Status: Accepted (the decision that deleting a folder deletes its drawings is superseded by [0046](0046-trash-as-a-deleted-at-timestamp-on-the-summary.md))
 - Date: 2026-11-06
 
 ## Context
