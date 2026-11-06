@@ -1,5 +1,6 @@
 // Pure helpers for editing text (ADR 0026, 0027): what a click edits, what a
 // commit does to the document, and where the editing textarea goes.
+import { followBindings } from './binding.ts'
 import {
   BUILT_IN_STYLE,
   createText,
@@ -192,7 +193,14 @@ export function commitEdit(
         : current
   const next = [...elements]
   next[index] = updated
-  return { document: { ...document, elements: next }, selectId: current.id }
+  // A label can grow its shape; arrows attached to it follow (ADR 0048).
+  return {
+    document: {
+      ...document,
+      elements: followBindings(next, new Set([current.id])),
+    },
+    selectId: current.id,
+  }
 }
 
 /** Where and how the editing textarea shows the text, in world units. */
