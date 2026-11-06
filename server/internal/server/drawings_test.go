@@ -386,6 +386,18 @@ func TestBareDeleteOnTheCollectionRemovesNothing(t *testing.T) {
 	wantStatus(t, api.do(http.MethodDelete, "/api/drawings?trashed=true&deletedBefore=soon", ""), http.StatusBadRequest)
 }
 
+// An empty cutoff is malformed, not "no cutoff": it must not empty Trash
+// (Codex review round 1, finding 2).
+func TestEmptyCutoffIsRejectedAndRemovesNothing(t *testing.T) {
+	api := newTestAPI(t)
+	wantStatus(t, api.do(http.MethodPut, "/api/drawings/"+docID, doc), http.StatusOK)
+	wantStatus(t, api.do(http.MethodPut, "/api/drawings/"+docID+"/trash", trashBody(true)), http.StatusOK)
+	wantStatus(t, api.do(http.MethodDelete, "/api/drawings?trashed=true&deletedBefore=", ""), http.StatusBadRequest)
+	if len(listTrashed(t, api)) != 1 {
+		t.Error("a malformed cutoff emptied Trash")
+	}
+}
+
 func TestTrashRoutesNeedAnAllowedOrigin(t *testing.T) {
 	api := newTestAPI(t)
 	for _, tc := range []struct{ method, path, body string }{

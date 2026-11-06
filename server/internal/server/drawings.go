@@ -193,8 +193,9 @@ func (a drawingsAPI) emptyTrash(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var err error
-	if raw := query.Get("deletedBefore"); raw != "" {
-		cutoff, parseErr := strconv.ParseInt(raw, 10, 64)
+	// Has, not Get != "": an empty value is malformed, not an absent cutoff.
+	if query.Has("deletedBefore") {
+		cutoff, parseErr := strconv.ParseInt(query.Get("deletedBefore"), 10, 64)
 		if parseErr != nil {
 			http.Error(w, "deletedBefore must be an integer", http.StatusBadRequest)
 			return
