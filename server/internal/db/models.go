@@ -4,6 +4,10 @@
 
 package db
 
+import (
+	"database/sql"
+)
+
 type Drawing struct {
 	ID            string
 	Name          string
@@ -11,4 +15,13 @@ type Drawing struct {
 	Document      string
 	CreatedAt     int64
 	UpdatedAt     int64
+	FolderID      sql.NullString
+}
+
+type Folder struct {
+	ID        string
+	Name      string
+	Icon      string
+	Color     string
+	CreatedAt int64
 }

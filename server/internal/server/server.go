@@ -24,6 +24,7 @@ func newHandler(static fs.FS, allowedOrigins AllowedOrigins, queries *db.Queries
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", handleHealth)
 	drawingsAPI{queries: queries, now: now}.register(mux)
+	foldersAPI{queries: queries, now: now}.register(mux)
 	// Behind a password, image bytes must not be kept by shared caches.
 	imagesAPI{dir: imagesDir, private: auth.Enabled()}.register(mux)
 	if auth != nil {
