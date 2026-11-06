@@ -63,7 +63,7 @@ Goal: open Yodo, draw basic shapes, close the browser, come back to the same dra
 | 3.3 | Search ✓ ([#91](https://github.com/sonaszjojka/yodo/issues/91)) | Finds drawings by name and canvas text (`search_text`, ADR 0013); results split as in `docs/ui.md`. |
 | 3.4 | Attached arrows ✓ ([#92](https://github.com/sonaszjojka/yodo/issues/92)) | Arrows bound to shapes follow when either shape moves or resizes. The Excalidraw import (2.9) drops arrow bindings, so map them here too. |
 | 3.5 | Card menus ✓ ([#93](https://github.com/sonaszjojka/yodo/issues/93)) | ⋯ and right-click menu with every action from `docs/ui.md` (duplicate, open in new tab, export, …). |
-| 3.6 | MVP e2e + release, code merged, tag `v1.0.0` pending ([#94](https://github.com/sonaszjojka/yodo/issues/94)) | Playwright covers the 3–5 key flows in both modes; tagged `v1.0.0` image on GHCR; README documents both usage modes. |
+| 3.6 | MVP e2e + release ✓ (PR [#129](https://github.com/sonaszjojka/yodo/pull/129)) ([#94](https://github.com/sonaszjojka/yodo/issues/94)) | Playwright covers the 3–5 key flows in both modes; tagged `v1.0.0` image on GHCR; README documents both usage modes. |
 
 ## Rules for changing this roadmap
 - Tasks may be split, merged or reordered; record why in the commit message.
