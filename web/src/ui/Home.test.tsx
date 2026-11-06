@@ -28,6 +28,8 @@ function render(props: Partial<HomeViewProps> = {}) {
       onSaveFolder={() => {}}
       onDeleteFolder={() => {}}
       onMove={() => {}}
+      onDuplicate={() => {}}
+      onExport={() => {}}
       onTrash={() => {}}
       onRestore={() => {}}
       onDeleteForever={() => {}}

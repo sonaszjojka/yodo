@@ -944,6 +944,12 @@ a.drawing-card-body:focus-visible,
   box-shadow: var(--shadow-float);
 }
 
+/* Opens below the card's ⋯ button instead, when there's no room above. */
+.menu-down {
+  top: 54px;
+  bottom: auto;
+}
+
 .menu [role='menuitem'],
 .menu [role='menuitemradio'] {
   min-height: 36px;
@@ -956,6 +962,13 @@ a.drawing-card-body:focus-visible,
   font-size: 14px;
   text-align: left;
   cursor: pointer;
+}
+
+/* A menu item that is a link (Open in new tab) looks like the buttons. */
+.menu a[role='menuitem'] {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
 }
 
 .menu [role='menuitem']:hover,
