@@ -42,6 +42,15 @@ A task is done only when all of these hold:
 - Docs that the change made stale are updated (ADR for any architectural decision, `docs/ui.md`, README).
 - No secrets in the diff.
 
+## Releases ([ADR 0049](adr/0049-releases-semver-tags-publish-the-image.md))
+Versions are semver, `vMAJOR.MINOR.PATCH`; the MVP is `v1.0.0`. Commits say what changed (`fix` patch, `feat` minor, breaking major). A release is cut by the owner from an up-to-date `main` whose CI is green:
+1. `git tag -a vX.Y.Z -m "vX.Y.Z"` and `git push origin vX.Y.Z`. The pushed tag runs the `docker` job, which refuses a tag that is not on `main` or not the highest, then publishes `ghcr.io/sonaszjojka/yodo` as `X.Y.Z`, `X.Y` and `latest` (`edge` is the head of `main`).
+2. Check the run, then `docker pull ghcr.io/sonaszjojka/yodo:X.Y.Z`.
+3. Create the GitHub Release from the tag, with notes from the Conventional Commits since the last one (`gh release create vX.Y.Z --generate-notes`).
+4. First release only: make the GHCR package public (package settings).
+
+A task whose done-when includes a release stays open until step 2 works: its PR says `Refs #<issue>` rather than `Closes`, and the roadmap tick and the issue close follow the pull.
+
 ## Who does what
 | Step | Claude | Owner |
 |---|---|---|
