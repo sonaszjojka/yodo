@@ -7,7 +7,9 @@ import {
 } from '../document/create.ts'
 import { lineFromDrag } from '../geometry/line.ts'
 import { MAX_ZOOM, MIN_ZOOM } from '../geometry/viewport.ts'
+import type { ArrowElement } from '../document/types.ts'
 import { createEditor, type Tool } from './editor.ts'
+import { sceneOf } from './scene.ts'
 
 /** An editor on an empty drawing with the rectangle tool active. */
 function setup() {
@@ -1736,5 +1738,104 @@ describe('use as default (roadmap 2.2b, ADR 0036)', () => {
     const { editor } = setupSelection()
     editor.useAsDefault()
     expect(editor.store.getState().defaults).toBe(BUILT_IN_STYLE)
+  })
+})
+
+describe('attached arrows', () => {
+  /** Squares a and b with an arrow drawn from a's right edge to b's left. */
+  function setupArrow() {
+    const { editor, a, b } = setupSelection()
+    editor.setTool('arrow')
+    editor.drawTool.pointerDown(1, [95, 50], false)
+    editor.drawTool.pointerMove(1, [206, 50], false)
+    editor.drawTool.pointerUp(1)
+    const arrow = () =>
+      editor.store
+        .getState()
+        .document.elements.find((e) => e.type === 'arrow') as ArrowElement
+    return { editor, a, b, arrow }
+  }
+
+  test('an arrow drawn between two shapes binds both ends to their edges', () => {
+    const { a, b, arrow } = setupArrow()
+    expect(arrow()).toMatchObject({
+      x: 100,
+      y: 50,
+      points: [
+        [0, 0],
+        [100, 0],
+      ],
+      startBinding: { elementId: a.id, ratio: [1, 0.5] },
+      endBinding: { elementId: b.id, ratio: [0, 0.5] },
+    })
+  })
+
+  test('an arrow drawn in empty space is not bound', () => {
+    const { editor } = setupSelection()
+    editor.setTool('arrow')
+    editor.drawTool.pointerDown(1, [0, 300], false)
+    editor.drawTool.pointerMove(1, [100, 300], false)
+    editor.drawTool.pointerUp(1)
+    const [, , arrow] = editor.store.getState().document.elements
+    expect(arrow).not.toHaveProperty('startBinding')
+    expect(arrow).not.toHaveProperty('endBinding')
+  })
+
+  test('the end is not bound to the shape the arrow starts on', () => {
+    const { editor } = setupSelection()
+    editor.setTool('arrow')
+    editor.drawTool.pointerDown(1, [50, 50], false)
+    editor.drawTool.pointerMove(1, [80, 50], false)
+    editor.drawTool.pointerUp(1)
+    const [, , arrow] = editor.store.getState().document.elements
+    expect(arrow).toHaveProperty('startBinding')
+    expect(arrow).not.toHaveProperty('endBinding')
+  })
+
+  test('moving a shape drags the arrow end, and one undo reverts both', () => {
+    const { editor, b, arrow } = setupArrow()
+    const before = editor.store.getState().document
+    drag(editor, [250, 50], [250, 150])
+    expect(editor.store.getState().document.elements[1]).toMatchObject({
+      y: 100,
+    })
+    expect(arrow()).toMatchObject({
+      points: [
+        [0, 0],
+        [100, 100],
+      ],
+      endBinding: { elementId: b.id },
+    })
+
+    editor.undo()
+    expect(editor.store.getState().document).toBe(before)
+  })
+
+  test('the canvas shows the arrow following during the drag', () => {
+    const { editor } = setupArrow()
+    editor.pointerDown(1, [250, 50], { button: 0, shift: false })
+    editor.pointerMove(1, [250, 150], false)
+    const scene = sceneOf(editor.store.getState())
+    expect((scene.elements[2] as ArrowElement).points[1]).toEqual([100, 100])
+    editor.pointerUp(1)
+  })
+
+  test('resizing a shape keeps the arrow end on its edge', () => {
+    const { editor, arrow } = setupArrow()
+    click(editor, [250, 50])
+    drag(editor, [307, 107], [407, 307])
+    const end = arrow().points[1]!
+    // b is now 200 wide and 300 tall; the end sits at its left edge middle.
+    expect([arrow().x + end[0], arrow().y + end[1]]).toEqual([200, 150])
+  })
+
+  test('deleting a shape detaches the arrow and leaves it in place', () => {
+    const { editor, a, arrow } = setupArrow()
+    const before = arrow()
+    click(editor, [250, 50])
+    editor.deleteSelected()
+    expect(arrow()).not.toHaveProperty('endBinding')
+    expect(arrow().points).toEqual(before.points)
+    expect(arrow().startBinding?.elementId).toBe(a.id)
   })
 })

@@ -5,6 +5,7 @@
 // of storage and the DOM (ADR 0002).
 import { createDocument, randomId, randomSeed } from '../document/create.ts'
 import type {
+  ArrowElement,
   FillStyle,
   FontFamily,
   Point,
@@ -13,6 +14,7 @@ import type {
   YodoElement,
 } from '../document/types.ts'
 import { MAX_PASTE_ELEMENTS, parseElements } from '../document/validate.ts'
+import { attachEnd, isBindable } from '../editor/binding.ts'
 import { elementBounds, unionBounds } from '../geometry/rect.ts'
 import { layoutText, type Measure } from '../text/layout.ts'
 
@@ -172,8 +174,17 @@ const SKIPPED_TYPES: Record<string, string> = {
   iframe: 'embedded content',
 }
 
+/** The source ids of the shapes an arrow end is attached to. */
+type Attached = { start?: string; end?: string }
+
 type Slot =
-  | { kind: 'element'; element: YodoElement; rawId: string }
+  | {
+      kind: 'element'
+      element: YodoElement
+      rawId: string
+      /** Source ids of the shapes an arrow is attached to. */
+      attached?: Attached
+    }
   | { kind: 'text'; raw: Raw; text: string }
 
 const SHAPE_TYPES = ['rectangle', 'diamond', 'ellipse'] as const
@@ -313,9 +324,6 @@ export async function convertExcalidraw(
             element: { type: 'pencil', ...linear },
           }
         }
-        if (raw.startBinding || raw.endBinding) {
-          simplified.add('arrows no longer attached to shapes')
-        }
         const end = raw.endArrowhead
         if (raw.startArrowhead || (end && end !== 'arrow')) {
           simplified.add('arrowheads')
@@ -323,6 +331,10 @@ export async function convertExcalidraw(
         return {
           kind: 'element',
           rawId,
+          attached: {
+            start: boundId(raw.startBinding),
+            end: boundId(raw.endBinding),
+          },
           element: {
             type: 'arrow',
             ...linear,
@@ -390,9 +402,16 @@ export async function convertExcalidraw(
   }
 
   const elements: YodoElement[] = []
+  /** Source id -> the converted element, for arrows to attach to. */
+  const bySourceId = new Map<string, YodoElement>()
+  const arrows: { index: number; attached: Attached }[] = []
   for (const slot of slots) {
     if (slot.kind === 'element') {
-      elements.push(labelled.get(slot.rawId) ?? slot.element)
+      const element = labelled.get(slot.rawId) ?? slot.element
+      if (slot.rawId) bySourceId.set(slot.rawId, element)
+      if (slot.attached)
+        arrows.push({ index: elements.length, attached: slot.attached })
+      elements.push(element)
       continue
     }
     if (labelTexts.has(slot)) continue
@@ -414,6 +433,20 @@ export async function convertExcalidraw(
     }
     if (isValid(textElement)) elements.push(textElement)
     else skipped.add('unreadable elements')
+  }
+
+  // Arrows attach to the converted shapes (ADR 0048). A binding to a shape
+  // that was dropped, or that an arrow cannot attach to, is reported.
+  for (const { index, attached } of arrows) {
+    let arrow = elements[index] as ArrowElement
+    for (const end of ['start', 'end'] as const) {
+      const sourceId = attached[end]
+      if (sourceId === undefined) continue
+      const target = bySourceId.get(sourceId)
+      if (target && isBindable(target)) arrow = attachEnd(arrow, end, target)
+      else simplified.add('arrows no longer attached to shapes')
+    }
+    elements[index] = arrow
   }
 
   const result = parseElements(elements)
@@ -438,6 +471,15 @@ export async function convertExcalidraw(
       simplified: simplified.entries(),
     },
   }
+}
+
+/** The source id an Excalidraw binding points at, if it has a usable one. */
+function boundId(binding: unknown): string | undefined {
+  if (!binding) return undefined
+  // An unusable binding gets an id nothing has, so it is reported as lost.
+  return isRecord(binding) && typeof binding.elementId === 'string'
+    ? binding.elementId
+    : ''
 }
 
 /** Short lines for the person importing, e.g. "Skipped frames (2)". */

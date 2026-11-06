@@ -3,6 +3,7 @@
 import { parseElements } from '../document/validate.ts'
 import type { YodoElement } from '../document/types.ts'
 import { elementBounds, unionBounds, type Bounds } from '../geometry/rect.ts'
+import { remapBindings } from './binding.ts'
 import { DUPLICATE_OFFSET } from './selection.ts'
 
 const MARKER = 'yodo/clipboard'
@@ -69,10 +70,12 @@ export function pasteElements(
     dx += view.x + view.width / 2 - (group.x + group.width / 2)
     dy += view.y + view.height / 2 - (group.y + group.height / 2)
   }
-  return copied.map((element) => ({
-    ...element,
-    id: createId(),
-    x: element.x + dx,
-    y: element.y + dy,
-  }))
+  const idMap = new Map<string, string>()
+  const copies = copied.map((element) => {
+    const id = createId()
+    idMap.set(element.id, id)
+    return { ...element, id, x: element.x + dx, y: element.y + dy }
+  })
+  // Bindings follow the copied shapes, or are dropped (ADR 0048).
+  return remapBindings(copies, idMap)
 }

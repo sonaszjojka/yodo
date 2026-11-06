@@ -99,10 +99,26 @@ export interface LineElement extends BaseElement {
   points: Point[]
 }
 
+/**
+ * One end of an arrow attached to a shape (roadmap 3.4, ADR 0048). `ratio` is
+ * the end's place in the target's bounding box as fractions (0 to 1).
+ */
+export interface ArrowBinding {
+  elementId: string
+  ratio: Point
+}
+
+/**
+ * Format note (ADR 0013, 0048): `startBinding` and `endBinding` are optional,
+ * so schemaVersion stays 1. The arrow's own geometry is always kept in sync
+ * with its bindings.
+ */
 export interface ArrowElement extends BaseElement {
   type: 'arrow'
   points: Point[]
   endArrowhead: 'arrow' | null
+  startBinding?: ArrowBinding
+  endBinding?: ArrowBinding
 }
 
 export interface PencilElement extends BaseElement {

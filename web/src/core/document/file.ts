@@ -9,8 +9,12 @@ import {
   type Migrations,
   migrations,
 } from './migrate.ts'
-import { CURRENT_SCHEMA_VERSION, type YodoDocument } from './types.ts'
-import { isElement } from './validate.ts'
+import {
+  CURRENT_SCHEMA_VERSION,
+  type YodoDocument,
+  type YodoElement,
+} from './types.ts'
+import { isElement, sanitizeElement } from './validate.ts'
 
 /** One inlined image. `data` is the image's bytes as standard base64. */
 export interface YodoFileEntry {
@@ -97,12 +101,15 @@ export function parseYodoFile(
   const migrated = migrateWith(isRecord(raw) ? rest : raw, steps, target)
 
   const seen = new Set<string>()
+  const elements: YodoElement[] = []
   for (const element of migrated.elements as unknown[]) {
     if (!isElement(element) || seen.has(element.id)) {
       throw new DocumentError('bad-elements', 'The file has a broken element')
     }
     seen.add(element.id)
+    elements.push(sanitizeElement(element))
   }
+  migrated.elements = elements
 
   const document = migrated as unknown as YodoDocument
   // An image element must have its picture in the file, or it would draw as a

@@ -4,6 +4,7 @@ import type { Point, YodoElement } from '../document/types.ts'
 import { hitTest } from '../geometry/hit.ts'
 import { containsBounds, elementBounds, type Bounds } from '../geometry/rect.ts'
 import { scaleElement, type ResizeTransform } from '../geometry/resize.ts'
+import { followBindings, remapBindings, unbindDeleted } from './binding.ts'
 
 function insideBox(point: Point, box: Bounds, reach: number) {
   return (
@@ -92,21 +93,31 @@ export function moveElements(
   dx: number,
   dy: number,
 ): YodoElement[] {
-  return elements.map((element) =>
-    ids.has(element.id)
-      ? { ...element, x: element.x + dx, y: element.y + dy }
-      : element,
+  return followBindings(
+    elements.map((element) =>
+      ids.has(element.id)
+        ? { ...element, x: element.x + dx, y: element.y + dy }
+        : element,
+    ),
+    ids,
   )
 }
 
-/** Scales the elements in `ids` by `t`; like `moveElements`, others keep their identity. */
+/**
+ * Scales the elements in `ids` by `t`; like `moveElements`, others keep their
+ * identity and arrows attached to them follow.
+ */
 export function resizeElements(
   elements: readonly YodoElement[],
   ids: ReadonlySet<string>,
   t: ResizeTransform,
 ): YodoElement[] {
-  return elements.map((element) =>
-    ids.has(element.id) ? scaleElement(element, t) : element,
+  return followBindings(
+    elements.map((element) =>
+      ids.has(element.id) ? scaleElement(element, t) : element,
+    ),
+    ids,
+    { x: t.sx < 0, y: t.sy < 0 },
   )
 }
 
@@ -122,7 +133,10 @@ export function deleteElements(
   elements: readonly YodoElement[],
   ids: ReadonlySet<string>,
 ): YodoElement[] {
-  return elements.filter((element) => !ids.has(element.id))
+  return unbindDeleted(
+    elements.filter((element) => !ids.has(element.id)),
+    ids,
+  )
 }
 
 /** How far a duplicate lands from its original, right and down (world units). */
@@ -142,6 +156,7 @@ export function duplicateElements(
     return { elements, ids: [] }
   }
   const copies: string[] = []
+  const idMap = new Map<string, string>()
   const result = elements.flatMap((element) => {
     if (!ids.has(element.id)) return [element]
     const copy = {
@@ -151,7 +166,18 @@ export function duplicateElements(
       y: element.y + DUPLICATE_OFFSET,
     }
     copies.push(copy.id)
+    idMap.set(element.id, copy.id)
     return [element, copy]
   })
-  return { elements: result, ids: copies }
+  // A copied arrow attaches to the copied shape, not to the original.
+  const copySet = new Set(copies)
+  const remapped = remapBindings(
+    result.filter((element) => copySet.has(element.id)),
+    idMap,
+  )
+  const byId = new Map(remapped.map((element) => [element.id, element]))
+  return {
+    elements: result.map((element) => byId.get(element.id) ?? element),
+    ids: copies,
+  }
 }

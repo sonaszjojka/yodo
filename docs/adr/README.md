@@ -58,3 +58,4 @@ Why Yodo is built the way it is. See [0001](0001-record-architecture-decisions.m
 | [0045](0045-folders-as-metadata-with-a-folder-repository.md) | Folders are metadata outside the document, behind a `FolderRepository` | Accepted |
 | [0046](0046-trash-as-a-deleted-at-timestamp-on-the-summary.md) | Trash is a `deletedAt` timestamp on the drawing summary; folder delete trashes; 30-day client-side purge | Accepted |
 | [0047](0047-search-index-in-the-repository-matched-on-the-client.md) | Search: an index in the repository (`searchIndex()`, `X-Yodo-Search-Text` header), matched on the client | Accepted |
+| [0048](0048-attached-arrows-as-bindings-on-the-arrow.md) | Attached arrows: optional `startBinding`/`endBinding` (`elementId` + box `ratio`) on the arrow, geometry kept in sync | Accepted |

@@ -16,7 +16,7 @@ import {
   LINE_HEIGHT,
 } from '../text/layout.ts'
 import { createEditor, type Editor } from './editor.ts'
-import { editBox } from './text.ts'
+import { commitEdit, editBox } from './text.ts'
 
 function setup(elements: YodoElement[] = []) {
   return createEditor({ ...createDocument(), elements })
@@ -524,5 +524,33 @@ describe('defaults for new text (ADR 0036)', () => {
     expect(
       editBox(document, editing!, estimateMeasure, MONO_DEFAULTS),
     ).toMatchObject({ fontFamily: 'mono', fontSize: 28, textAlign: 'center' })
+  })
+})
+
+describe('arrows attached to a shape whose label grows', () => {
+  test('the arrow end stays on the shape edge', () => {
+    const shape = createShape('rectangle', {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+    })
+    const arrow = {
+      ...createLinear('arrow', lineFromDrag([50, 100], [50, 300], false)),
+      startBinding: { elementId: shape.id, ratio: [0.5, 1] as Point },
+    }
+    const editor = setup([shape, arrow])
+    const { document } = commitEdit(
+      editor.store.getState().document,
+      {
+        target: 'label',
+        id: shape.id,
+        text: Array(20).fill('line').join('\n'),
+      },
+      estimateMeasure,
+    )
+    const [grown, moved] = document.elements as [typeof shape, typeof arrow]
+    expect(grown.height).toBeGreaterThan(100)
+    expect(moved.y).toBeCloseTo(grown.y + grown.height, 5)
   })
 })
