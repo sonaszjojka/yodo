@@ -72,8 +72,10 @@ const (
 	// maxHeaderSearchText bounds the decoded header text. The client sends at
 	// most about 6 KB encoded; longer text goes to PUT …/search-text.
 	maxHeaderSearchText = 16 << 10
-	// maxSearchTextBytes bounds the body of PUT …/search-text.
-	maxSearchTextBytes = 1 << 20
+	// maxSearchTextBytes bounds the body of PUT …/search-text. The text comes
+	// from a document, which is bounded by maxDocumentBytes, so it is never
+	// cut: a cut would make the end of a long drawing unsearchable (ADR 0047).
+	maxSearchTextBytes = maxDocumentBytes
 )
 
 // searchTextFromHeader reads the optional header. an absent header gives

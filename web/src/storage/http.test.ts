@@ -164,6 +164,13 @@ describe('HttpDrawingRepository search (ADR 0047)', () => {
     expect(second![1]).toMatchObject({ method: 'PUT', body: long })
   })
 
+  test('text far beyond the header limit is sent whole, never cut', async () => {
+    const huge = `${'x'.repeat(300_000)}uniqueTail`
+    const { fetch, repo } = repoReplying(() => Response.json({}))
+    await repo.save(docWithText(huge))
+    expect(fetch.mock.calls[1]![1]?.body).toBe(huge)
+  })
+
   test('a failed second request does not fail the save', async () => {
     const doc = docWithText('x'.repeat(MAX_HEADER_TEXT + 1))
     let calls = 0

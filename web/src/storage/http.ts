@@ -18,17 +18,8 @@ export const SEARCH_TEXT_HEADER = 'X-Yodo-Search-Text'
  * header near 8 KB, so longer text goes to `PUT …/search-text` instead.
  */
 export const MAX_HEADER_TEXT = 6000
-/** The most characters sent to `PUT …/search-text`; 4 bytes each is 1 MiB. */
-const MAX_INDEX_CHARS = 256 * 1024
 /** Documents fetched at once while backfilling the index. */
 const BACKFILL_BATCH = 4
-
-function clampIndexText(text: string): string {
-  if (text.length <= MAX_INDEX_CHARS) return text
-  const cut = text.slice(0, MAX_INDEX_CHARS)
-  // Do not leave half of a surrogate pair at the end.
-  return /[\uD800-\uDBFF]$/.test(cut) ? cut.slice(0, -1) : cut
-}
 
 /** A response with a status the API doesn't promise for that call. */
 export class HttpError extends Error {
@@ -194,7 +185,7 @@ export class HttpDrawingRepository implements DrawingRepository {
       [204, 404],
       {
         headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-        body: clampIndexText(text),
+        body: text,
       },
     )
   }
