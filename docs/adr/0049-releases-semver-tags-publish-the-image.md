@@ -13,7 +13,7 @@ Roadmap 3.6 ends the MVP with a tagged `v1.0.0` image on GHCR. [0019](0019-docke
   - a release tag pushes `X.Y.Z`, `X.Y` and `sha-<short>`, and moves `latest`;
   - a merge to `main` pushes `edge` and `sha-<short>`, and no longer moves `latest`.
   So `latest` is the newest release and `edge` is the head of `main`.
-- **Guards**, checked by the `docker` job before it builds, on tag pushes only: the tagged commit must be reachable from `origin/main`, and the tag must be the highest release tag. The second rule means a late tag on an old commit, or a rerun of an old tag's workflow, fails instead of moving `latest` backwards.
+- **Guards**, checked by the `docker` job before it builds, on tag pushes only: the tagged commit must be reachable from `origin/main`, and the tag must be the highest release tag. The second rule means a late tag on an old commit, or a rerun of an old tag's workflow, fails instead of moving `latest` backwards. Release jobs share one concurrency group and run one at a time, so the check of a queued tag runs after the earlier release has published and sees every tag pushed before it.
 - **On a tag push** only the `docker` job (and the `ci` gate) runs. The tagged commit is on `main` and passed the full workflow when it merged, so the `changes` job and the test jobs are skipped.
 - **Releasing is the owner's act**, after the merge: tag `main` with an annotated tag, push the tag, create the GitHub Release from it, and make the GHCR package public once. The steps are in `docs/conventions.md`.
 - Supersedes the Publishing bullet of 0019 (which pushed `latest` from `main`); the rest of 0019 (embedding, distroless base, multi-arch) stands.

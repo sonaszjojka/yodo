@@ -206,6 +206,12 @@ jobs:
     # `changes` is skipped on a tag, so a status function is needed for this
     # job to run at all.
     if: ${{ !cancelled() && (startsWith(github.ref, 'refs/tags/v') || needs.changes.outputs.docker == 'true') }}
+    # Release jobs queue one at a time, so the tag check below always sees every
+    # tag pushed before this job started and an older build can't finish last
+    # and move `latest` back. Other runs keep the workflow's own group.
+    concurrency:
+      group: ${{ startsWith(github.ref, 'refs/tags/v') && 'release-image' || format('docker-{0}', github.run_id) }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     permissions:
       contents: read
