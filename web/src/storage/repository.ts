@@ -3,6 +3,9 @@
 // contract suite (`contract.ts`) runs against each implementation (ADR 0011).
 
 import type { YodoDocument } from '../core/document/types.ts'
+import type { SearchIndexEntry } from '../core/search/match.ts'
+
+export type { SearchIndexEntry }
 
 /** A drawing's metadata, enough for the Home screen without its elements. */
 export interface DrawingSummary {
@@ -29,6 +32,13 @@ export interface DrawingRepository {
   list(): Promise<DrawingSummary[]>
   /** The summaries of the drawings in Trash, in no particular order. */
   listTrash(): Promise<DrawingSummary[]>
+  /**
+   * The canvas text of every live drawing, for search (ADR 0047): the text in
+   * its `text` elements and shape labels, `''` for a drawing with none. Drawings
+   * in Trash are left out, like in `list()`. Loads no documents. Matching is
+   * `searchDrawings` in core, so both modes find the same things.
+   */
+  searchIndex(): Promise<SearchIndexEntry[]>
   /** The document migrated to the current version (ADR 0013), or undefined. */
   get(id: string): Promise<YodoDocument | undefined>
   /**

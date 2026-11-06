@@ -3,7 +3,11 @@
 // not a test file itself, so it never runs on its own.
 
 import { beforeEach, describe, expect, test } from 'vitest'
-import { createDocument, createShape } from '../core/document/create.ts'
+import {
+  createDocument,
+  createShape,
+  createText,
+} from '../core/document/create.ts'
 import v1Fixture from '../core/document/fixtures/v1-every-element.json?raw'
 import type { YodoDocument } from '../core/document/types.ts'
 import type { DrawingRepository } from './repository.ts'
@@ -18,6 +22,18 @@ function drawing(name: string): YodoDocument {
     ...doc,
     elements: [createShape('rectangle', { x: 1, y: 2, width: 3, height: 4 })],
   }
+}
+
+function withText(name: string, ...texts: string[]): YodoDocument {
+  const doc = createDocument(name)
+  return {
+    ...doc,
+    elements: texts.map((text) => ({ ...createText([0, 0]), text })),
+  }
+}
+
+function withTextFor(doc: YodoDocument, text: string): YodoDocument {
+  return { ...doc, elements: [{ ...createText([0, 0]), text }] }
 }
 
 export function describeRepositoryContract(
@@ -116,6 +132,98 @@ export function describeRepositoryContract(
       const doc = JSON.parse(v1Fixture) as YodoDocument
       await repo.save(doc)
       expect(await repo.get(doc.id)).toEqual(doc)
+    })
+
+    describe('Search index (ADR 0047)', () => {
+      test('is empty for an empty repository', async () => {
+        expect(await repo.searchIndex()).toEqual([])
+      })
+
+      test('holds the canvas text of the latest save, "" when there is none', async () => {
+        const text = withText('Notes', 'budget', 'plan')
+        const plain = drawing('Plain')
+        await repo.save(text)
+        await repo.save(plain)
+
+        expect((await repo.searchIndex()).sort(byId)).toEqual(
+          [
+            { id: text.id, searchText: 'budget\nplan' },
+            { id: plain.id, searchText: '' },
+          ].sort(byId),
+        )
+
+        await repo.save({ ...text, elements: [] })
+        expect(await repo.searchIndex()).toContainEqual({
+          id: text.id,
+          searchText: '',
+        })
+      })
+
+      test('leaves the text out of the summaries', async () => {
+        const doc = withText('Notes', 'budget')
+        const summary = await repo.save(doc)
+        expect(summary).not.toHaveProperty('searchText')
+        expect(await repo.list()).toEqual([summary])
+      })
+
+      test('leaves trashed drawings out and takes a restored one back', async () => {
+        const doc = withText('Notes', 'budget')
+        await repo.save(doc)
+        await repo.trash(doc.id)
+        expect(await repo.searchIndex()).toEqual([])
+
+        await repo.restore(doc.id)
+        expect(await repo.searchIndex()).toEqual([
+          { id: doc.id, searchText: 'budget' },
+        ])
+      })
+
+      test('saving a trashed drawing keeps it out and updates its text', async () => {
+        const doc = withText('Notes', 'old')
+        await repo.save(doc)
+        await repo.trash(doc.id)
+        await repo.save(withTextFor(doc, 'new'))
+        expect(await repo.searchIndex()).toEqual([])
+        await repo.restore(doc.id)
+        expect(await repo.searchIndex()).toEqual([
+          { id: doc.id, searchText: 'new' },
+        ])
+      })
+
+      test('forgets deleted drawings and emptied Trash', async () => {
+        const gone = withText('Gone', 'a')
+        const emptied = withText('Emptied', 'b')
+        await repo.save(gone)
+        await repo.save(emptied)
+        await repo.delete(gone.id)
+        await repo.trash(emptied.id)
+        await repo.emptyTrash()
+        expect(await repo.searchIndex()).toEqual([])
+
+        // Saving the same id again must not bring the old text back.
+        await repo.save({ ...emptied, elements: [] })
+        expect(await repo.searchIndex()).toEqual([
+          { id: emptied.id, searchText: '' },
+        ])
+      })
+
+      test('keeps long text whole', async () => {
+        const long = `start ${'lorem ipsum '.repeat(2000)}the end`
+        const doc = withText('Long', long)
+        await repo.save(doc)
+        expect(await repo.searchIndex()).toEqual([
+          { id: doc.id, searchText: long },
+        ])
+      })
+
+      test('keeps non-ASCII text and cleans lone surrogates without failing the save', async () => {
+        const doc = withText('Odd', 'zażółć 😀\nline', 'a\uD800b')
+        await repo.save(doc)
+        expect(await repo.searchIndex()).toEqual([
+          { id: doc.id, searchText: 'zażółć 😀\nline\na\uFFFDb' },
+        ])
+        expect(await repo.get(doc.id)).toEqual(doc)
+      })
     })
 
     describe('Trash (ADR 0046)', () => {

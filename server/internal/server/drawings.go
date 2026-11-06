@@ -8,9 +8,11 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/sonaszjojka/yodo/server/internal/db"
 )
@@ -59,6 +61,108 @@ func (a drawingsAPI) register(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/drawings/{id}", a.delete)
 	mux.HandleFunc("PUT /api/drawings/{id}/folder", a.move)
 	mux.HandleFunc("PUT /api/drawings/{id}/trash", a.trash)
+	mux.HandleFunc("PUT /api/drawings/{id}/search-text", a.putSearchText)
+	mux.HandleFunc("GET /api/search-index", a.searchIndex)
+}
+
+const (
+	// searchTextHeader carries a drawing's canvas text, percent-encoded, on a
+	// save (ADR 0047). The body stays the raw document.
+	searchTextHeader = "X-Yodo-Search-Text"
+	// maxHeaderSearchText bounds the decoded header text. The client sends at
+	// most about 6 KB encoded; longer text goes to PUT …/search-text.
+	maxHeaderSearchText = 16 << 10
+	// maxSearchTextBytes bounds the body of PUT …/search-text. The text comes
+	// from a document, which is bounded by maxDocumentBytes, so it is never
+	// cut: a cut would make the end of a long drawing unsearchable (ADR 0047).
+	maxSearchTextBytes = maxDocumentBytes
+)
+
+// searchTextFromHeader reads the optional header. an absent header gives
+// an invalid NullString (the column becomes NULL); err is set for a malformed value.
+func searchTextFromHeader(r *http.Request) (sql.NullString, error) {
+	values := r.Header.Values(searchTextHeader)
+	switch len(values) {
+	case 0:
+		return sql.NullString{}, nil
+	case 1:
+	default:
+		return sql.NullString{}, errors.New(searchTextHeader + " must be sent once")
+	}
+	decoded, err := url.PathUnescape(values[0])
+	if err != nil {
+		return sql.NullString{}, fmt.Errorf("%s is not percent-encoded: %w", searchTextHeader, err)
+	}
+	if len(decoded) > maxHeaderSearchText {
+		return sql.NullString{}, errors.New(searchTextHeader + " is too long")
+	}
+	if !utf8.ValidString(decoded) {
+		return sql.NullString{}, errors.New(searchTextHeader + " is not UTF-8")
+	}
+	return sql.NullString{String: decoded, Valid: true}, nil
+}
+
+// searchIndexEntry is one drawing's canvas text; SearchText is null for a
+// drawing that is not indexed yet (ADR 0047).
+type searchIndexEntry struct {
+	ID         string  `json:"id"`
+	SearchText *string `json:"searchText"`
+}
+
+// searchIndex serves the canvas text of every live drawing, without documents.
+func (a drawingsAPI) searchIndex(w http.ResponseWriter, r *http.Request) {
+	rows, err := a.queries.ListSearchIndex(r.Context())
+	if err != nil {
+		serverError(w, r, err)
+		return
+	}
+	out := make([]searchIndexEntry, 0, len(rows))
+	for _, row := range rows {
+		entry := searchIndexEntry{ID: row.ID}
+		if row.SearchText.Valid {
+			entry.SearchText = &row.SearchText.String
+		}
+		out = append(out, entry)
+	}
+	writeJSON(w, r, http.StatusOK, out)
+}
+
+// putSearchText sets only a drawing's canvas text (body: the text, UTF-8). It
+// covers what the header can't: text too long for it, and the backfill of
+// drawings saved before search existed, which passes ?ifUnset=true so it never
+// overwrites text a save stored meanwhile. updated_at is untouched (ADR 0047).
+func (a drawingsAPI) putSearchText(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxSearchTextBytes))
+	if err != nil {
+		if maxErr := (*http.MaxBytesError)(nil); errors.As(err, &maxErr) {
+			http.Error(w, "search text too large", http.StatusRequestEntityTooLarge)
+			return
+		}
+		http.Error(w, "could not read body", http.StatusBadRequest)
+		return
+	}
+	if !utf8.Valid(body) {
+		http.Error(w, "search text must be UTF-8", http.StatusBadRequest)
+		return
+	}
+	id := r.PathValue("id")
+	text := sql.NullString{String: string(body), Valid: true}
+	if r.URL.Query().Get("ifUnset") == "true" {
+		// Nothing to report when it was already set, or the drawing is gone.
+		err = a.queries.SetSearchTextIfUnset(r.Context(), db.SetSearchTextIfUnsetParams{ID: id, SearchText: text})
+	} else {
+		var n int64
+		n, err = a.queries.SetSearchText(r.Context(), db.SetSearchTextParams{ID: id, SearchText: text})
+		if err == nil && n == 0 {
+			http.Error(w, "drawing not found", http.StatusNotFound)
+			return
+		}
+	}
+	if err != nil {
+		serverError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // list serves the live drawings, or the drawings in Trash with ?trashed=true
@@ -160,12 +264,19 @@ func (a drawingsAPI) put(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	searchText, err := searchTextFromHeader(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	row, err := a.queries.UpsertDrawing(r.Context(), db.UpsertDrawingParams{
 		ID:            id,
 		Name:          *meta.Name,
 		SchemaVersion: *meta.SchemaVersion,
 		Document:      string(body),
 		Now:           a.now().UnixMilli(),
+		SearchText:    searchText,
 	})
 	if err != nil {
 		serverError(w, r, err)

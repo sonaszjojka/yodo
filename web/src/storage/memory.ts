@@ -3,8 +3,13 @@
 
 import { migrate } from '../core/document/migrate.ts'
 import type { YodoDocument } from '../core/document/types.ts'
+import { safeSearchText } from '../core/search/extract.ts'
 import type { Folder, FolderInput, FolderRepository } from './folders.ts'
-import type { DrawingRepository, DrawingSummary } from './repository.ts'
+import type {
+  DrawingRepository,
+  DrawingSummary,
+  SearchIndexEntry,
+} from './repository.ts'
 
 export interface RepositoryOptions {
   /** Clock for the save timestamps, in epoch milliseconds. */
@@ -15,6 +20,8 @@ export interface RepositoryOptions {
 export class MemoryData {
   readonly summaries = new Map<string, DrawingSummary>()
   readonly documents = new Map<string, YodoDocument>()
+  /** Canvas text by drawing id (ADR 0047). */
+  readonly searchTexts = new Map<string, string>()
   readonly folders = new Map<string, Folder>()
 }
 
@@ -26,12 +33,14 @@ export class InMemoryDrawingRepository implements DrawingRepository {
   readonly #now: () => number
   readonly #summaries: Map<string, DrawingSummary>
   readonly #documents: Map<string, YodoDocument>
+  readonly #searchTexts: Map<string, string>
   readonly #folders: Map<string, Folder>
 
   constructor({ now = Date.now, data = new MemoryData() }: MemoryOptions = {}) {
     this.#now = now
     this.#summaries = data.summaries
     this.#documents = data.documents
+    this.#searchTexts = data.searchTexts
     this.#folders = data.folders
   }
 
@@ -47,6 +56,12 @@ export class InMemoryDrawingRepository implements DrawingRepository {
     return [...this.#summaries.values()]
       .filter((s) => s.deletedAt !== undefined)
       .map((s) => ({ ...s }))
+  }
+
+  async searchIndex(): Promise<SearchIndexEntry[]> {
+    return [...this.#summaries.values()]
+      .filter((s) => s.deletedAt === undefined)
+      .map((s) => ({ id: s.id, searchText: this.#searchTexts.get(s.id) ?? '' }))
   }
 
   async get(id: string): Promise<YodoDocument | undefined> {
@@ -69,7 +84,10 @@ export class InMemoryDrawingRepository implements DrawingRepository {
     // Auto-save must not bring a trashed drawing back (ADR 0046).
     if (existing?.deletedAt !== undefined)
       summary.deletedAt = existing.deletedAt
-    this.#documents.set(doc.id, structuredClone(doc))
+    const clone = structuredClone(doc)
+    this.#documents.set(doc.id, clone)
+    // Indexing must never block a save (ADR 0047).
+    this.#searchTexts.set(doc.id, safeSearchText(clone))
     this.#summaries.set(doc.id, summary)
     return { ...summary }
   }
@@ -117,11 +135,13 @@ export class InMemoryDrawingRepository implements DrawingRepository {
       if (deletedBefore !== undefined && deletedAt >= deletedBefore) continue
       this.#summaries.delete(id)
       this.#documents.delete(id)
+      this.#searchTexts.delete(id)
     }
   }
 
   async delete(id: string): Promise<void> {
     this.#documents.delete(id)
+    this.#searchTexts.delete(id)
     this.#summaries.delete(id)
   }
 }

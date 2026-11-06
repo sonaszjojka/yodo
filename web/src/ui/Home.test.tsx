@@ -275,3 +275,95 @@ describe('HomeView', () => {
     })
   })
 })
+
+describe('HomeView search (ADR 0047)', () => {
+  const index = (entries: { id: string; searchText: string }[]) => ({
+    status: 'ready' as const,
+    forList: drawings,
+    entries,
+  })
+
+  test('has a search box in the title row', () => {
+    const html = render()
+    expect(html).toMatch(
+      /<input[^>]*type="search"[^>]*aria-label="Search drawings"/,
+    )
+  })
+
+  test('hides the search box in Trash', () => {
+    expect(render({ view: 'trash' })).not.toContain('Search drawings')
+  })
+
+  test('shows the normal grid with its tile while the query is blank', () => {
+    const html = render({ query: '   ' })
+    expect(html).toContain('new-drawing-tile')
+    expect(html).not.toContain('In names')
+  })
+
+  test('replaces the grid with the two sections and hides the tile', () => {
+    const html = render({
+      query: 'alp',
+      searchIndex: index([{ id: 'c', searchText: 'the alpine route' }]),
+    })
+    expect(html).not.toContain('new-drawing-tile')
+    expect(html).toContain('>In names</h2>')
+    expect(html).toContain('>In text on the canvas</h2>')
+    // The name match is a normal card.
+    expect(names(html)).toEqual(['alpha'])
+    // The text match is a row that opens its drawing, with the match marked.
+    expect(html).toMatch(
+      /<a class="search-row" href="#\/d\/c"><span class="search-row-name">Gamma<\/span><span class="search-row-snippet">the <mark>alp<\/mark>ine route<\/span><\/a>/,
+    )
+  })
+
+  test('lists name matches in the chosen sort order', () => {
+    const named = [
+      { id: 'x', name: 'Zed note', createdAt: 1, updatedAt: now - 1_000 },
+      { id: 'y', name: 'Alpha note', createdAt: 2, updatedAt: now - 9_000 },
+    ]
+    const list = {
+      status: 'loaded' as const,
+      drawings: named,
+      trashed: [],
+      folders: [],
+    }
+    expect(names(render({ list, query: 'note', sort: 'recent' }))).toEqual([
+      'Zed note',
+      'Alpha note',
+    ])
+    expect(names(render({ list, query: 'note', sort: 'name' }))).toEqual([
+      'Alpha note',
+      'Zed note',
+    ])
+  })
+
+  test('shows Searching… until the index is ready', () => {
+    const html = render({ query: 'alp' })
+    expect(html).toContain('Searching…')
+    expect(names(html)).toEqual(['alpha'])
+  })
+
+  test('says so when the index failed, and still lists name matches', () => {
+    const html = render({
+      query: 'alp',
+      searchIndex: { status: 'error', forList: drawings },
+    })
+    expect(html).toContain('Text on the canvas couldn’t be searched.')
+    expect(names(html)).toEqual(['alpha'])
+  })
+
+  test('says when nothing matches', () => {
+    const html = render({ query: 'zzz', searchIndex: index([]) })
+    expect(html).toContain('No drawings match “zzz”.')
+    expect(html).not.toContain('In names')
+  })
+
+  test('escapes the query and snippets', () => {
+    const html = render({
+      query: '<b>',
+      searchIndex: index([{ id: 'a', searchText: 'x <b> y' }]),
+    })
+    expect(html).toContain('<mark>&lt;b&gt;</mark>')
+    expect(html).not.toContain('<mark><b>')
+  })
+})

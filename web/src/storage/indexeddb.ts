@@ -4,16 +4,21 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 import { migrate } from '../core/document/migrate.ts'
 import type { YodoDocument } from '../core/document/types.ts'
+import { safeSearchText } from '../core/search/extract.ts'
 import type { RepositoryOptions } from './memory.ts'
 import type { Folder, FolderInput, FolderRepository } from './folders.ts'
 import { sha256Hex, type ImageRepository } from './images.ts'
-import type { DrawingRepository, DrawingSummary } from './repository.ts'
+import type {
+  DrawingRepository,
+  DrawingSummary,
+  SearchIndexEntry,
+} from './repository.ts'
 
 /** Database names start with `yodo-` (ADR 0005). */
 export const DEFAULT_DB_NAME = 'yodo-data'
 
 // Bump together with a new step in `upgrade`; never edit a released step.
-const DB_VERSION = 3
+const DB_VERSION = 4
 
 // Summaries and documents live in separate stores so `list()` reads only the
 // small summaries, never every drawing's elements.
@@ -24,6 +29,13 @@ interface YodoDb extends DBSchema {
   blobs: { key: string; value: StoredBlob }
   /** Folders (ADR 0045). A drawing's summary names its folder in `folderId`. */
   folders: { key: string; value: Folder }
+  /** Canvas text per drawing, for search (ADR 0047). Kept apart so `list()` stays small. */
+  search: { key: string; value: SearchRecord }
+}
+
+interface SearchRecord {
+  id: string
+  text: string
 }
 
 interface StoredBlob {
@@ -55,7 +67,7 @@ class YodoDbConnection {
       if (this.#db === opening) this.#db = undefined
     }
     const opening = openDB<YodoDb>(this.#dbName, DB_VERSION, {
-      upgrade(db, oldVersion) {
+      async upgrade(db, oldVersion, _newVersion, tx) {
         if (oldVersion < 1) {
           db.createObjectStore('drawings', { keyPath: 'id' })
           db.createObjectStore('documents', { keyPath: 'id' })
@@ -67,6 +79,26 @@ class YodoDbConnection {
         // Existing drawings simply have no folder (ADR 0045).
         if (oldVersion < 3) {
           db.createObjectStore('folders', { keyPath: 'id' })
+        }
+        // Index the drawings saved before search existed (ADR 0047). A
+        // document that can't be read gets an empty text, never a failed open.
+        if (oldVersion < 4) {
+          const search = db.createObjectStore('search', { keyPath: 'id' })
+          const documents = tx.objectStore('documents')
+          const puts: Promise<unknown>[] = []
+          for (
+            let cursor = await documents.openCursor();
+            cursor;
+            cursor = await cursor.continue()
+          ) {
+            puts.push(
+              search.put({
+                id: cursor.key,
+                text: safeSearchText(cursor.value),
+              }),
+            )
+          }
+          await Promise.all(puts)
         }
       },
       // Another tab wants a newer schema: close so its upgrade isn't blocked.
@@ -117,6 +149,20 @@ export class IndexedDbDrawingRepository implements DrawingRepository {
     )
   }
 
+  async searchIndex(): Promise<SearchIndexEntry[]> {
+    const db = await this.#open()
+    // One transaction, so the live list and the texts are the same moment.
+    const tx = db.transaction(['drawings', 'search'], 'readonly')
+    const [summaries, records] = await Promise.all([
+      tx.objectStore('drawings').getAll(),
+      tx.objectStore('search').getAll(),
+    ])
+    const texts = new Map(records.map((r) => [r.id, r.text]))
+    return summaries
+      .filter((s) => s.deletedAt === undefined)
+      .map((s) => ({ id: s.id, searchText: texts.get(s.id) ?? '' }))
+  }
+
   async get(id: string): Promise<YodoDocument | undefined> {
     const db = await this.#open()
     const doc = await db.get('documents', id)
@@ -127,7 +173,7 @@ export class IndexedDbDrawingRepository implements DrawingRepository {
     const db = await this.#open()
     // One transaction, so the summary and document never disagree and two
     // saves of the same drawing can't interleave between read and write.
-    const tx = db.transaction(['drawings', 'documents'], 'readwrite')
+    const tx = db.transaction(['drawings', 'documents', 'search'], 'readwrite')
     const drawings = tx.objectStore('drawings')
     const existing = await drawings.get(doc.id)
     const time = this.#now()
@@ -146,6 +192,9 @@ export class IndexedDbDrawingRepository implements DrawingRepository {
     try {
       pending.push(drawings.put(summary))
       pending.push(tx.objectStore('documents').put(doc))
+      pending.push(
+        tx.objectStore('search').put({ id: doc.id, text: safeSearchText(doc) }),
+      )
     } catch (error) {
       // put() throws synchronously for a value it can't clone. That is not a
       // failed request, so the transaction would commit the summary alone.
@@ -217,24 +266,30 @@ export class IndexedDbDrawingRepository implements DrawingRepository {
     const db = await this.#open()
     // One transaction reads the summaries and deletes the matching ones, so
     // nothing restored or trashed again in between is removed (ADR 0046).
-    const tx = db.transaction(['drawings', 'documents'], 'readwrite')
+    const tx = db.transaction(['drawings', 'documents', 'search'], 'readwrite')
     const drawings = tx.objectStore('drawings')
     const documents = tx.objectStore('documents')
+    const search = tx.objectStore('search')
     const removals: Promise<unknown>[] = [tx.done]
     for (const { id, deletedAt } of await drawings.getAll()) {
       if (deletedAt === undefined) continue
       if (deletedBefore !== undefined && deletedAt >= deletedBefore) continue
-      removals.push(drawings.delete(id), documents.delete(id))
+      removals.push(
+        drawings.delete(id),
+        documents.delete(id),
+        search.delete(id),
+      )
     }
     await Promise.all(removals)
   }
 
   async delete(id: string): Promise<void> {
     const db = await this.#open()
-    const tx = db.transaction(['drawings', 'documents'], 'readwrite')
+    const tx = db.transaction(['drawings', 'documents', 'search'], 'readwrite')
     await Promise.all([
       tx.objectStore('drawings').delete(id),
       tx.objectStore('documents').delete(id),
+      tx.objectStore('search').delete(id),
       tx.done,
     ])
   }
