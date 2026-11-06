@@ -85,9 +85,9 @@ export function DrawingCard({
         <span className="drawing-card-folder">
           <FolderGlyph icon={folder.icon} color={folder.color} size={14} />
           {folder.name}
-          {' · '}
         </span>
       )}
+      {showFolder && folder && ' · '}
       {formatEdited(updatedAt, now)}
     </span>
   )
