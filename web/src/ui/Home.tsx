@@ -1,5 +1,5 @@
 import { Plus } from '@phosphor-icons/react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   describeSummary,
   ExcalidrawImportError,
@@ -30,8 +30,15 @@ import type { ImageCache } from './imageCache.ts'
 import { DrawingCard } from './DrawingCard.tsx'
 import type { FolderValues } from './FolderDialog.tsx'
 import { activeFolder, drawingsInView, folderCounts } from './homeFolders.ts'
+import {
+  isSearching,
+  needsIndex,
+  searchView,
+  type SearchIndexState,
+  type SearchView,
+} from './homeSearch.ts'
 import { createCanvasMeasure } from './measure.ts'
-import { navigate } from './route.ts'
+import { navigate, routeHash } from './route.ts'
 import { SettingsMenu } from './SettingsMenu.tsx'
 import { withoutDrawing } from './homeTrash.ts'
 import { Sidebar } from './Sidebar.tsx'
@@ -92,6 +99,8 @@ export function Home({
   const [notice, setNotice] = useState<string>()
   const [importing, setImporting] = useState(false)
   const [imported, setImported] = useState<ImportedDrawing>()
+  const [query, setQuery] = useState('')
+  const [searchIndex, setSearchIndex] = useState<SearchIndexState>()
   // "Edited 5 min ago" is relative to when the list was loaded; render stays pure.
   const [now, setNow] = useState(Date.now)
 
@@ -128,6 +137,36 @@ export function Home({
       cancelled = true
     }
   }, [repository, folders, waitForEditor, attempt])
+
+  // The canvas-text index is read when a search starts and again whenever the
+  // list changed under it (a restore, an import, a delete), so a drawing that
+  // just came back is found (ADR 0047).
+  const liveDrawings = list.status === 'loaded' ? list.drawings : undefined
+  const searching = view === 'drawings' && isSearching(query)
+  const indexStale =
+    searching &&
+    liveDrawings !== undefined &&
+    needsIndex(searchIndex, liveDrawings)
+  useEffect(() => {
+    if (!indexStale || !liveDrawings) return
+    let cancelled = false
+    repository.searchIndex().then(
+      (entries) => {
+        if (!cancelled) {
+          setSearchIndex({ status: 'ready', forList: liveDrawings, entries })
+        }
+      },
+      (error: unknown) => {
+        console.error('Could not read the search index', error)
+        if (!cancelled) {
+          setSearchIndex({ status: 'error', forList: liveDrawings })
+        }
+      },
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [indexStale, liveDrawings, repository])
 
   /** The folder being viewed, if the route names one that still exists. */
   const current =
@@ -371,6 +410,9 @@ export function Home({
       list={list}
       sort={sort}
       onSort={setSort}
+      query={query}
+      onQuery={setQuery}
+      searchIndex={searchIndex}
       creating={creating}
       onCreate={() => void onCreate()}
       importing={importing}
@@ -421,6 +463,11 @@ export interface HomeViewProps {
   list: HomeList
   sort: DrawingSort
   onSort(sort: DrawingSort): void
+  /** The search box's text; blank shows the normal card grid. */
+  query?: string
+  onQuery?(query: string): void
+  /** The canvas-text index Home has read, if any (ADR 0047). */
+  searchIndex?: SearchIndexState
   creating: boolean
   onCreate(): void
   importing?: boolean
@@ -451,6 +498,9 @@ export function HomeView({
   list,
   sort,
   onSort,
+  query = '',
+  onQuery,
+  searchIndex,
   creating,
   onCreate,
   importing = false,
@@ -504,6 +554,20 @@ export function HomeView({
             </h1>
             {!inTrash && (
               <>
+                <input
+                  type="search"
+                  className="home-search"
+                  placeholder="Search drawings"
+                  aria-label="Search drawings"
+                  value={query}
+                  onChange={(event) => onQuery?.(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape' && query !== '') {
+                      event.preventDefault()
+                      onQuery?.('')
+                    }
+                  }}
+                />
                 <button
                   type="button"
                   className="button"
@@ -591,6 +655,30 @@ export function HomeView({
                 onEmptyTrash={onEmptyTrash}
               />
             )
+          ) : loaded && isSearching(query) ? (
+            <SearchResultsView
+              view={searchView(
+                loaded.drawings,
+                current?.id,
+                searchIndex,
+                query,
+              )}
+              query={query.trim()}
+              renderCard={(summary) => (
+                <DrawingCard
+                  key={summary.id}
+                  summary={summary}
+                  repository={repository}
+                  imageCache={imageCache}
+                  now={now}
+                  folders={folders}
+                  showFolder={current === undefined}
+                  onRename={(name) => onRename(summary.id, name)}
+                  onMove={(target) => onMove(summary.id, target)}
+                  onTrash={() => onTrash(summary.id)}
+                />
+              )}
+            />
           ) : (
             <ul className="card-grid" aria-busy={list.status === 'loading'}>
               <li>
@@ -631,6 +719,75 @@ export function HomeView({
           )}
         </main>
       </div>
+    </div>
+  )
+}
+
+function SearchResultsView({
+  view,
+  query,
+  renderCard,
+}: {
+  view: SearchView
+  query: string
+  renderCard(summary: DrawingSummary): ReactNode
+}) {
+  const { names, text } = view.results
+  const waiting = view.textPending
+  if (names.length === 0 && text.length === 0 && !waiting) {
+    return (
+      <div className="search-results">
+        <p className="search-empty" role="status">
+          No drawings match “{query}”.
+        </p>
+        {view.textFailed && (
+          <p className="home-notice">
+            Text on the canvas couldn’t be searched.
+          </p>
+        )}
+      </div>
+    )
+  }
+  return (
+    <div className="search-results">
+      {names.length > 0 && (
+        <section aria-labelledby="search-names">
+          <h2 id="search-names">In names</h2>
+          <ul className="card-grid">{names.map(renderCard)}</ul>
+        </section>
+      )}
+      {(text.length > 0 || waiting || view.textFailed) && (
+        <section aria-labelledby="search-text">
+          <h2 id="search-text">In text on the canvas</h2>
+          {waiting ? (
+            <p className="search-status" role="status">
+              Searching…
+            </p>
+          ) : view.textFailed ? (
+            <p className="home-notice">
+              Text on the canvas couldn’t be searched.
+            </p>
+          ) : (
+            <ul className="search-rows">
+              {text.map(({ summary, snippet }) => (
+                <li key={summary.id}>
+                  <a
+                    className="search-row"
+                    href={routeHash({ name: 'drawing', id: summary.id })}
+                  >
+                    <span className="search-row-name">{summary.name}</span>
+                    <span className="search-row-snippet">
+                      {snippet.before}
+                      <mark>{snippet.match}</mark>
+                      {snippet.after}
+                    </span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
     </div>
   )
 }
