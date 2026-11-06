@@ -40,6 +40,42 @@ export function toStrictJson(value: unknown): string {
   })
 }
 
+/**
+ * Sends one request under the app root and throws HttpError unless the status
+ * is one of `expected`. Shared by the drawing and folder repositories.
+ */
+export async function sendRequest(
+  fetch: typeof globalThis.fetch,
+  baseUrl: URL,
+  method: string,
+  path: string,
+  expected: number[],
+  init: RequestInit = {},
+): Promise<Response> {
+  // Relative, so the API is found under /yodo/ as well as at / (ADR 0007).
+  const url = new URL(path, baseUrl)
+  const response = await fetch(url, { ...init, method })
+  if (!expected.includes(response.status)) {
+    const body = await response.text().catch(() => '')
+    throw new HttpError(
+      response.status,
+      `${method} ${url.pathname} failed with ${response.status}: ${body.trim()}`,
+    )
+  }
+  return response
+}
+
+/**
+ * URL parsing collapses "." and ".." segments, escaped or not, so these ids
+ * would reach another route. App-made ids are UUIDs (ADR 0013).
+ */
+export function pathSegment(kind: string, id: string): string {
+  if (id === '.' || id === '..') {
+    throw new TypeError(`A ${kind} id can't be "${id}" over HTTP`)
+  }
+  return encodeURIComponent(id)
+}
+
 export interface HttpRepositoryOptions {
   /** The app root the API lives under, e.g. `new URL('./', document.baseURI)`. */
   baseUrl: URL
@@ -57,33 +93,17 @@ export class HttpDrawingRepository implements DrawingRepository {
     this.#fetch = fetch.bind(globalThis)
   }
 
-  /** Sends the request and throws HttpError unless the status is expected. */
   async #request(
     method: string,
     path: string,
     expected: number[],
     init: RequestInit = {},
   ): Promise<Response> {
-    // Relative, so the API is found under /yodo/ as well as at / (ADR 0007).
-    const url = new URL(path, this.#baseUrl)
-    const response = await this.#fetch(url, { ...init, method })
-    if (!expected.includes(response.status)) {
-      const body = await response.text().catch(() => '')
-      throw new HttpError(
-        response.status,
-        `${method} ${url.pathname} failed with ${response.status}: ${body.trim()}`,
-      )
-    }
-    return response
+    return sendRequest(this.#fetch, this.#baseUrl, method, path, expected, init)
   }
 
   #drawingPath(id: string): string {
-    // URL parsing collapses "." and ".." segments, escaped or not, so these
-    // ids would reach another route. App-made ids are UUIDs (ADR 0013).
-    if (id === '.' || id === '..') {
-      throw new TypeError(`A drawing id can't be "${id}" over HTTP`)
-    }
-    return `api/drawings/${encodeURIComponent(id)}`
+    return `api/drawings/${pathSegment('drawing', id)}`
   }
 
   async list(): Promise<DrawingSummary[]> {
@@ -114,6 +134,24 @@ export class HttpDrawingRepository implements DrawingRepository {
         body,
       },
     )
+    return (await response.json()) as DrawingSummary
+  }
+
+  async move(
+    id: string,
+    folderId: string | null,
+  ): Promise<DrawingSummary | undefined> {
+    // 400 (an unknown folder) throws HttpError; only a missing drawing is quiet.
+    const response = await this.#request(
+      'PUT',
+      `${this.#drawingPath(id)}/folder`,
+      [200, 404],
+      {
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folderId }),
+      },
+    )
+    if (response.status === 404) return undefined
     return (await response.json()) as DrawingSummary
   }
 

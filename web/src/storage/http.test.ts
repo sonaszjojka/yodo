@@ -3,6 +3,7 @@ import { createDocument } from '../core/document/create.ts'
 import v1Fixture from '../core/document/fixtures/v1-every-element.json?raw'
 import { migrate } from '../core/document/migrate.ts'
 import { HttpDrawingRepository, HttpError, toStrictJson } from './http.ts'
+import { HttpFolderRepository } from './httpFolders.ts'
 
 // The behaviour shared with other repositories is proven against the real
 // server by `http.server-test.ts`; these tests cover the HTTP mapping alone.
@@ -120,5 +121,105 @@ describe('toStrictJson', () => {
     ['undefined in an array', [1, undefined]],
   ])('throws on %s instead of changing it', (_, value) => {
     expect(() => toStrictJson(value)).toThrow(TypeError)
+  })
+})
+
+describe('HttpDrawingRepository.move', () => {
+  test('puts the folder id to api/drawings/{id}/folder', async () => {
+    const summary = {
+      id: 'a b',
+      name: 'A',
+      createdAt: 1,
+      updatedAt: 2,
+      folderId: 'f',
+    }
+    const { fetch, repo } = repoReplying(() => Response.json(summary))
+    expect(await repo.move('a b', 'f')).toEqual(summary)
+    const { url, method, init } = request(fetch)
+    expect(url).toBe('https://example.test/yodo/api/drawings/a%20b/folder')
+    expect(method).toBe('PUT')
+    expect(JSON.parse(init!.body as string)).toEqual({ folderId: 'f' })
+  })
+
+  test('sends null to take a drawing out of its folder', async () => {
+    const { fetch, repo } = repoReplying(() =>
+      Response.json({ id: 'a', name: 'A', createdAt: 1, updatedAt: 2 }),
+    )
+    await repo.move('a', null)
+    expect(JSON.parse(request(fetch).init!.body as string)).toEqual({
+      folderId: null,
+    })
+  })
+
+  test('a 404 is a missing drawing, a 400 is an error', async () => {
+    const missing = repoReplying(() => new Response('', { status: 404 }))
+    expect(await missing.repo.move('a', null)).toBeUndefined()
+    const noFolder = repoReplying(
+      () => new Response('folder not found', { status: 400 }),
+    )
+    await expect(noFolder.repo.move('a', 'x')).rejects.toMatchObject({
+      status: 400,
+    })
+  })
+
+  test.each(['.', '..'])('refuses the id %j without a request', async (id) => {
+    const { fetch, repo } = repoReplying(() => Response.json({}))
+    await expect(repo.move(id, null)).rejects.toThrow(TypeError)
+    expect(fetch).not.toHaveBeenCalled()
+  })
+})
+
+describe('HttpFolderRepository', () => {
+  const input = { id: 'f/1', name: 'Work', icon: 'folder', color: 'teal' }
+
+  function foldersReplying(response: () => Response) {
+    const fetch = vi.fn<typeof globalThis.fetch>(async () => response())
+    return { fetch, repo: new HttpFolderRepository({ baseUrl, fetch }) }
+  }
+
+  test('lists from GET api/folders', async () => {
+    const folders = [{ ...input, createdAt: 1 }]
+    const { fetch, repo } = foldersReplying(() => Response.json(folders))
+    expect(await repo.list()).toEqual(folders)
+    expect(request(fetch)).toMatchObject({
+      url: 'https://example.test/yodo/api/folders',
+      method: 'GET',
+    })
+  })
+
+  test('saves with PUT of exactly the folder fields', async () => {
+    const { fetch, repo } = foldersReplying(() =>
+      Response.json({ ...input, createdAt: 1 }),
+    )
+    expect(await repo.save(input)).toEqual({ ...input, createdAt: 1 })
+    const { url, method, init } = request(fetch)
+    expect(url).toBe('https://example.test/yodo/api/folders/f%2F1')
+    expect(method).toBe('PUT')
+    expect(JSON.parse(init!.body as string)).toEqual(input)
+  })
+
+  test('deletes with DELETE and expects 204', async () => {
+    const { fetch, repo } = foldersReplying(
+      () => new Response(null, { status: 204 }),
+    )
+    await repo.delete('f')
+    expect(request(fetch)).toMatchObject({
+      url: 'https://example.test/yodo/api/folders/f',
+      method: 'DELETE',
+    })
+  })
+
+  test('a failing status throws HttpError', async () => {
+    const { repo } = foldersReplying(
+      () => new Response('nope', { status: 400 }),
+    )
+    await expect(repo.save(input)).rejects.toBeInstanceOf(HttpError)
+  })
+
+  test.each(['.', '..'])('refuses the id %j without a request', async (id) => {
+    const { fetch, repo } = foldersReplying(() => Response.json({}))
+    await expect(repo.delete(id)).rejects.toThrow(TypeError)
+    await expect(repo.save({ ...input, id })).rejects.toThrow(TypeError)
+    expect(fetch).not.toHaveBeenCalled()
   })
 })

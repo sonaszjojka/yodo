@@ -4,7 +4,9 @@
 import { expect, inject, test } from 'vitest'
 import { createDocument } from '../core/document/create.ts'
 import { describeRepositoryContract } from './contract.ts'
+import { describeFolderContract } from './folderContract.ts'
 import { HttpDrawingRepository } from './http.ts'
+import { HttpFolderRepository } from './httpFolders.ts'
 import { HttpImageRepository } from './httpImages.ts'
 import { describeImageContract } from './imageContract.ts'
 
@@ -31,6 +33,13 @@ async function emptyRepository(): Promise<HttpDrawingRepository> {
 }
 
 describeRepositoryContract('HttpDrawingRepository', emptyRepository)
+
+// Deleting every folder also deletes the drawings in them (ADR 0045).
+describeFolderContract('Http repositories', async () => {
+  const folders = new HttpFolderRepository({ baseUrl, fetch: fetchWithOrigin })
+  for (const { id } of await folders.list()) await folders.delete(id)
+  return { drawings: await emptyRepository(), folders }
+})
 
 test('a new repository instance sees earlier saves', async () => {
   const doc = createDocument('Persisted')
