@@ -7,6 +7,7 @@ import {
 } from '../core/excalidraw/convert.ts'
 import {
   createDrawing,
+  duplicateDrawing,
   renameDrawing,
   sortDrawings,
   type DrawingSort,
@@ -43,7 +44,13 @@ import { SettingsMenu } from './SettingsMenu.tsx'
 import { withoutDrawing } from './homeTrash.ts'
 import { Sidebar } from './Sidebar.tsx'
 import { TrashView } from './TrashView.tsx'
-import { importErrorMessage, importFile, isYodoFile } from './yodoFile.ts'
+import {
+  exportDrawing,
+  exportErrorMessage,
+  importErrorMessage,
+  importFile,
+  isYodoFile,
+} from './yodoFile.ts'
 
 export type HomeList =
   | { status: 'loading' }
@@ -403,6 +410,31 @@ export function Home({
     }
   }
 
+  async function onDuplicate(source: DrawingSummary) {
+    setNotice(undefined)
+    try {
+      const copy = await duplicateDrawing(repository, source)
+      // undefined: the original is gone (deleted elsewhere), so nothing to show.
+      if (copy) updateLoaded((c) => ({ ...c, drawings: [...c.drawings, copy] }))
+    } catch (error) {
+      console.error('Could not duplicate the drawing', error)
+      setNotice('Couldn’t duplicate the drawing. Try again.')
+      // The copy may have been saved before the failure, so list again.
+      setAttempt((n) => n + 1)
+    }
+  }
+
+  async function onExport(id: string) {
+    setNotice(undefined)
+    try {
+      const document = await repository.get(id)
+      if (document) await exportDrawing(document, images)
+    } catch (error) {
+      console.error('Could not export the drawing', error)
+      setNotice(exportErrorMessage(error))
+    }
+  }
+
   return (
     <HomeView
       repository={repository}
@@ -429,6 +461,8 @@ export function Home({
       onSaveFolder={(values, existing) => void onSaveFolder(values, existing)}
       onDeleteFolder={(folder) => void onDeleteFolder(folder)}
       onMove={(id, target) => void onMove(id, target)}
+      onDuplicate={(source) => void onDuplicate(source)}
+      onExport={(id) => void onExport(id)}
       onRetry={() => {
         setList({ status: 'loading' })
         setAttempt((n) => n + 1)
@@ -482,6 +516,8 @@ export interface HomeViewProps {
   onSaveFolder(values: FolderValues, existing?: Folder): void
   onDeleteFolder(folder: Folder): void
   onMove(id: string, folderId: string | null): void
+  onDuplicate(summary: DrawingSummary): void
+  onExport(id: string): void
   onTrash(id: string): void
   onRestore(id: string): void
   onDeleteForever(id: string): void
@@ -513,6 +549,8 @@ export function HomeView({
   onSaveFolder,
   onDeleteFolder,
   onMove,
+  onDuplicate,
+  onExport,
   onTrash,
   onRestore,
   onDeleteForever,
@@ -676,6 +714,8 @@ export function HomeView({
                   showFolder={current === undefined}
                   onRename={(name) => onRename(summary.id, name)}
                   onMove={(target) => onMove(summary.id, target)}
+                  onDuplicate={() => onDuplicate(summary)}
+                  onExport={() => onExport(summary.id)}
                   onTrash={() => onTrash(summary.id)}
                 />
               )}
@@ -713,6 +753,8 @@ export function HomeView({
                     showFolder={current === undefined}
                     onRename={(name) => onRename(summary.id, name)}
                     onMove={(target) => onMove(summary.id, target)}
+                    onDuplicate={() => onDuplicate(summary)}
+                    onExport={() => onExport(summary.id)}
                     onTrash={() => onTrash(summary.id)}
                   />
                 ))}

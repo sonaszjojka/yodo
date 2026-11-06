@@ -1,6 +1,7 @@
 import { Check, DotsThree } from '@phosphor-icons/react'
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent,
@@ -14,6 +15,7 @@ import { sortFolders, type Folder } from '../storage/folders.ts'
 import { FolderGlyph } from './FolderGlyph.tsx'
 import { formatEdited } from './formatEdited.ts'
 import { isOutside } from './outsidePress.ts'
+import { opensDown } from './menuPlacement.ts'
 import { navigate, routeHash } from './route.ts'
 import type { ImageCache } from './imageCache.ts'
 import { Thumbnail } from './Thumbnail.tsx'
@@ -30,14 +32,17 @@ export interface DrawingCardProps {
   showFolder: boolean
   onRename(name: string): void
   onMove(folderId: string | null): void
+  /** Saves a copy named "<name> copy" next to the drawing. */
+  onDuplicate(): void
+  /** Downloads the drawing as a `.yodo` file. */
+  onExport(): void
   /** Moves the drawing to Trash (ADR 0046); no confirmation, it can be restored. */
   onTrash(): void
 }
 
 /**
  * One drawing on Home (`docs/ui.md`, Drawing card). The ⋯ button and a
- * right-click open the same menu; Open, Rename, Move to folder and Move to
- * Trash exist so far.
+ * right-click open the same menu.
  */
 export function DrawingCard({
   summary,
@@ -48,6 +53,8 @@ export function DrawingCard({
   showFolder,
   onRename,
   onMove,
+  onDuplicate,
+  onExport,
   onTrash,
 }: DrawingCardProps) {
   const { id, name, updatedAt, folderId } = summary
@@ -56,9 +63,21 @@ export function DrawingCard({
   // The menu has a second page that lists the folders (Move to folder).
   const [movePage, setMovePage] = useState(false)
   const [renaming, setRenaming] = useState(false)
+  // The menu opens upwards; it opens downwards when that would leave the screen.
+  const [down, setDown] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const moreRef = useRef<HTMLButtonElement>(null)
   const route = { name: 'drawing', id } as const
+
+  // Before paint, so the menu never shows in the wrong place. It measures the
+  // menu as if it opened upwards and runs again on the move page, whose height
+  // differs.
+  useLayoutEffect(() => {
+    if (!menuOpen) return
+    const menu = menuRef.current!
+    const cardBottom = menu.parentElement!.getBoundingClientRect().bottom
+    setDown(opensDown(cardBottom, menu.offsetHeight))
+  }, [menuOpen, movePage])
 
   useEffect(() => {
     if (!menuOpen) return
@@ -146,7 +165,7 @@ export function DrawingCard({
       {menuOpen && (
         <div
           ref={menuRef}
-          className="menu"
+          className={down ? 'menu menu-down' : 'menu'}
           role="menu"
           aria-label={`Actions for ${name}`}
           onKeyDown={(event) => {
@@ -192,6 +211,15 @@ export function DrawingCard({
               >
                 Open
               </button>
+              <a
+                role="menuitem"
+                href={routeHash(route)}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMenuOpen(false)}
+              >
+                Open in new tab
+              </a>
               <button
                 type="button"
                 role="menuitem"
@@ -205,10 +233,30 @@ export function DrawingCard({
               <button
                 type="button"
                 role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false)
+                  onDuplicate()
+                }}
+              >
+                Duplicate
+              </button>
+              <button
+                type="button"
+                role="menuitem"
                 aria-haspopup="menu"
                 onClick={() => setMovePage(true)}
               >
                 Move to folder…
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false)
+                  onExport()
+                }}
+              >
+                Export as .yodo
               </button>
               <button
                 type="button"

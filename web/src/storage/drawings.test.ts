@@ -8,6 +8,7 @@ import { DocumentError } from '../core/document/migrate.ts'
 import { blobToBase64 } from './base64.ts'
 import {
   createDrawing,
+  duplicateDrawing,
   exportYodo,
   importDrawing,
   loadDrawing,
@@ -16,7 +17,11 @@ import {
   yodoFileName,
 } from './drawings.ts'
 import { pngBlob } from './imageContract.ts'
-import { InMemoryDrawingRepository } from './memory.ts'
+import {
+  InMemoryDrawingRepository,
+  InMemoryFolderRepository,
+  MemoryData,
+} from './memory.ts'
 import { InMemoryImageRepository } from './memoryImages.ts'
 import type { DrawingSummary } from './repository.ts'
 
@@ -115,6 +120,92 @@ describe('renameDrawing', () => {
 
     expect(await renameDrawing(repository, 'missing', 'x')).toBeUndefined()
     expect(await repository.list()).toEqual([])
+  })
+})
+
+describe('duplicateDrawing', () => {
+  test('saves a copy with a new id and a "copy" name, leaving the original', async () => {
+    const repository = new InMemoryDrawingRepository()
+    const doc = {
+      ...createDocument('Plan'),
+      elements: [createShape('rectangle', { x: 1, y: 2, width: 3, height: 4 })],
+    }
+    const source = await repository.save(doc)
+
+    const copy = await duplicateDrawing(repository, source)
+
+    expect(copy).toBeDefined()
+    expect(copy!.id).not.toBe(doc.id)
+    expect(copy!.name).toBe('Plan copy')
+    expect(await repository.get(copy!.id)).toEqual({
+      ...doc,
+      id: copy!.id,
+      name: 'Plan copy',
+    })
+    expect(await repository.get(doc.id)).toEqual(doc)
+  })
+
+  test('puts the copy in the same folder as the original', async () => {
+    const data = new MemoryData()
+    const repository = new InMemoryDrawingRepository({ data })
+    await new InMemoryFolderRepository({ data }).save({
+      id: 'f1',
+      name: 'Work',
+      icon: 'folder',
+      color: '#000000',
+    })
+    const doc = createDocument('In folder')
+    await repository.save(doc)
+    const source = (await repository.move(doc.id, 'f1'))!
+
+    const copy = await duplicateDrawing(repository, source)
+
+    expect(copy!.folderId).toBe('f1')
+    expect((await repository.list()).map((d) => d.folderId)).toEqual([
+      'f1',
+      'f1',
+    ])
+  })
+
+  test('leaves a drawing outside folders outside folders', async () => {
+    const repository = new InMemoryDrawingRepository()
+    const source = await repository.save(createDocument('Loose'))
+
+    const copy = await duplicateDrawing(repository, source)
+
+    expect(copy!.folderId).toBeUndefined()
+  })
+
+  test('returns undefined for a drawing that is gone and creates nothing', async () => {
+    const repository = new InMemoryDrawingRepository()
+    const gone: DrawingSummary = {
+      id: 'gone',
+      name: 'Gone',
+      createdAt: 1,
+      updatedAt: 1,
+    }
+
+    expect(await duplicateDrawing(repository, gone)).toBeUndefined()
+    expect(await repository.list()).toEqual([])
+  })
+
+  test('keeps the images of the original', async () => {
+    const repository = new InMemoryDrawingRepository()
+    const doc = {
+      ...createDocument('Pictures'),
+      elements: [
+        createImage(
+          'abc',
+          { width: 10, height: 10 },
+          { x: 0, y: 0, width: 800, height: 600 },
+        ),
+      ],
+    }
+    const source = await repository.save(doc)
+
+    const copy = await duplicateDrawing(repository, source)
+
+    expect((await repository.get(copy!.id))?.elements).toEqual(doc.elements)
   })
 })
 

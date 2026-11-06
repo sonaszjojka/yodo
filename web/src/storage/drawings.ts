@@ -163,6 +163,28 @@ export async function renameDrawing(
   return repository.save({ ...document, name: trimmed })
 }
 
+/**
+ * Saves a copy of a stored drawing, named "<name> copy", in the same folder,
+ * and returns its summary. Resolves undefined, creating nothing, when the
+ * drawing is gone. The copy shares the original's images: they are stored by
+ * content hash (ADR 0040).
+ */
+export async function duplicateDrawing(
+  repository: DrawingRepository,
+  source: DrawingSummary,
+): Promise<DrawingSummary | undefined> {
+  const document = await repository.get(source.id)
+  if (!document) return undefined
+  const copy = await repository.save({
+    ...document,
+    id: randomId(),
+    name: `${document.name} copy`,
+  })
+  // A folder is metadata outside the document (ADR 0046), so it's set apart.
+  if (source.folderId === undefined) return copy
+  return (await repository.move(copy.id, source.folderId)) ?? copy
+}
+
 export type DrawingSort = 'recent' | 'name' | 'created'
 
 const collator = new Intl.Collator(undefined, { sensitivity: 'base' })
