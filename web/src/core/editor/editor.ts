@@ -492,26 +492,18 @@ export function createEditor(
             elements: [...prev.document.elements, draft],
           },
         }
-        // A tool picked mid-drag wins: the shape is still drawn, but the
-        // user's new tool and its cleared selection are kept. The pencil
-        // stays active for the next stroke, as handwriting takes many.
-        if (prev.tool !== ended.tool || ended.tool === 'pencil')
-          return committed
-        // The new element is selected and Select becomes active, so it can be
-        // moved right away (as in Excalidraw).
-        const selected = {
-          ...committed,
-          tool: 'select' as const,
-          selectedIds: [draft.id],
-        }
-        // A new note opens its text for typing at once.
-        return draft.type === 'note'
+        // The tool stays active for the next element (ADR 0050) and the new
+        // one is not selected. A tool picked mid-drag wins: the shape is
+        // still drawn, and the new tool keeps its cleared selection.
+        // A new note opens its text for typing at once, unless the user
+        // picked another tool meanwhile (the editor would capture their
+        // next press).
+        return draft.type === 'note' && prev.tool === ended.tool
           ? {
-              ...selected,
+              ...committed,
               editing: editFor(draft, ended.start, prev.defaults),
-              selectedIds: [],
             }
-          : selected
+          : committed
       })
     },
     pointerCancel(pointerId) {
@@ -819,10 +811,24 @@ export function createEditor(
         ...prev,
         document,
         editing: null,
-        tool: 'select',
-        selectedIds: selectId ? [selectId] : [],
+        // The tool stays (ADR 0050). Only the select tool's label edit leaves
+        // the edited element selected.
+        selectedIds: selectId && prev.tool === 'select' ? [selectId] : [],
       }
     })
+  }
+
+  function setTool(tool: Tool) {
+    commitText()
+    if (store.getState().tool === tool) return
+    selectTool.cancel()
+    eraserTool.cancel()
+    store.setState((prev) => ({
+      ...prev,
+      tool,
+      selectedIds: [],
+      hoverHandle: null,
+    }))
   }
 
   /**
@@ -1114,7 +1120,10 @@ export function createEditor(
     cancel() {
       textPress = null
       if (!pan && !drag && !gesture && !erase) {
-        setSelection([])
+        // Nothing to cancel: a drawing tool goes back to Select (ADR 0050),
+        // else the selection is cleared.
+        if (store.getState().tool !== 'select') setTool('select')
+        else setSelection([])
         return
       }
       if (pan) endPan()
@@ -1265,18 +1274,7 @@ export function createEditor(
     history: history.status,
     undo: () => travel(history.undo),
     redo: () => travel(history.redo),
-    setTool(tool) {
-      commitText()
-      if (store.getState().tool === tool) return
-      selectTool.cancel()
-      eraserTool.cancel()
-      store.setState((prev) => ({
-        ...prev,
-        tool,
-        selectedIds: [],
-        hoverHandle: null,
-      }))
-    },
+    setTool,
     setSpaceHeld(spaceHeld) {
       store.setState((prev) =>
         prev.spaceHeld === spaceHeld ? prev : { ...prev, spaceHeld },

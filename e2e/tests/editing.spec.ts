@@ -56,14 +56,21 @@ test('draw shapes, label one, attach an arrow, move, undo and redo', async ({
   await test.step('draw a rectangle and an ellipse', async () => {
     await tool(page, 'Rectangle').click()
     await drag(page, [150, 150], [350, 300])
+    // The tool stays active after an element (ADR 0050).
+    await expect(tool(page, 'Rectangle')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
     await tool(page, 'Ellipse').click()
     await drag(page, [600, 150], [800, 300])
+    await expect(tool(page, 'Ellipse')).toHaveAttribute('aria-pressed', 'true')
     await expectInk(page)
     await saved(2)
   })
 
   await test.step('type a label into the rectangle', async () => {
-    await tool(page, 'Select').click()
+    await page.keyboard.press('Escape')
+    await expect(tool(page, 'Select')).toHaveAttribute('aria-pressed', 'true')
     await page
       .locator('canvas.canvas')
       .dblclick({ position: { x: 250, y: 225 } })
