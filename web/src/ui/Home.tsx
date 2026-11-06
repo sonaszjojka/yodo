@@ -33,6 +33,7 @@ import { activeFolder, drawingsInView, folderCounts } from './homeFolders.ts'
 import { createCanvasMeasure } from './measure.ts'
 import { navigate } from './route.ts'
 import { SettingsMenu } from './SettingsMenu.tsx'
+import { withoutDrawing } from './homeTrash.ts'
 import { Sidebar } from './Sidebar.tsx'
 import { TrashView } from './TrashView.tsx'
 import { importErrorMessage, importFile, isYodoFile } from './yodoFile.ts'
@@ -328,10 +329,7 @@ export function Home({
     setNotice(undefined)
     try {
       await repository.delete(id)
-      updateLoaded((c) => ({
-        ...c,
-        trashed: c.trashed.filter((d) => d.id !== id),
-      }))
+      updateLoaded((c) => ({ ...c, ...withoutDrawing(c, id) }))
     } catch (error) {
       console.error('Could not delete the drawing', error)
       setNotice('Couldn’t delete the drawing. Try again.')
