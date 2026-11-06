@@ -28,6 +28,31 @@ const valid = [
   createImage('b'.repeat(64), { width: 20, height: 10 }, box),
 ]
 
+describe('arrow bindings', () => {
+  const arrow = createLinear('arrow', lineFromDrag([0, 0], [10, 10], false))
+  const good = { elementId: 'a', ratio: [0.5, 1] }
+
+  test('a valid binding is kept', () => {
+    const json = JSON.parse(JSON.stringify({ ...arrow, startBinding: good }))
+    expect(parseElements([json])).toEqual([json])
+  })
+
+  test.each([
+    ['a null ratio', { elementId: 'a', ratio: null }],
+    ['a short ratio', { elementId: 'a', ratio: [1] }],
+    ['a non-finite ratio', { elementId: 'a', ratio: [1, null] }],
+    ['an empty id', { elementId: '', ratio: [0, 0] }],
+    ['a non-object', 'a'],
+  ])('%s is stripped and the arrow kept', (_name, bad) => {
+    const json = JSON.parse(
+      JSON.stringify({ ...arrow, startBinding: bad, endBinding: good }),
+    )
+    const [result] = parseElements([json])
+    expect(result).toEqual({ ...arrow, endBinding: good })
+    expect(result).not.toHaveProperty('startBinding')
+  })
+})
+
 describe('parseElements', () => {
   test('keeps a valid element of every type, unchanged', () => {
     const json = JSON.parse(JSON.stringify(valid))

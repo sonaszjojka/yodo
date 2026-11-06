@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { estimateMeasure } from '../text/layout.ts'
+import type { ArrowElement } from '../document/types.ts'
+import { moveElements } from '../editor/selection.ts'
 import { elementBounds } from '../geometry/rect.ts'
 import {
   convertExcalidraw,
@@ -74,19 +76,64 @@ describe('shapes, lines, arrows and pencil', () => {
     })
   })
 
-  test('reports dropped bindings and arrowheads as simplified', async () => {
+  test('reports dropped arrowheads as simplified, not attached arrows', async () => {
     const { document, summary } = await convert(shapes)
     expect(document.elements[5]).toMatchObject({ endArrowhead: 'arrow' })
     expect(summary.simplified).toEqual([
       { reason: 'zigzag fills, shown as hachure', count: 1 },
-      { reason: 'arrows no longer attached to shapes', count: 1 },
       { reason: 'arrowheads', count: 1 },
     ])
     expect(describeSummary(summary)).toEqual([
       'Simplified zigzag fills, shown as hachure (1)',
-      'Simplified arrows no longer attached to shapes (1)',
       'Simplified arrowheads (1)',
     ])
+  })
+
+  test('attaches a bound arrow to the converted shapes, on their outlines', async () => {
+    const { document } = await convert(shapes)
+    const [rectangle, , ellipse] = document.elements
+    const arrow = document.elements[5] as ArrowElement
+    expect(arrow.startBinding?.elementId).toBe(rectangle!.id)
+    expect(arrow.endBinding?.elementId).toBe(ellipse!.id)
+    // Start (0, 400) snapped onto the rectangle at (10, 20, 100x50), whose
+    // corners are round: on its bottom-left curve, inside the box corner.
+    expect(arrow.x).toBeGreaterThan(10)
+    expect(arrow.x).toBeLessThan(40)
+    expect(arrow.y).toBeGreaterThan(55)
+    expect(arrow.y).toBeLessThan(70)
+  })
+
+  test('reports a binding to a shape that was not imported', async () => {
+    const input = JSON.parse(shapes)
+    const a1 = input.elements.find((e: { id: string }) => e.id === 'a1')
+    a1.endBinding = { elementId: 'gone' }
+    const { document, summary } = await convertExcalidraw(input, options())
+    expect(document.elements[5]).not.toHaveProperty('endBinding')
+    expect(document.elements[5]).toHaveProperty('startBinding')
+    expect(summary.simplified).toContainEqual({
+      reason: 'arrows no longer attached to shapes',
+      count: 1,
+    })
+  })
+
+  test('a bound arrow with a bend follows its shape when it moves', async () => {
+    const input = JSON.parse(shapes)
+    const a1 = input.elements.find((e: { id: string }) => e.id === 'a1')
+    a1.points = [
+      [0, 0],
+      [40, -30],
+      [100, 50],
+    ]
+    const { document } = await convertExcalidraw(input, options())
+    const ellipse = document.elements[2]!
+    const before = document.elements[5] as ArrowElement
+    const moved = moveElements(document.elements, new Set([ellipse.id]), 0, 100)
+    const after = moved[5] as ArrowElement
+    const world = (a: ArrowElement) =>
+      a.points.map(([dx, dy]) => [a.x + dx, a.y + dy])
+    expect(world(after)[1]).toEqual(world(before)[1])
+    expect(world(after)[0]).toEqual(world(before)[0])
+    expect(world(after)[2]![1]).toBeGreaterThan(world(before)[2]![1]!)
   })
 
   test('gives every element a fresh id and keeps the order', async () => {

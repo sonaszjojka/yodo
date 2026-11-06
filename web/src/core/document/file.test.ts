@@ -24,6 +24,18 @@ function exportObject(): Record<string, unknown> {
   return JSON.parse(v1Export) as Record<string, unknown>
 }
 
+describe('parseYodoFile bindings', () => {
+  test('a malformed arrow binding is stripped and the arrow kept', () => {
+    const arrow = everyElement.elements.find((e) => e.type === 'arrow')!
+    const broken = {
+      ...exportObject(),
+      elements: [{ ...arrow, startBinding: { elementId: 'x', ratio: null } }],
+    }
+    const { document } = parseYodoFile(JSON.stringify(broken))
+    expect(document.elements).toEqual([arrow])
+  })
+})
+
 describe('serializeYodoFile', () => {
   test('round-trips a document with every element type and an image', () => {
     const doc = { ...everyElement, fileIds: ['hash-a'] }

@@ -149,3 +149,37 @@ describe('duplicateElements', () => {
     expect(result.elements).toBe(elements)
   })
 })
+
+describe('arrows attached to shapes', () => {
+  const target = createShape('rectangle', { x: 0, y: 0, width: 50, height: 50 })
+  const arrow = {
+    ...createLinear('arrow', lineFromDrag([50, 25], [200, 25], false)),
+    startBinding: { elementId: target.id, ratio: [1, 0.5] as [number, number] },
+  }
+
+  test('deleting the shape clears the arrow binding', () => {
+    const [result] = deleteElements([target, arrow], new Set([target.id]))
+    expect(result).not.toHaveProperty('startBinding')
+  })
+
+  test('duplicating both attaches the copy to the copied shape', () => {
+    let n = 0
+    const { elements } = duplicateElements(
+      [target, arrow],
+      new Set([target.id, arrow.id]),
+      () => `copy-${++n}`,
+    )
+    const copy = elements.find((e) => e.type === 'arrow' && e.id !== arrow.id)
+    expect(copy).toMatchObject({ startBinding: { elementId: 'copy-1' } })
+    expect(elements.find((e) => e.id === arrow.id)).toBe(arrow)
+  })
+
+  test('duplicating only the arrow leaves the copy free', () => {
+    const { elements } = duplicateElements(
+      [target, arrow],
+      new Set([arrow.id]),
+      () => 'c',
+    )
+    expect(elements[2]).not.toHaveProperty('startBinding')
+  })
+})

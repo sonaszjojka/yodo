@@ -52,6 +52,7 @@ import {
   pasteElements,
   serializeClipboard,
 } from './clipboard.ts'
+import { bindableAt, snapToOutline } from './binding.ts'
 import { arrange, type LayerOrder } from './layers.ts'
 import {
   applyDefaults,
@@ -341,15 +342,50 @@ export function createEditor(
     start: Point
     last: Point
     shift: boolean
+    /** The shape an arrow started on, which its end cannot attach to. */
+    startTargetId?: string
   } | null = null
 
   function owns(pointerId: number) {
     return drag?.pointerId === pointerId
   }
 
+  /** The shape an arrow end dropped at `point` attaches to, if any (ADR 0048). */
+  function bindableUnder(point: Point) {
+    const { document, viewport } = store.getState()
+    return bindableAt(document.elements, point, HIT_TOLERANCE / viewport.zoom)
+  }
+
   function updateDraft() {
     // A stroke grows sample by sample in pointerMove; Shift doesn't reshape it.
     if (!drag || drag.tool === 'pencil') return
+    if (drag.tool === 'arrow') {
+      // The end snaps onto a shape under the pointer and remembers it; a
+      // snapped end ignores Shift, since it has a place of its own.
+      const target = bindableUnder(drag.last)
+      const snap =
+        target && target.id !== drag.startTargetId
+          ? snapToOutline(target, drag.last)
+          : null
+      const geometry = lineFromDrag(
+        drag.start,
+        snap?.point ?? drag.last,
+        drag.shift && !snap,
+      )
+      store.setState((prev) => {
+        if (prev.draft?.type !== 'arrow') return prev
+        const { endBinding: _previous, ...arrow } = prev.draft
+        return {
+          ...prev,
+          draft: {
+            ...arrow,
+            ...geometry,
+            ...(snap ? { endBinding: snap.binding } : {}),
+          },
+        }
+      })
+      return
+    }
     const geometry = geometryFromDrag(
       drag.tool,
       drag.start,
@@ -379,18 +415,32 @@ export function createEditor(
       if (drag && !owns(pointerId)) return
       const { tool, defaults: style } = store.getState()
       if (!isDrawingTool(tool)) return
-      drag = { pointerId, tool, start: point, last: point, shift }
+      // An arrow starting on a shape starts on its outline and is attached.
+      const target = tool === 'arrow' ? bindableUnder(point) : null
+      const snap = target ? snapToOutline(target, point) : null
+      const origin = snap?.point ?? point
+      drag = {
+        pointerId,
+        tool,
+        start: origin,
+        last: point,
+        shift,
+        startTargetId: target?.id,
+      }
       // The seed is picked once here and kept for the element's lifetime.
       const draft =
         tool === 'pencil'
           ? createPencil(startStroke(point), undefined, style)
           : isLinear(tool)
-            ? createLinear(
-                tool,
-                lineFromDrag(point, point, shift),
-                undefined,
-                style,
-              )
+            ? {
+                ...createLinear(
+                  tool,
+                  lineFromDrag(origin, origin, shift),
+                  undefined,
+                  style,
+                ),
+                ...(snap ? { startBinding: snap.binding } : {}),
+              }
             : tool === 'note'
               ? createNote(rectFromDrag(point, point, shift), undefined, style)
               : createShape(

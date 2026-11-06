@@ -93,3 +93,24 @@ describe('pasteElements', () => {
     expect(pasteElements([], view, 0, ids())).toEqual([])
   })
 })
+
+describe('pasting attached arrows', () => {
+  const arrow = {
+    ...createLinear('arrow', lineFromDrag([150, 125], [300, 125], false)),
+    startBinding: { elementId: rect.id, ratio: [1, 0.5] as [number, number] },
+    endBinding: { elementId: 'elsewhere', ratio: [0, 0] as [number, number] },
+  }
+
+  test('a binding follows the pasted shape; one to a shape not copied is dropped', () => {
+    const [pastedRect, pastedArrow] = pasteElements(
+      [rect, arrow],
+      view,
+      0,
+      ids(),
+    )
+    expect(pastedArrow).toMatchObject({
+      startBinding: { elementId: pastedRect!.id },
+    })
+    expect(pastedArrow).not.toHaveProperty('endBinding')
+  })
+})
