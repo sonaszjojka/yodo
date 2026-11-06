@@ -182,3 +182,53 @@ func TestOpenUpgradesADatabaseToTrash(t *testing.T) {
 		t.Errorf("drawings after down = %d, %v; want 1", n, err)
 	}
 }
+
+// A database from before search (migrations 1-3) keeps its populated rows,
+// which stay unindexed (NULL), and the migration can be undone (ADR 0047).
+func TestOpenUpgradesADatabaseToSearchText(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "yodo.db")
+	ctx := context.Background()
+
+	old, err := sql.Open("sqlite", "file:"+filepath.ToSlash(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider, err := goose.NewProvider(goose.DialectSQLite3, old, migrations.FS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := provider.UpTo(ctx, 3); err != nil {
+		t.Fatalf("migrate to 3: %v", err)
+	}
+	if _, err := old.ExecContext(ctx,
+		"INSERT INTO drawings (id, name, schema_version, document, created_at, updated_at, deleted_at) VALUES ('a', 'A', 1, '{}', 10, 20, NULL), ('b', 'B', 1, '{}', 11, 21, 99)"); err != nil {
+		t.Fatal(err)
+	}
+	if err := old.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	sqlDB, err := Open(ctx, path)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer func() { _ = sqlDB.Close() }()
+	var n int
+	if err := sqlDB.QueryRowContext(ctx, "SELECT count(*) FROM drawings WHERE search_text IS NULL").Scan(&n); err != nil || n != 2 {
+		t.Fatalf("unindexed rows = %d, %v; want 2", n, err)
+	}
+
+	provider, err = goose.NewProvider(goose.DialectSQLite3, sqlDB, migrations.FS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := provider.DownTo(ctx, 3); err != nil {
+		t.Fatalf("migrate down to 3: %v", err)
+	}
+	if _, err := sqlDB.ExecContext(ctx, "SELECT search_text FROM drawings"); err == nil {
+		t.Error("search_text still exists after the down migration")
+	}
+	if err := sqlDB.QueryRowContext(ctx, "SELECT count(*) FROM drawings").Scan(&n); err != nil || n != 2 {
+		t.Errorf("drawings after down = %d, %v; want 2", n, err)
+	}
+}

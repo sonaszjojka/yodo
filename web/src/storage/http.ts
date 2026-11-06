@@ -191,7 +191,7 @@ export class HttpDrawingRepository implements DrawingRepository {
     await this.#request(
       'PUT',
       `${this.#drawingPath(id)}/search-text${query}`,
-      [200, 404],
+      [204, 404],
       {
         headers: { 'Content-Type': 'text/plain; charset=utf-8' },
         body: clampIndexText(text),

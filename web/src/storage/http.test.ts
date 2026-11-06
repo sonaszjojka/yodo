@@ -195,7 +195,7 @@ describe('HttpDrawingRepository search (ADR 0047)', () => {
           { id: doc.id, searchText: null },
           { id: 'done', searchText: 'x' },
         ])
-      if (init?.method === 'PUT') return Response.json({})
+      if (init?.method === 'PUT') return new Response(null, { status: 204 })
       return Response.json(doc)
     })
     const repo = new HttpDrawingRepository({ baseUrl, fetch })

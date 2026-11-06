@@ -106,6 +106,42 @@ func (q *Queries) ListDrawings(ctx context.Context) ([]ListDrawingsRow, error) {
 	return items, nil
 }
 
+const listSearchIndex = `-- name: ListSearchIndex :many
+SELECT id, search_text
+FROM drawings
+WHERE deleted_at IS NULL
+`
+
+type ListSearchIndexRow struct {
+	ID         string
+	SearchText sql.NullString
+}
+
+// ListSearchIndex returns the canvas text of every live drawing, NULL for one
+// that is not indexed yet (ADR 0047).
+func (q *Queries) ListSearchIndex(ctx context.Context) ([]ListSearchIndexRow, error) {
+	rows, err := q.db.QueryContext(ctx, listSearchIndex)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListSearchIndexRow
+	for rows.Next() {
+		var i ListSearchIndexRow
+		if err := rows.Scan(&i.ID, &i.SearchText); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTrashedDrawings = `-- name: ListTrashedDrawings :many
 SELECT id, name, created_at, updated_at, folder_id, deleted_at
 FROM drawings
@@ -220,6 +256,45 @@ func (q *Queries) SetDrawingFolder(ctx context.Context, arg SetDrawingFolderPara
 	return i, err
 }
 
+const setSearchText = `-- name: SetSearchText :execrows
+UPDATE drawings
+SET search_text = ?1
+WHERE id = ?2
+`
+
+type SetSearchTextParams struct {
+	SearchText sql.NullString
+	ID         string
+}
+
+// SetSearchText sets a drawing's canvas text and nothing else, so updated_at
+// stays: indexing is not editing (ADR 0047).
+func (q *Queries) SetSearchText(ctx context.Context, arg SetSearchTextParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, setSearchText, arg.SearchText, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const setSearchTextIfUnset = `-- name: SetSearchTextIfUnset :exec
+UPDATE drawings
+SET search_text = ?1
+WHERE id = ?2 AND search_text IS NULL
+`
+
+type SetSearchTextIfUnsetParams struct {
+	SearchText sql.NullString
+	ID         string
+}
+
+// SetSearchTextIfUnset is the backfill: it never overwrites text that a save
+// stored meanwhile (ADR 0047).
+func (q *Queries) SetSearchTextIfUnset(ctx context.Context, arg SetSearchTextIfUnsetParams) error {
+	_, err := q.db.ExecContext(ctx, setSearchTextIfUnset, arg.SearchText, arg.ID)
+	return err
+}
+
 const trashDrawing = `-- name: TrashDrawing :one
 UPDATE drawings
 SET deleted_at = COALESCE(deleted_at, ?1)
@@ -258,13 +333,14 @@ func (q *Queries) TrashDrawing(ctx context.Context, arg TrashDrawingParams) (Tra
 }
 
 const upsertDrawing = `-- name: UpsertDrawing :one
-INSERT INTO drawings (id, name, schema_version, document, created_at, updated_at)
-VALUES (?1, ?2, ?3, ?4, ?5, ?5)
+INSERT INTO drawings (id, name, schema_version, document, created_at, updated_at, search_text)
+VALUES (?1, ?2, ?3, ?4, ?5, ?5, ?6)
 ON CONFLICT (id) DO UPDATE SET
     name           = excluded.name,
     schema_version = excluded.schema_version,
     document       = excluded.document,
-    updated_at     = excluded.updated_at
+    updated_at     = excluded.updated_at,
+    search_text    = excluded.search_text
 RETURNING id, name, created_at, updated_at, folder_id, deleted_at
 `
 
@@ -274,6 +350,7 @@ type UpsertDrawingParams struct {
 	SchemaVersion int64
 	Document      string
 	Now           int64
+	SearchText    sql.NullString
 }
 
 type UpsertDrawingRow struct {
@@ -288,6 +365,8 @@ type UpsertDrawingRow struct {
 // UpsertDrawing inserts or replaces a drawing in one statement, so created_at
 // survives a replace without a read-then-write race (ADR 0030). deleted_at is
 // not in the update set: auto-save keeps a trashed drawing in Trash (ADR 0046).
+// search_text is replaced with the request's value, NULL when the client sent
+// none, so the index never describes an older document (ADR 0047).
 func (q *Queries) UpsertDrawing(ctx context.Context, arg UpsertDrawingParams) (UpsertDrawingRow, error) {
 	row := q.db.QueryRowContext(ctx, upsertDrawing,
 		arg.ID,
@@ -295,6 +374,7 @@ func (q *Queries) UpsertDrawing(ctx context.Context, arg UpsertDrawingParams) (U
 		arg.SchemaVersion,
 		arg.Document,
 		arg.Now,
+		arg.SearchText,
 	)
 	var i UpsertDrawingRow
 	err := row.Scan(
