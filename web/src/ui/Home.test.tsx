@@ -316,6 +316,27 @@ describe('HomeView search (ADR 0047)', () => {
     )
   })
 
+  test('lists name matches in the chosen sort order', () => {
+    const named = [
+      { id: 'x', name: 'Zed note', createdAt: 1, updatedAt: now - 1_000 },
+      { id: 'y', name: 'Alpha note', createdAt: 2, updatedAt: now - 9_000 },
+    ]
+    const list = {
+      status: 'loaded' as const,
+      drawings: named,
+      trashed: [],
+      folders: [],
+    }
+    expect(names(render({ list, query: 'note', sort: 'recent' }))).toEqual([
+      'Zed note',
+      'Alpha note',
+    ])
+    expect(names(render({ list, query: 'note', sort: 'name' }))).toEqual([
+      'Alpha note',
+      'Zed note',
+    ])
+  })
+
   test('shows Searching… until the index is ready', () => {
     const html = render({ query: 'alp' })
     expect(html).toContain('Searching…')

@@ -662,6 +662,7 @@ export function HomeView({
                 current?.id,
                 searchIndex,
                 query,
+                sort,
               )}
               query={query.trim()}
               renderCard={(summary) => (

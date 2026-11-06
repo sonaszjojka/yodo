@@ -6,6 +6,7 @@ import {
   type SearchIndexEntry,
   type SearchResults,
 } from '../core/search/match.ts'
+import { sortDrawings, type DrawingSort } from '../storage/drawings.ts'
 import type { DrawingSummary } from '../storage/repository.ts'
 import { drawingsInView } from './homeFolders.ts'
 
@@ -46,14 +47,16 @@ export interface SearchView {
 /**
  * Searches the drawings the current view lists (all drawings, or one folder).
  * Names match at once; canvas text once the index for this list is ready.
+ * Both lists follow the Sort by control, like the card grid.
  */
 export function searchView(
   drawings: readonly DrawingSummary[],
   folderId: string | undefined,
   index: SearchIndexState | undefined,
   query: string,
+  sort: DrawingSort,
 ): SearchView {
-  const inView = drawingsInView(drawings, folderId)
+  const inView = sortDrawings(drawingsInView(drawings, folderId), sort)
   const usable = index?.forList === drawings ? index : undefined
   const entries = usable?.status === 'ready' ? usable.entries : []
   return {

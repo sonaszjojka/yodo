@@ -51,9 +51,37 @@ describe('needsIndex', () => {
   })
 })
 
+describe('searchView sorting', () => {
+  const list = [
+    summary('a', 'Beta'),
+    summary('b', 'alpha'),
+    summary('c', 'Gamma'),
+  ]
+  const ids = (view: ReturnType<typeof searchView>) =>
+    view.results.names.map((d) => d.id)
+
+  test('orders names by the chosen sort, as the grid does', () => {
+    expect(ids(searchView(list, undefined, undefined, 'a', 'name'))).toEqual([
+      'b',
+      'a',
+      'c',
+    ])
+  })
+
+  test('orders canvas-text rows by the chosen sort too', () => {
+    const index = {
+      status: 'ready' as const,
+      forList: list,
+      entries: list.map((d) => ({ id: d.id, searchText: 'needle' })),
+    }
+    const view = searchView(list, undefined, index, 'needle', 'name')
+    expect(view.results.text.map((r) => r.summary.id)).toEqual(['b', 'a', 'c'])
+  })
+})
+
 describe('searchView', () => {
   test('matches names before the index arrives', () => {
-    const view = searchView(drawings, undefined, undefined, 'note')
+    const view = searchView(drawings, undefined, undefined, 'note', 'recent')
     expect(view.results.names.map((d) => d.id)).toEqual(['b'])
     expect(view.textPending).toBe(true)
     expect(view.textFailed).toBe(false)
@@ -65,7 +93,7 @@ describe('searchView', () => {
       forList: drawings,
       entries: [{ id: 'c', searchText: 'book the hotel' }],
     }
-    const view = searchView(drawings, undefined, index, 'hotel')
+    const view = searchView(drawings, undefined, index, 'hotel', 'recent')
     expect(view.results.text.map((r) => r.summary.id)).toEqual(['c'])
     expect(view.textPending).toBe(false)
   })
@@ -76,7 +104,7 @@ describe('searchView', () => {
       forList: [...drawings],
       entries: [{ id: 'c', searchText: 'hotel' }],
     }
-    const view = searchView(drawings, undefined, stale, 'hotel')
+    const view = searchView(drawings, undefined, stale, 'hotel', 'recent')
     expect(view.results.text).toEqual([])
     expect(view.textPending).toBe(true)
   })
@@ -87,6 +115,7 @@ describe('searchView', () => {
       undefined,
       { status: 'error', forList: drawings },
       'trip',
+      'recent',
     )
     expect(view.textFailed).toBe(true)
     expect(view.textPending).toBe(false)
@@ -94,10 +123,10 @@ describe('searchView', () => {
   })
 
   test('searches only the open folder', () => {
-    const view = searchView(drawings, 'work', undefined, 'o')
+    const view = searchView(drawings, 'work', undefined, 'o', 'recent')
     expect(view.results.names.map((d) => d.id)).toEqual([])
     expect(
-      searchView(drawings, 'work', undefined, 'bud').results.names,
+      searchView(drawings, 'work', undefined, 'bud', 'recent').results.names,
     ).toHaveLength(1)
   })
 })
