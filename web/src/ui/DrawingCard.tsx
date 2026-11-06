@@ -154,28 +154,30 @@ export function DrawingCard({
               <div className="menu-heading" aria-hidden="true">
                 Move to folder
               </div>
-              <MoveItem
-                label="No folder"
-                checked={folderId === undefined}
-                onChoose={() => {
-                  closeMenu()
-                  onMove(null)
-                }}
-              />
-              {sortFolders(folders).map((f) => (
+              <div role="group" aria-label="Folders" className="menu-scroll">
                 <MoveItem
-                  key={f.id}
-                  label={f.name}
-                  glyph={
-                    <FolderGlyph icon={f.icon} color={f.color} size={16} />
-                  }
-                  checked={f.id === folderId}
+                  label="No folder"
+                  checked={folderId === undefined}
                   onChoose={() => {
                     closeMenu()
-                    onMove(f.id)
+                    onMove(null)
                   }}
                 />
-              ))}
+                {sortFolders(folders).map((f) => (
+                  <MoveItem
+                    key={f.id}
+                    label={f.name}
+                    glyph={
+                      <FolderGlyph icon={f.icon} color={f.color} size={16} />
+                    }
+                    checked={f.id === folderId}
+                    onChoose={() => {
+                      closeMenu()
+                      onMove(f.id)
+                    }}
+                  />
+                ))}
+              </div>
             </>
           ) : (
             <>

@@ -490,6 +490,15 @@ body {
   color: var(--danger);
 }
 
+.menu-scroll {
+  display: flex;
+  flex-direction: column;
+  /* The menu opens upwards from the card, so a long list scrolls instead of
+     leaving the top of the page where it can't be reached. */
+  max-height: min(240px, 40vh);
+  overflow-y: auto;
+}
+
 .menu-folder-item {
   display: flex;
   align-items: center;
