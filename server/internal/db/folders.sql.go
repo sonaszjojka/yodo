@@ -7,6 +7,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 )
 
 const deleteFolder = `-- name: DeleteFolder :exec
@@ -14,8 +15,9 @@ DELETE FROM folders
 WHERE id = ?
 `
 
-// DeleteFolder removes a folder and, through ON DELETE CASCADE, its drawings;
-// a missing id is not an error.
+// DeleteFolder removes a folder; a missing id is not an error. Its drawings
+// must already be out of it (TrashFolderDrawings): ON DELETE CASCADE would
+// delete any that are left (ADR 0045, 0046).
 func (q *Queries) DeleteFolder(ctx context.Context, id string) error {
 	_, err := q.db.ExecContext(ctx, deleteFolder, id)
 	return err
@@ -54,6 +56,26 @@ func (q *Queries) ListFolders(ctx context.Context) ([]Folder, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const trashFolderDrawings = `-- name: TrashFolderDrawings :exec
+UPDATE drawings
+SET deleted_at = COALESCE(deleted_at, ?1),
+    folder_id  = NULL
+WHERE folder_id = ?2
+`
+
+type TrashFolderDrawingsParams struct {
+	Now      sql.NullInt64
+	FolderID sql.NullString
+}
+
+// TrashFolderDrawings sends a folder's drawings to Trash and takes them out of
+// the folder, so a restore never points at a missing one. Drawings already in
+// Trash keep their deleted_at (ADR 0046).
+func (q *Queries) TrashFolderDrawings(ctx context.Context, arg TrashFolderDrawingsParams) error {
+	_, err := q.db.ExecContext(ctx, trashFolderDrawings, arg.Now, arg.FolderID)
+	return err
 }
 
 const upsertFolder = `-- name: UpsertFolder :one

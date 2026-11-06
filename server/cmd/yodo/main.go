@@ -26,7 +26,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/sonaszjojka/yodo/server/internal/db"
 	"github.com/sonaszjojka/yodo/server/internal/server"
 	"github.com/sonaszjojka/yodo/server/internal/store"
 	"github.com/sonaszjojka/yodo/server/internal/webui"
@@ -94,7 +93,7 @@ func run(ctx context.Context, getenv func(string) string) error {
 
 	srv := &http.Server{
 		Addr:    addr,
-		Handler: server.New(webui.FS(), origins, db.New(sqlDB), filepath.Join(dataDir, "images"), auth),
+		Handler: server.New(webui.FS(), origins, sqlDB, filepath.Join(dataDir, "images"), auth),
 		// Bounds slow clients that never finish their headers (Slowloris).
 		ReadHeaderTimeout: 10 * time.Second,
 	}

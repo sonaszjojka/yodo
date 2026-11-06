@@ -187,7 +187,20 @@ func TestMoveErrors(t *testing.T) {
 	}
 }
 
-func TestDeletingAFolderDeletesItsDrawingsOnly(t *testing.T) {
+func listTrashed(t *testing.T, api *testAPI) []summary {
+	t.Helper()
+	rec := api.do(http.MethodGet, "/api/drawings?trashed=true", "")
+	wantStatus(t, rec, http.StatusOK)
+	var list []summary
+	if err := json.Unmarshal(rec.Body.Bytes(), &list); err != nil {
+		t.Fatal(err)
+	}
+	return list
+}
+
+// ADR 0046: deleting a folder sends its drawings to Trash, outside the folder;
+// drawings in other folders or in no folder stay where they are.
+func TestDeletingAFolderTrashesItsDrawingsOnly(t *testing.T) {
 	api := newTestAPI(t)
 	const otherID = "11111111-2222-4333-8444-555555555555"
 	other := strings.NewReplacer(docID, otherID, `"Plan"`, `"Other"`).Replace(doc)
@@ -196,18 +209,43 @@ func TestDeletingAFolderDeletesItsDrawingsOnly(t *testing.T) {
 	wantStatus(t, api.do(http.MethodPut, "/api/drawings/"+otherID, other), http.StatusOK)
 	wantStatus(t, api.do(http.MethodPut, "/api/drawings/"+docID+"/folder", moveBody(folderID)), http.StatusOK)
 
+	api.now = time.UnixMilli(7_000)
 	wantStatus(t, api.do(http.MethodDelete, "/api/folders/"+folderID, ""), http.StatusNoContent)
 
-	wantStatus(t, api.do(http.MethodGet, "/api/drawings/"+docID, ""), http.StatusNotFound)
-	wantStatus(t, api.do(http.MethodGet, "/api/drawings/"+otherID, ""), http.StatusOK)
+	// The document survives, so a restore brings the drawing back whole.
+	wantStatus(t, api.do(http.MethodGet, "/api/drawings/"+docID, ""), http.StatusOK)
 	if list := listSummaries(t, api); len(list) != 1 || list[0].ID != otherID {
 		t.Errorf("list = %+v, want only %s", list, otherID)
 	}
+	trashed := listTrashed(t, api)
+	if len(trashed) != 1 || trashed[0].ID != docID || trashed[0].FolderID != nil ||
+		trashed[0].DeletedAt == nil || *trashed[0].DeletedAt != 7_000 || trashed[0].UpdatedAt != 1_000 {
+		t.Errorf("trash = %+v, want %s trashed at 7000, in no folder, updatedAt unchanged", trashed, docID)
+	}
 }
 
-// ADR 0045: a tab that still has the drawing open saves it again (ADR 0032,
-// last write wins), which re-creates it outside any folder.
-func TestSaveAfterTheFolderWasDeletedRecreatesTheDrawing(t *testing.T) {
+// A drawing already in Trash keeps its deleted_at and loses the folder; the
+// folder's ON DELETE CASCADE must not remove it for good.
+func TestDeletingAFolderKeepsAnEarlierDeletedAt(t *testing.T) {
+	api := newTestAPI(t)
+	wantStatus(t, api.do(http.MethodPut, "/api/folders/"+folderID, folderBody), http.StatusOK)
+	wantStatus(t, api.do(http.MethodPut, "/api/drawings/"+docID, doc), http.StatusOK)
+	wantStatus(t, api.do(http.MethodPut, "/api/drawings/"+docID+"/folder", moveBody(folderID)), http.StatusOK)
+	api.now = time.UnixMilli(3_000)
+	wantStatus(t, api.do(http.MethodPut, "/api/drawings/"+docID+"/trash", trashBody(true)), http.StatusOK)
+
+	api.now = time.UnixMilli(9_000)
+	wantStatus(t, api.do(http.MethodDelete, "/api/folders/"+folderID, ""), http.StatusNoContent)
+
+	trashed := listTrashed(t, api)
+	if len(trashed) != 1 || trashed[0].FolderID != nil || *trashed[0].DeletedAt != 3_000 {
+		t.Errorf("trash = %+v, want the drawing trashed at 3000 with no folder", trashed)
+	}
+}
+
+// ADR 0032, 0046: a tab that still has the drawing open saves it again, which
+// keeps it in Trash (and never in a folder that is gone).
+func TestSaveAfterTheFolderWasDeletedKeepsTheDrawingInTrash(t *testing.T) {
 	api := newTestAPI(t)
 	wantStatus(t, api.do(http.MethodPut, "/api/folders/"+folderID, folderBody), http.StatusOK)
 	wantStatus(t, api.do(http.MethodPut, "/api/drawings/"+docID, doc), http.StatusOK)
@@ -215,8 +253,11 @@ func TestSaveAfterTheFolderWasDeletedRecreatesTheDrawing(t *testing.T) {
 	wantStatus(t, api.do(http.MethodDelete, "/api/folders/"+folderID, ""), http.StatusNoContent)
 
 	wantStatus(t, api.do(http.MethodPut, "/api/drawings/"+docID, doc), http.StatusOK)
-	if list := listSummaries(t, api); len(list) != 1 || list[0].FolderID != nil {
-		t.Errorf("list = %+v, want the drawing back with no folder", list)
+	if list := listSummaries(t, api); len(list) != 0 {
+		t.Errorf("list = %+v, want the drawing to stay in Trash", list)
+	}
+	if trashed := listTrashed(t, api); len(trashed) != 1 || trashed[0].FolderID != nil {
+		t.Errorf("trash = %+v, want the drawing with no folder", trashed)
 	}
 }
 

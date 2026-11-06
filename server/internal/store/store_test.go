@@ -128,3 +128,57 @@ func TestOpenUpgradesADatabaseWithDrawings(t *testing.T) {
 		t.Errorf("got %q %d %d %+v, want A 10 20 and no folder", name, created, updated, folder)
 	}
 }
+
+// A database from before Trash (migrations 1 and 2) keeps its drawings live
+// when the server upgrades it, and the migration can be undone (ADR 0046).
+func TestOpenUpgradesADatabaseToTrash(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "yodo.db")
+	ctx := context.Background()
+
+	old, err := sql.Open("sqlite", "file:"+filepath.ToSlash(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider, err := goose.NewProvider(goose.DialectSQLite3, old, migrations.FS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := provider.UpTo(ctx, 2); err != nil {
+		t.Fatalf("migrate to 2: %v", err)
+	}
+	if _, err := old.ExecContext(ctx,
+		"INSERT INTO drawings (id, name, schema_version, document, created_at, updated_at) VALUES ('a', 'A', 1, '{}', 10, 20)"); err != nil {
+		t.Fatal(err)
+	}
+	if err := old.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	sqlDB, err := Open(ctx, path)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer func() { _ = sqlDB.Close() }()
+	var deleted sql.NullInt64
+	if err := sqlDB.QueryRowContext(ctx, "SELECT deleted_at FROM drawings WHERE id = 'a'").Scan(&deleted); err != nil {
+		t.Fatalf("select: %v", err)
+	}
+	if deleted.Valid {
+		t.Errorf("deleted_at = %d, want NULL (live)", deleted.Int64)
+	}
+
+	provider, err = goose.NewProvider(goose.DialectSQLite3, sqlDB, migrations.FS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := provider.DownTo(ctx, 2); err != nil {
+		t.Fatalf("migrate down to 2: %v", err)
+	}
+	if _, err := sqlDB.ExecContext(ctx, "SELECT deleted_at FROM drawings"); err == nil {
+		t.Error("deleted_at still exists after the down migration")
+	}
+	var n int
+	if err := sqlDB.QueryRowContext(ctx, "SELECT count(*) FROM drawings").Scan(&n); err != nil || n != 1 {
+		t.Errorf("drawings after down = %d, %v; want 1", n, err)
+	}
+}

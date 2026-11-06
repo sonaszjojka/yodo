@@ -16,6 +16,7 @@ type Drawing struct {
 	CreatedAt     int64
 	UpdatedAt     int64
 	FolderID      sql.NullString
+	DeletedAt     sql.NullInt64
 }
 
 type Folder struct {

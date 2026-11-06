@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sonaszjojka/yodo/server/internal/db"
 	"github.com/sonaszjojka/yodo/server/internal/store"
 )
 
@@ -30,7 +29,7 @@ func newTestAPI(t *testing.T) *testAPI {
 	}
 	t.Cleanup(func() { _ = sqlDB.Close() })
 	api := &testAPI{t: t, now: time.UnixMilli(1_000)}
-	api.handler = newHandler(builtFS, mustParse(t, "http://example.com"), db.New(sqlDB), t.TempDir(), nil,
+	api.handler = newHandler(builtFS, mustParse(t, "http://example.com"), sqlDB, t.TempDir(), nil,
 		func() time.Time { return api.now })
 	return api
 }
@@ -195,4 +194,208 @@ func TestDrawingsWrongMethod(t *testing.T) {
 	api := newTestAPI(t)
 	wantStatus(t, api.do(http.MethodPost, "/api/drawings", doc), http.StatusMethodNotAllowed)
 	wantStatus(t, api.do(http.MethodPatch, "/api/drawings/"+docID, doc), http.StatusMethodNotAllowed)
+}
+
+func trashBody(trashed bool) string {
+	if trashed {
+		return `{"trashed":true}`
+	}
+	return `{"trashed":false}`
+}
+
+func putDrawing(t *testing.T, api *testAPI, id, name string) {
+	t.Helper()
+	body := strings.NewReplacer(docID, id, `"Plan"`, `"`+name+`"`).Replace(doc)
+	wantStatus(t, api.do(http.MethodPut, "/api/drawings/"+id, body), http.StatusOK)
+}
+
+func TestTrashAndRestoreRoundTrip(t *testing.T) {
+	api := newTestAPI(t)
+	wantStatus(t, api.do(http.MethodPut, "/api/folders/"+folderID, folderBody), http.StatusOK)
+	wantStatus(t, api.do(http.MethodPut, "/api/drawings/"+docID, doc), http.StatusOK)
+	wantStatus(t, api.do(http.MethodPut, "/api/drawings/"+docID+"/folder", moveBody(folderID)), http.StatusOK)
+
+	api.now = time.UnixMilli(4_000)
+	rec := api.do(http.MethodPut, "/api/drawings/"+docID+"/trash", trashBody(true))
+	wantStatus(t, rec, http.StatusOK)
+	got := decodeSummary(t, rec)
+	if got.DeletedAt == nil || *got.DeletedAt != 4_000 || got.UpdatedAt != 1_000 || got.FolderID == nil {
+		t.Errorf("trashed summary = %+v, want deletedAt 4000, updatedAt 1000, folder kept", got)
+	}
+	if list := listSummaries(t, api); len(list) != 0 {
+		t.Errorf("list = %+v, want the drawing hidden", list)
+	}
+	if trashed := listTrashed(t, api); len(trashed) != 1 || trashed[0].ID != docID {
+		t.Errorf("trash = %+v", trashed)
+	}
+	// The document is untouched, so a restore brings the drawing back whole.
+	if got := api.do(http.MethodGet, "/api/drawings/"+docID, "").Body.String(); got != doc {
+		t.Errorf("document = %q, want %q", got, doc)
+	}
+
+	rec = api.do(http.MethodPut, "/api/drawings/"+docID+"/trash", trashBody(false))
+	wantStatus(t, rec, http.StatusOK)
+	got = decodeSummary(t, rec)
+	if got.DeletedAt != nil || got.UpdatedAt != 1_000 || got.FolderID == nil || *got.FolderID != folderID {
+		t.Errorf("restored summary = %+v, want live, updatedAt 1000, still in the folder", got)
+	}
+	if len(listTrashed(t, api)) != 0 || len(listSummaries(t, api)) != 1 {
+		t.Error("restore did not move the drawing back to the list")
+	}
+}
+
+func TestTrashingTwiceKeepsTheFirstDeletedAt(t *testing.T) {
+	api := newTestAPI(t)
+	wantStatus(t, api.do(http.MethodPut, "/api/drawings/"+docID, doc), http.StatusOK)
+	api.now = time.UnixMilli(2_000)
+	wantStatus(t, api.do(http.MethodPut, "/api/drawings/"+docID+"/trash", trashBody(true)), http.StatusOK)
+	api.now = time.UnixMilli(8_000)
+	rec := api.do(http.MethodPut, "/api/drawings/"+docID+"/trash", trashBody(true))
+	wantStatus(t, rec, http.StatusOK)
+	if got := decodeSummary(t, rec); got.DeletedAt == nil || *got.DeletedAt != 2_000 {
+		t.Errorf("deletedAt = %v, want 2000", got.DeletedAt)
+	}
+}
+
+func TestTrashErrors(t *testing.T) {
+	api := newTestAPI(t)
+	wantStatus(t, api.do(http.MethodPut, "/api/drawings/"+docID, doc), http.StatusOK)
+	wantStatus(t, api.do(http.MethodPut, "/api/drawings/missing/trash", trashBody(true)), http.StatusNotFound)
+	wantStatus(t, api.do(http.MethodPut, "/api/drawings/missing/trash", trashBody(false)), http.StatusNotFound)
+	for name, body := range map[string]string{
+		"not json":       `x`,
+		"missing key":    `{}`,
+		"string":         `{"trashed":"true"}`,
+		"null":           `{"trashed":null}`,
+		"wrong key case": `{"Trashed":true}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			wantStatus(t, api.do(http.MethodPut, "/api/drawings/"+docID+"/trash", body), http.StatusBadRequest)
+		})
+	}
+	if len(listTrashed(t, api)) != 0 {
+		t.Error("a rejected request trashed the drawing")
+	}
+}
+
+func TestTrashedListStartsAsAnEmptyArray(t *testing.T) {
+	rec := newTestAPI(t).do(http.MethodGet, "/api/drawings?trashed=true", "")
+	wantStatus(t, rec, http.StatusOK)
+	if got := strings.TrimSpace(rec.Body.String()); got != "[]" {
+		t.Errorf("body = %q, want []", got)
+	}
+}
+
+func TestSaveKeepsADrawingInTrash(t *testing.T) {
+	api := newTestAPI(t)
+	wantStatus(t, api.do(http.MethodPut, "/api/drawings/"+docID, doc), http.StatusOK)
+	api.now = time.UnixMilli(2_000)
+	wantStatus(t, api.do(http.MethodPut, "/api/drawings/"+docID+"/trash", trashBody(true)), http.StatusOK)
+
+	api.now = time.UnixMilli(6_000)
+	rec := api.do(http.MethodPut, "/api/drawings/"+docID, strings.Replace(doc, `"Plan"`, `"Final"`, 1))
+	wantStatus(t, rec, http.StatusOK)
+	got := decodeSummary(t, rec)
+	if got.DeletedAt == nil || *got.DeletedAt != 2_000 || got.Name != "Final" || got.UpdatedAt != 6_000 {
+		t.Errorf("summary = %+v, want still trashed at 2000, saved at 6000", got)
+	}
+}
+
+func TestMoveWorksOnATrashedDrawing(t *testing.T) {
+	api := newTestAPI(t)
+	wantStatus(t, api.do(http.MethodPut, "/api/folders/"+folderID, folderBody), http.StatusOK)
+	wantStatus(t, api.do(http.MethodPut, "/api/drawings/"+docID, doc), http.StatusOK)
+	wantStatus(t, api.do(http.MethodPut, "/api/drawings/"+docID+"/trash", trashBody(true)), http.StatusOK)
+	rec := api.do(http.MethodPut, "/api/drawings/"+docID+"/folder", moveBody(folderID))
+	wantStatus(t, rec, http.StatusOK)
+	if got := decodeSummary(t, rec); got.DeletedAt == nil || got.FolderID == nil {
+		t.Errorf("summary = %+v, want trashed and in the folder", got)
+	}
+}
+
+func TestPermanentDeleteWorksOnATrashedDrawing(t *testing.T) {
+	api := newTestAPI(t)
+	wantStatus(t, api.do(http.MethodPut, "/api/drawings/"+docID, doc), http.StatusOK)
+	wantStatus(t, api.do(http.MethodPut, "/api/drawings/"+docID+"/trash", trashBody(true)), http.StatusOK)
+	wantStatus(t, api.do(http.MethodDelete, "/api/drawings/"+docID, ""), http.StatusNoContent)
+	wantStatus(t, api.do(http.MethodGet, "/api/drawings/"+docID, ""), http.StatusNotFound)
+	if len(listTrashed(t, api)) != 0 {
+		t.Error("the drawing is still in Trash")
+	}
+}
+
+func TestEmptyTrashRemovesOnlyTrashedDrawings(t *testing.T) {
+	api := newTestAPI(t)
+	const liveID, oldID = "aaaaaaaa-2222-4333-8444-555555555555", "bbbbbbbb-2222-4333-8444-555555555555"
+	putDrawing(t, api, liveID, "Live")
+	putDrawing(t, api, oldID, "Old")
+	putDrawing(t, api, docID, "Plan")
+	api.now = time.UnixMilli(2_000)
+	wantStatus(t, api.do(http.MethodPut, "/api/drawings/"+oldID+"/trash", trashBody(true)), http.StatusOK)
+	api.now = time.UnixMilli(5_000)
+	wantStatus(t, api.do(http.MethodPut, "/api/drawings/"+docID+"/trash", trashBody(true)), http.StatusOK)
+
+	// With a cutoff only older items go; the cutoff itself is not older.
+	wantStatus(t, api.do(http.MethodDelete, "/api/drawings?trashed=true&deletedBefore=5000", ""), http.StatusNoContent)
+	if trashed := listTrashed(t, api); len(trashed) != 1 || trashed[0].ID != docID {
+		t.Errorf("trash after the sweep = %+v, want only %s", trashed, docID)
+	}
+
+	wantStatus(t, api.do(http.MethodDelete, "/api/drawings?trashed=true", ""), http.StatusNoContent)
+	if len(listTrashed(t, api)) != 0 {
+		t.Error("Trash is not empty")
+	}
+	wantStatus(t, api.do(http.MethodGet, "/api/drawings/"+docID, ""), http.StatusNotFound)
+	if list := listSummaries(t, api); len(list) != 1 || list[0].ID != liveID {
+		t.Errorf("list = %+v, want only the live drawing", list)
+	}
+}
+
+// A sweep with a stale cutoff must not remove a drawing that was restored and
+// trashed again since (ADR 0046).
+func TestSweepSkipsADrawingTrashedAgain(t *testing.T) {
+	api := newTestAPI(t)
+	wantStatus(t, api.do(http.MethodPut, "/api/drawings/"+docID, doc), http.StatusOK)
+	api.now = time.UnixMilli(2_000)
+	wantStatus(t, api.do(http.MethodPut, "/api/drawings/"+docID+"/trash", trashBody(true)), http.StatusOK)
+	wantStatus(t, api.do(http.MethodPut, "/api/drawings/"+docID+"/trash", trashBody(false)), http.StatusOK)
+	api.now = time.UnixMilli(9_000)
+	wantStatus(t, api.do(http.MethodPut, "/api/drawings/"+docID+"/trash", trashBody(true)), http.StatusOK)
+
+	wantStatus(t, api.do(http.MethodDelete, "/api/drawings?trashed=true&deletedBefore=3000", ""), http.StatusNoContent)
+	if len(listTrashed(t, api)) != 1 {
+		t.Error("the sweep removed a drawing that was trashed after the cutoff")
+	}
+	// And a restored drawing is live, so no sweep or empty touches it.
+	wantStatus(t, api.do(http.MethodPut, "/api/drawings/"+docID+"/trash", trashBody(false)), http.StatusOK)
+	wantStatus(t, api.do(http.MethodDelete, "/api/drawings?trashed=true", ""), http.StatusNoContent)
+	wantStatus(t, api.do(http.MethodGet, "/api/drawings/"+docID, ""), http.StatusOK)
+}
+
+func TestBareDeleteOnTheCollectionRemovesNothing(t *testing.T) {
+	api := newTestAPI(t)
+	wantStatus(t, api.do(http.MethodPut, "/api/drawings/"+docID, doc), http.StatusOK)
+	for _, path := range []string{"/api/drawings", "/api/drawings?trashed=false", "/api/drawings?deletedBefore=1"} {
+		rec := api.do(http.MethodDelete, path, "")
+		wantStatus(t, rec, http.StatusMethodNotAllowed)
+		if got := rec.Header().Get("Allow"); got != "GET" {
+			t.Errorf("%s: Allow = %q, want GET", path, got)
+		}
+	}
+	wantStatus(t, api.do(http.MethodGet, "/api/drawings/"+docID, ""), http.StatusOK)
+	wantStatus(t, api.do(http.MethodDelete, "/api/drawings?trashed=true&deletedBefore=soon", ""), http.StatusBadRequest)
+}
+
+func TestTrashRoutesNeedAnAllowedOrigin(t *testing.T) {
+	api := newTestAPI(t)
+	for _, tc := range []struct{ method, path, body string }{
+		{http.MethodPut, "/api/drawings/" + docID + "/trash", trashBody(true)},
+		{http.MethodDelete, "/api/drawings?trashed=true", ""},
+	} {
+		req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
+		req.Header.Set("Origin", "http://evil.example")
+		rec := httptest.NewRecorder()
+		api.handler.ServeHTTP(rec, req)
+		wantStatus(t, rec, http.StatusForbidden)
+	}
 }
