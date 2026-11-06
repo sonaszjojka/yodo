@@ -229,6 +229,20 @@ describe('followBindings', () => {
   })
 })
 
+describe('followBindings, review fixes', () => {
+  const a = createShape('rectangle', { x: 0, y: 0, width: 100, height: 100 })
+
+  test('an arrow with no points is detached instead of crashing', () => {
+    const broken = {
+      ...createLinear('arrow', lineFromDrag([0, 0], [10, 0], false)),
+      points: [],
+      endBinding: { elementId: a.id, ratio: [1, 0.5] as [number, number] },
+    } as ArrowElement
+    const result = moveElements([a, broken], new Set([a.id]), 5, 5)[1]
+    expect(result).not.toHaveProperty('endBinding')
+  })
+})
+
 describe('unbindDeleted', () => {
   test('clears bindings to deleted elements and leaves the arrow', () => {
     const a = createShape('rectangle', box)

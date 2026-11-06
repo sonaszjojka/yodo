@@ -208,6 +208,9 @@ export function followBindings(
   const byId = new Map(elements.map((e) => [e.id, e]))
   return elements.map((element) => {
     if (element.type !== 'arrow' || !hasBinding(element)) return element
+    // A file can hold an arrow with no points; there is no end to move.
+    if (element.points.length < 2)
+      return without(without(element, 'startBinding'), 'endBinding')
     let arrow: ArrowElement = element
     for (const end of ['start', 'end'] as const) {
       const key = end === 'start' ? 'startBinding' : 'endBinding'
