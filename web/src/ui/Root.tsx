@@ -45,11 +45,12 @@ export function Root({
     void saved.then((ok) => setLastSaveFailed(!ok))
   }, [])
 
-  return route.name === 'home' ? (
+  return route.name !== 'drawing' ? (
     <Home
       repository={repository}
       folders={folders}
-      folderId={route.folderId}
+      folderId={route.name === 'home' ? route.folderId : undefined}
+      view={route.name === 'trash' ? 'trash' : 'drawings'}
       images={images}
       imageCache={imageCache}
       waitForEditor={waitForEditor}

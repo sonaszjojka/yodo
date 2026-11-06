@@ -30,11 +30,14 @@ export interface DrawingCardProps {
   showFolder: boolean
   onRename(name: string): void
   onMove(folderId: string | null): void
+  /** Moves the drawing to Trash (ADR 0046); no confirmation, it can be restored. */
+  onTrash(): void
 }
 
 /**
  * One drawing on Home (`docs/ui.md`, Drawing card). The ⋯ button and a
- * right-click open the same menu; Open, Rename and Move to folder exist so far.
+ * right-click open the same menu; Open, Rename, Move to folder and Move to
+ * Trash exist so far.
  */
 export function DrawingCard({
   summary,
@@ -45,6 +48,7 @@ export function DrawingCard({
   showFolder,
   onRename,
   onMove,
+  onTrash,
 }: DrawingCardProps) {
   const { id, name, updatedAt, folderId } = summary
   const folder = folders.find((f) => f.id === folderId)
@@ -205,6 +209,17 @@ export function DrawingCard({
                 onClick={() => setMovePage(true)}
               >
                 Move to folder…
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="menu-danger"
+                onClick={() => {
+                  setMenuOpen(false)
+                  onTrash()
+                }}
+              >
+                Move to Trash
               </button>
             </>
           )}

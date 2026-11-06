@@ -19,14 +19,14 @@ function render(props: Partial<SidebarProps> = {}) {
   )
 }
 
-test('lists All drawings with its count, then the folders by name', () => {
+test('lists All drawings with its count, then the folders by name, then Trash', () => {
   const html = render()
   expect(html).toMatch(/href="#\/"[^>]*aria-current="page"/)
   expect(html).toContain('>5</span>')
   const names = [...html.matchAll(/sidebar-link-name">([^<]*)</g)].map(
     (m) => m[1],
   )
-  expect(names).toEqual(['All drawings', 'archive', 'Work'])
+  expect(names).toEqual(['All drawings', 'archive', 'Work', 'Trash'])
 })
 
 test('each folder links to its route and shows how many drawings it holds', () => {
@@ -69,4 +69,19 @@ test('escapes folder names', () => {
   const html = render({ folders: [folder('f1', '<b>x</b>')] })
   expect(html).toContain('&lt;b&gt;x&lt;/b&gt;')
   expect(html).not.toContain('<b>x</b>')
+})
+
+test('links to Trash, with a count when it is known (ADR 0046)', () => {
+  expect(render()).toMatch(/href="#\/trash"[^>]*>.*Trash<\/span>/)
+  expect(render()).not.toMatch(/Trash<\/span><span class="sidebar-count">/)
+  expect(render({ trashCount: 4 })).toMatch(
+    /Trash<\/span><span class="sidebar-count">4</,
+  )
+})
+
+test('marks Trash, and not All drawings, as the current page on the Trash screen', () => {
+  const html = render({ trashSelected: true })
+  expect(html.match(/aria-current="page"/g)).toHaveLength(1)
+  expect(html).toMatch(/href="#\/trash"[^>]*aria-current="page"/)
+  expect(html).not.toMatch(/href="#\/"[^>]*aria-current/)
 })

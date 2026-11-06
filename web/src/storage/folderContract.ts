@@ -120,7 +120,7 @@ export function describeFolderContract(
       expect(await drawings.list()).toEqual([saved])
     })
 
-    test('deleting a folder deletes its drawings and no others', async () => {
+    test('deleting a folder trashes its drawings, outside any folder, and no others', async () => {
       const work = await folders.save(folderInput('Work'))
       const play = await folders.save(folderInput('Play'))
       const inWork = createDocument('In work')
@@ -128,24 +128,62 @@ export function describeFolderContract(
       const loose = createDocument('Loose')
       for (const d of [inWork, inPlay, loose]) await drawings.save(d)
       await drawings.move(inWork.id, work.id)
-      await drawings.move(inPlay.id, play.id)
+      const inPlaySummary = await drawings.move(inPlay.id, play.id)
 
       await folders.delete(work.id)
 
       expect(await folders.list()).toEqual([play])
-      expect(await drawings.get(inWork.id)).toBeUndefined()
-      expect((await drawings.list()).map((s) => s.id).sort()).toEqual(
-        [inPlay.id, loose.id].sort(),
-      )
-      expect(await drawings.get(inPlay.id)).toEqual(inPlay)
-      expect(await drawings.get(loose.id)).toEqual(loose)
+      // The document stays, so the drawing can come back (ADR 0046).
+      expect(await drawings.get(inWork.id)).toEqual(inWork)
+      const trashed = await drawings.listTrash()
+      expect(trashed.map((s) => s.id)).toEqual([inWork.id])
+      expect(trashed[0]).not.toHaveProperty('folderId')
+      expect(trashed[0]?.deletedAt).toBeGreaterThan(0)
+      const live = await drawings.list()
+      expect(live.map((s) => s.id).sort()).toEqual([inPlay.id, loose.id].sort())
+      expect(live.find((s) => s.id === inPlay.id)).toEqual(inPlaySummary)
       // The deleted folder can't be moved into any more.
       await expect(drawings.move(loose.id, work.id)).rejects.toThrow()
     })
 
-    // ADR 0045: saves are upserts (ADR 0032), so a tab that still has the
-    // drawing open brings it back, in no folder.
-    test('saving a drawing whose folder was deleted re-creates it outside any folder', async () => {
+    test('a drawing trashed from a deleted folder restores outside any folder', async () => {
+      const folder = await folders.save(folderInput('Work'))
+      await drawings.save(doc)
+      await drawings.move(doc.id, folder.id)
+      await folders.delete(folder.id)
+
+      const restored = await drawings.restore(doc.id)
+      expect(restored).not.toHaveProperty('folderId')
+      expect(restored).not.toHaveProperty('deletedAt')
+      expect(await drawings.list()).toEqual([restored])
+    })
+
+    test('a trashed drawing keeps its folder until the folder is deleted', async () => {
+      const folder = await folders.save(folderInput('Work'))
+      await drawings.save(doc)
+      await drawings.move(doc.id, folder.id)
+      await drawings.trash(doc.id)
+      const restored = await drawings.restore(doc.id)
+      expect(restored?.folderId).toBe(folder.id)
+    })
+
+    test('deleting a folder keeps the earlier deletedAt of a drawing already in Trash', async () => {
+      const folder = await folders.save(folderInput('Work'))
+      await drawings.save(doc)
+      await drawings.move(doc.id, folder.id)
+      const first = await drawings.trash(doc.id)
+
+      await folders.delete(folder.id)
+
+      const [trashed] = await drawings.listTrash()
+      expect(trashed?.deletedAt).toBe(first?.deletedAt)
+      expect(trashed).not.toHaveProperty('folderId')
+      expect(await drawings.get(doc.id)).toEqual(doc)
+    })
+
+    // ADR 0032, 0046: saves are upserts, so a tab that still has the drawing
+    // open saves it again; it stays in Trash and outside any folder.
+    test('saving a drawing whose folder was deleted keeps it in Trash outside any folder', async () => {
       const folder = await folders.save(folderInput('Work'))
       await drawings.save(doc)
       await drawings.move(doc.id, folder.id)
@@ -153,8 +191,10 @@ export function describeFolderContract(
 
       const summary = await drawings.save(doc)
       expect(summary.folderId).toBeUndefined()
+      expect(summary.deletedAt).toBeGreaterThan(0)
       expect(await drawings.get(doc.id)).toEqual(doc)
-      expect((await drawings.list()).sort(byId)).toEqual([summary])
+      expect(await drawings.list()).toEqual([])
+      expect((await drawings.listTrash()).sort(byId)).toEqual([summary])
     })
   })
 }

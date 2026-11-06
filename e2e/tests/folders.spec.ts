@@ -1,6 +1,7 @@
 // Roadmap 3.1: create, rename and delete folders with an icon and colour, put
 // drawings in them, and keep it all across a reload, in each usage mode
-// (ADR 0035, 0045).
+// (ADR 0035, 0045). Deleting a folder moves its drawings to Trash (ADR 0046);
+// trash.spec.ts checks them there.
 
 import type { Locator, Page } from '@playwright/test'
 import { expect, test } from './fixtures.ts'
@@ -101,13 +102,13 @@ test('create, rename, fill and delete a folder', async ({ page, mode }) => {
   await expect(card(page, inside)).toBeVisible()
   await expect(card(page, loose)).toBeVisible()
 
-  // Delete asks first, says how many drawings go, and removes them.
+  // Delete asks first, says how many drawings move to Trash, and clears them.
   await page
     .getByRole('button', { name: `More actions for folder ${renamed}` })
     .click()
   await page.getByRole('menuitem', { name: 'Delete folder' }).click()
   const confirm = page.getByRole('dialog', { name: 'Delete folder' })
-  await expect(confirm).toContainText('its 2 drawings')
+  await expect(confirm).toContainText('Its 2 drawings will move to Trash')
   await confirm.getByRole('button', { name: 'Cancel' }).click()
   await expect(folderLink(page, renamed)).toBeVisible()
 

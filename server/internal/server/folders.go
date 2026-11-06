@@ -1,6 +1,8 @@
 package server
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"io"
@@ -35,6 +37,7 @@ func newFolder(row db.Folder) folder {
 // foldersAPI serves /api/folders, one route per FolderRepository method (ADR 0045).
 type foldersAPI struct {
 	queries *db.Queries
+	sqlDB   *sql.DB
 	now     func() time.Time
 }
 
@@ -104,10 +107,33 @@ func validText(s string, maxRunes int) bool {
 	return s != "" && utf8.RuneCountInString(s) <= maxRunes
 }
 
+// delete removes a folder and sends its drawings to Trash, without a folder, in
+// one transaction (ADR 0046).
 func (a foldersAPI) delete(w http.ResponseWriter, r *http.Request) {
-	if err := a.queries.DeleteFolder(r.Context(), r.PathValue("id")); err != nil {
+	id := r.PathValue("id")
+	if err := a.trashFolder(r.Context(), id); err != nil {
 		serverError(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (a foldersAPI) trashFolder(ctx context.Context, id string) error {
+	tx, err := a.sqlDB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }() // a no-op after Commit
+	q := a.queries.WithTx(tx)
+	trash := db.TrashFolderDrawingsParams{
+		Now:      sql.NullInt64{Int64: a.now().UnixMilli(), Valid: true},
+		FolderID: sql.NullString{String: id, Valid: true},
+	}
+	if err := q.TrashFolderDrawings(ctx, trash); err != nil {
+		return err
+	}
+	if err := q.DeleteFolder(ctx, id); err != nil {
+		return err
+	}
+	return tx.Commit()
 }

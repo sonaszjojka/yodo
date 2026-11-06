@@ -68,7 +68,7 @@ Shipped in usable milestones; the split into milestones and tasks is in `docs/ro
 | Home screen | Shows all drawings with thumbnail, name and last-edited date, sorted by recent (can also sort by name or creation date); drawings can be created, opened and renamed. |
 | Auto-save | Every change is saved without a Save button; a drawing survives closing and reopening the browser. In the self-hosted version it also survives clearing browser data and is the same in every browser. |
 | Folders | Drawings can be created in or moved into folders; folders can be created, renamed and deleted; each folder has an icon and a colour chosen by the user. |
-| Trash | Deleting a drawing moves it to Trash; it can be restored or permanently deleted; Trash can be emptied. |
+| Trash | Deleting a drawing moves it to Trash; it can be restored or permanently deleted; Trash can be emptied. Drawings are deleted forever after 30 days; deleting a folder moves its drawings to Trash. |
 | Search | Searching finds drawings by name and by text on their canvas. |
 | Import / export file | A drawing exports to a `.yodo` file (ADR 0013) and importing that file recreates it exactly, also files from older Yodo versions. |
 | Import Excalidraw file | Importing a `.excalidraw` file creates a new Yodo drawing with its shapes, text, arrows, pencil strokes and images; anything Yodo can't represent is listed in a short summary after import (ADR 0014). |

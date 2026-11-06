@@ -1,4 +1,4 @@
-import { DotsThree, Plus } from '@phosphor-icons/react'
+import { DotsThree, Plus, Trash } from '@phosphor-icons/react'
 import { useEffect, useRef, useState } from 'react'
 import { sortFolders, type Folder } from '../storage/folders.ts'
 import {
@@ -19,6 +19,10 @@ export interface SidebarProps {
   total?: number
   /** The folder being viewed; undefined means All drawings. */
   selectedId?: string
+  /** Drawings in Trash, shown next to "Trash"; the link is always there. */
+  trashCount?: number
+  /** Trash is the screen being viewed (ADR 0046). */
+  trashSelected?: boolean
   onSaveFolder(values: FolderValues, existing?: Folder): void
   onDeleteFolder(folder: Folder): void
 }
@@ -34,6 +38,8 @@ export function Sidebar({
   counts,
   total,
   selectedId,
+  trashCount,
+  trashSelected = false,
   onSaveFolder,
   onDeleteFolder,
 }: SidebarProps) {
@@ -57,7 +63,9 @@ export function Sidebar({
         <a
           className="sidebar-link"
           href="#/"
-          aria-current={selectedId === undefined ? 'page' : undefined}
+          aria-current={
+            selectedId === undefined && !trashSelected ? 'page' : undefined
+          }
         >
           <span className="sidebar-link-name">All drawings</span>
           {total !== undefined && (
@@ -91,6 +99,17 @@ export function Sidebar({
         {folders.length === 0 && (
           <p className="sidebar-empty">No folders yet.</p>
         )}
+        <a
+          className="sidebar-link sidebar-trash"
+          href={routeHash({ name: 'trash' })}
+          aria-current={trashSelected ? 'page' : undefined}
+        >
+          <Trash size={18} />
+          <span className="sidebar-link-name">Trash</span>
+          {trashCount !== undefined && (
+            <span className="sidebar-count">{trashCount}</span>
+          )}
+        </a>
       </nav>
       <FolderDialog
         open={open && dialog?.kind !== 'delete'}

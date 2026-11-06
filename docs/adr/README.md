@@ -56,3 +56,4 @@ Why Yodo is built the way it is. See [0001](0001-record-architecture-decisions.m
 | [0043](0043-export-svg-with-a-parallel-pure-svg-renderer.md) | Export SVG with a parallel pure SVG renderer (rough.js generator, same seeds) and embedded fonts | Accepted |
 | [0044](0044-export-visual-regression-baseline.md) | Guard the export with visual baselines made and checked in one pinned Playwright image | Accepted |
 | [0045](0045-folders-as-metadata-with-a-folder-repository.md) | Folders are metadata outside the document, behind a `FolderRepository` | Accepted |
+| [0046](0046-trash-as-a-deleted-at-timestamp-on-the-summary.md) | Trash is a `deletedAt` timestamp on the drawing summary; folder delete trashes; 30-day client-side purge | Accepted |

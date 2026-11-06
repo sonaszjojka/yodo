@@ -1,16 +1,20 @@
 // Hash routes (ADR 0007, 0033): `#/` is Home, `#/d/<id>` the editor on one
-// drawing, `#/f/<id>` Home filtered to one folder (ADR 0045). Hashes work on GitHub Pages, which has no SPA fallback.
+// drawing, `#/f/<id>` Home filtered to one folder (ADR 0045), `#/trash` the
+// Trash (ADR 0046). Hashes work on GitHub Pages, which has no SPA fallback.
 
 import { useSyncExternalStore } from 'react'
 
 export type Route =
-  { name: 'home'; folderId?: string } | { name: 'drawing'; id: string }
+  | { name: 'home'; folderId?: string }
+  | { name: 'trash' }
+  | { name: 'drawing'; id: string }
 
 const DRAWING = /^#\/d\/([^/]+)$/
 const FOLDER = /^#\/f\/([^/]+)$/
 
 /** The route for a `location.hash`; anything unknown is Home. */
 export function parseRoute(hash: string): Route {
+  if (hash === '#/trash') return { name: 'trash' }
   const drawing = DRAWING.exec(hash)
   const folder = FOLDER.exec(hash)
   const match = drawing ?? folder
@@ -25,6 +29,7 @@ export function parseRoute(hash: string): Route {
 }
 
 export function routeHash(route: Route): string {
+  if (route.name === 'trash') return '#/trash'
   if (route.name === 'drawing') return `#/d/${encodeURIComponent(route.id)}`
   return route.folderId === undefined
     ? '#/'

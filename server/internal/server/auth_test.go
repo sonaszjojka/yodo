@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sonaszjojka/yodo/server/internal/db"
 	"github.com/sonaszjojka/yodo/server/internal/store"
 )
 
@@ -29,7 +28,7 @@ func newAuthAPI(t *testing.T, password string) *authAPI {
 	api := &authAPI{t: t, now: time.UnixMilli(1_000_000)}
 	clock := func() time.Time { return api.now }
 	api.handler = newHandler(builtFS, mustParse(t, "http://example.com,https://secure.example"),
-		db.New(sqlDB), t.TempDir(), NewAuth(password, clock), clock)
+		sqlDB, t.TempDir(), NewAuth(password, clock), clock)
 	return api
 }
 

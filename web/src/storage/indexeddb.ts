@@ -103,7 +103,18 @@ export class IndexedDbDrawingRepository implements DrawingRepository {
 
   async list(): Promise<DrawingSummary[]> {
     const db = await this.#open()
-    return db.getAll('drawings')
+    // Summaries are small and a trashed drawing is rare, so filtering here
+    // beats an index (and needs no schema change, ADR 0046).
+    return (await db.getAll('drawings')).filter(
+      (s) => s.deletedAt === undefined,
+    )
+  }
+
+  async listTrash(): Promise<DrawingSummary[]> {
+    const db = await this.#open()
+    return (await db.getAll('drawings')).filter(
+      (s) => s.deletedAt !== undefined,
+    )
   }
 
   async get(id: string): Promise<YodoDocument | undefined> {
@@ -128,6 +139,9 @@ export class IndexedDbDrawingRepository implements DrawingRepository {
     }
     // Auto-save must not undo a move (ADR 0045).
     if (existing?.folderId !== undefined) summary.folderId = existing.folderId
+    // Auto-save must not bring a trashed drawing back (ADR 0046).
+    if (existing?.deletedAt !== undefined)
+      summary.deletedAt = existing.deletedAt
     const pending: Promise<unknown>[] = [tx.done]
     try {
       pending.push(drawings.put(summary))
@@ -166,6 +180,53 @@ export class IndexedDbDrawingRepository implements DrawingRepository {
       folderId === null ? rest : { ...rest, folderId }
     await Promise.all([tx.objectStore('drawings').put(summary), tx.done])
     return summary
+  }
+
+  async trash(id: string): Promise<DrawingSummary | undefined> {
+    const db = await this.#open()
+    const tx = db.transaction('drawings', 'readwrite')
+    const existing = await tx.store.get(id)
+    if (!existing) {
+      await tx.done
+      return undefined
+    }
+    const summary = {
+      ...existing,
+      deletedAt: existing.deletedAt ?? this.#now(),
+    }
+    await Promise.all([tx.store.put(summary), tx.done])
+    return summary
+  }
+
+  async restore(id: string): Promise<DrawingSummary | undefined> {
+    const db = await this.#open()
+    const tx = db.transaction('drawings', 'readwrite')
+    const existing = await tx.store.get(id)
+    if (!existing) {
+      await tx.done
+      return undefined
+    }
+    const { deletedAt: _deleted, ...summary } = existing
+    await Promise.all([tx.store.put(summary), tx.done])
+    return summary
+  }
+
+  async emptyTrash({
+    deletedBefore,
+  }: { deletedBefore?: number } = {}): Promise<void> {
+    const db = await this.#open()
+    // One transaction reads the summaries and deletes the matching ones, so
+    // nothing restored or trashed again in between is removed (ADR 0046).
+    const tx = db.transaction(['drawings', 'documents'], 'readwrite')
+    const drawings = tx.objectStore('drawings')
+    const documents = tx.objectStore('documents')
+    const removals: Promise<unknown>[] = [tx.done]
+    for (const { id, deletedAt } of await drawings.getAll()) {
+      if (deletedAt === undefined) continue
+      if (deletedBefore !== undefined && deletedAt >= deletedBefore) continue
+      removals.push(drawings.delete(id), documents.delete(id))
+    }
+    await Promise.all(removals)
   }
 
   async delete(id: string): Promise<void> {
@@ -214,15 +275,18 @@ export class IndexedDbFolderRepository implements FolderRepository {
 
   async delete(id: string): Promise<void> {
     const db = await this.#connection.open()
-    // One transaction, so a folder never outlives its drawings or the reverse.
-    // Drawings have no folder index, so this scans the summaries (ADR 0045).
-    const tx = db.transaction(['folders', 'drawings', 'documents'], 'readwrite')
+    // One transaction, so a folder never outlives its drawings' move to Trash
+    // or the reverse. Drawings have no folder index, so this scans the
+    // summaries (ADR 0045). A drawing already in Trash keeps its deletedAt.
+    const tx = db.transaction(['folders', 'drawings'], 'readwrite')
     const drawings = tx.objectStore('drawings')
-    const documents = tx.objectStore('documents')
     const removals: Promise<unknown>[] = [tx.objectStore('folders').delete(id)]
     for (const summary of await drawings.getAll()) {
       if (summary.folderId !== id) continue
-      removals.push(drawings.delete(summary.id), documents.delete(summary.id))
+      const { folderId: _folder, ...rest } = summary
+      removals.push(
+        drawings.put({ ...rest, deletedAt: summary.deletedAt ?? this.#now() }),
+      )
     }
     await Promise.all([...removals, tx.done])
   }

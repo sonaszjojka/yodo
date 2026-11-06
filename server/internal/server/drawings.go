@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -27,12 +28,17 @@ type summary struct {
 	UpdatedAt int64  `json:"updatedAt"`
 	// FolderID is left out of the JSON for a drawing in no folder (ADR 0045).
 	FolderID *string `json:"folderId,omitempty"`
+	// DeletedAt is left out of the JSON for a drawing that is not in Trash (ADR 0046).
+	DeletedAt *int64 `json:"deletedAt,omitempty"`
 }
 
-func newSummary(id, name string, createdAt, updatedAt int64, folderID sql.NullString) summary {
+func newSummary(id, name string, createdAt, updatedAt int64, folderID sql.NullString, deletedAt sql.NullInt64) summary {
 	s := summary{ID: id, Name: name, CreatedAt: createdAt, UpdatedAt: updatedAt}
 	if folderID.Valid {
 		s.FolderID = &folderID.String
+	}
+	if deletedAt.Valid {
+		s.DeletedAt = &deletedAt.Int64
 	}
 	return s
 }
@@ -49,20 +55,34 @@ func (a drawingsAPI) register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/drawings", a.list)
 	mux.HandleFunc("GET /api/drawings/{id}", a.get)
 	mux.HandleFunc("PUT /api/drawings/{id}", a.put)
+	mux.HandleFunc("DELETE /api/drawings", a.emptyTrash)
 	mux.HandleFunc("DELETE /api/drawings/{id}", a.delete)
 	mux.HandleFunc("PUT /api/drawings/{id}/folder", a.move)
+	mux.HandleFunc("PUT /api/drawings/{id}/trash", a.trash)
 }
 
+// list serves the live drawings, or the drawings in Trash with ?trashed=true
+// (ADR 0046).
 func (a drawingsAPI) list(w http.ResponseWriter, r *http.Request) {
-	rows, err := a.queries.ListDrawings(r.Context())
-	if err != nil {
-		serverError(w, r, err)
-		return
-	}
-	// make, not nil: an empty list must encode as [] rather than null.
-	out := make([]summary, 0, len(rows))
-	for _, row := range rows {
-		out = append(out, newSummary(row.ID, row.Name, row.CreatedAt, row.UpdatedAt, row.FolderID))
+	out := make([]summary, 0) // not nil: an empty list must encode as [] rather than null
+	if r.URL.Query().Get("trashed") == "true" {
+		rows, err := a.queries.ListTrashedDrawings(r.Context())
+		if err != nil {
+			serverError(w, r, err)
+			return
+		}
+		for _, row := range rows {
+			out = append(out, newSummary(row.ID, row.Name, row.CreatedAt, row.UpdatedAt, row.FolderID, row.DeletedAt))
+		}
+	} else {
+		rows, err := a.queries.ListDrawings(r.Context())
+		if err != nil {
+			serverError(w, r, err)
+			return
+		}
+		for _, row := range rows {
+			out = append(out, newSummary(row.ID, row.Name, row.CreatedAt, row.UpdatedAt, row.FolderID, row.DeletedAt))
+		}
 	}
 	writeJSON(w, r, http.StatusOK, out)
 }
@@ -151,7 +171,7 @@ func (a drawingsAPI) put(w http.ResponseWriter, r *http.Request) {
 		serverError(w, r, err)
 		return
 	}
-	writeJSON(w, r, http.StatusOK, newSummary(row.ID, row.Name, row.CreatedAt, row.UpdatedAt, row.FolderID))
+	writeJSON(w, r, http.StatusOK, newSummary(row.ID, row.Name, row.CreatedAt, row.UpdatedAt, row.FolderID, row.DeletedAt))
 }
 
 func (a drawingsAPI) delete(w http.ResponseWriter, r *http.Request) {
@@ -160,6 +180,74 @@ func (a drawingsAPI) delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// emptyTrash permanently removes the drawings in Trash: all of them, or only
+// those trashed before ?deletedBefore=<ms> (the retention sweep, ADR 0046).
+// ?trashed=true is required, so a bare DELETE can never wipe everything.
+func (a drawingsAPI) emptyTrash(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	if query.Get("trashed") != "true" {
+		w.Header().Set("Allow", http.MethodGet)
+		http.Error(w, "DELETE /api/drawings needs ?trashed=true", http.StatusMethodNotAllowed)
+		return
+	}
+	var err error
+	// Has, not Get != "": an empty value is malformed, not an absent cutoff.
+	if query.Has("deletedBefore") {
+		cutoff, parseErr := strconv.ParseInt(query.Get("deletedBefore"), 10, 64)
+		if parseErr != nil {
+			http.Error(w, "deletedBefore must be an integer", http.StatusBadRequest)
+			return
+		}
+		err = a.queries.DeleteTrashedDrawingsBefore(r.Context(), sql.NullInt64{Int64: cutoff, Valid: true})
+	} else {
+		err = a.queries.DeleteTrashedDrawings(r.Context())
+	}
+	if err != nil {
+		serverError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// trash moves a drawing to Trash or back with {"trashed": bool} (ADR 0046).
+// It never touches the document, the folder or updatedAt.
+func (a drawingsAPI) trash(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxMoveBytes))
+	if err != nil {
+		http.Error(w, "could not read body", http.StatusBadRequest)
+		return
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(body, &fields); err != nil {
+		http.Error(w, "body must be a JSON object", http.StatusBadRequest)
+		return
+	}
+	// A pointer, because null would otherwise decode into false: a restore.
+	var flag *bool
+	if raw, ok := fields["trashed"]; !ok || json.Unmarshal(raw, &flag) != nil || flag == nil {
+		http.Error(w, "trashed must be true or false", http.StatusBadRequest)
+		return
+	}
+	trashed := *flag
+	id := r.PathValue("id")
+	var row summary
+	if trashed {
+		res, e := a.queries.TrashDrawing(r.Context(), db.TrashDrawingParams{ID: id, Now: sql.NullInt64{Int64: a.now().UnixMilli(), Valid: true}})
+		row, err = newSummary(res.ID, res.Name, res.CreatedAt, res.UpdatedAt, res.FolderID, res.DeletedAt), e
+	} else {
+		res, e := a.queries.RestoreDrawing(r.Context(), id)
+		row, err = newSummary(res.ID, res.Name, res.CreatedAt, res.UpdatedAt, res.FolderID, res.DeletedAt), e
+	}
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		http.Error(w, "drawing not found", http.StatusNotFound)
+	case err != nil:
+		serverError(w, r, err)
+	default:
+		writeJSON(w, r, http.StatusOK, row)
+	}
 }
 
 // maxMoveBytes bounds the body of a move: one id or null.
@@ -204,7 +292,7 @@ func (a drawingsAPI) move(w http.ResponseWriter, r *http.Request) {
 	case err != nil:
 		serverError(w, r, err)
 	default:
-		writeJSON(w, r, http.StatusOK, newSummary(row.ID, row.Name, row.CreatedAt, row.UpdatedAt, row.FolderID))
+		writeJSON(w, r, http.StatusOK, newSummary(row.ID, row.Name, row.CreatedAt, row.UpdatedAt, row.FolderID, row.DeletedAt))
 	}
 }
 
