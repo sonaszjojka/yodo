@@ -3,10 +3,13 @@
 // server is there instead of being told at build time.
 
 import { HttpDrawingRepository } from './http.ts'
+import { HttpFolderRepository } from './httpFolders.ts'
 import { HttpImageRepository } from './httpImages.ts'
+import type { FolderRepository } from './folders.ts'
 import type { ImageRepository } from './images.ts'
 import {
   IndexedDbDrawingRepository,
+  IndexedDbFolderRepository,
   IndexedDbImageRepository,
 } from './indexeddb.ts'
 import type { DrawingRepository } from './repository.ts'
@@ -61,6 +64,7 @@ export async function detectRepository({
 }: DetectOptions): Promise<{
   mode: StorageMode
   repository: DrawingRepository
+  folders: FolderRepository
   images: ImageRepository
   /** The optional password (ADR 0020); only a Yodo server has one. */
   session?: Session
@@ -93,6 +97,7 @@ export async function detectRepository({
     return {
       mode: 'self-hosted',
       repository: new HttpDrawingRepository({ baseUrl, fetch: guardedFetch }),
+      folders: new HttpFolderRepository({ baseUrl, fetch: guardedFetch }),
       images: new HttpImageRepository({ baseUrl, fetch: guardedFetch }),
       session,
     }
@@ -100,6 +105,7 @@ export async function detectRepository({
   return {
     mode: 'hosted',
     repository: new IndexedDbDrawingRepository(),
+    folders: new IndexedDbFolderRepository(),
     images: new IndexedDbImageRepository(),
   }
 }

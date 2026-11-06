@@ -7,6 +7,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 )
 
 const deleteDrawing = `-- name: DeleteDrawing :exec
@@ -35,7 +36,7 @@ func (q *Queries) GetDrawingDocument(ctx context.Context, id string) (string, er
 }
 
 const listDrawings = `-- name: ListDrawings :many
-SELECT id, name, created_at, updated_at
+SELECT id, name, created_at, updated_at, folder_id
 FROM drawings
 `
 
@@ -44,6 +45,7 @@ type ListDrawingsRow struct {
 	Name      string
 	CreatedAt int64
 	UpdatedAt int64
+	FolderID  sql.NullString
 }
 
 // ListDrawings returns every drawing's summary, without documents.
@@ -61,6 +63,7 @@ func (q *Queries) ListDrawings(ctx context.Context) ([]ListDrawingsRow, error) {
 			&i.Name,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.FolderID,
 		); err != nil {
 			return nil, err
 		}
@@ -75,6 +78,41 @@ func (q *Queries) ListDrawings(ctx context.Context) ([]ListDrawingsRow, error) {
 	return items, nil
 }
 
+const setDrawingFolder = `-- name: SetDrawingFolder :one
+UPDATE drawings
+SET folder_id = ?1
+WHERE id = ?2
+RETURNING id, name, created_at, updated_at, folder_id
+`
+
+type SetDrawingFolderParams struct {
+	FolderID sql.NullString
+	ID       string
+}
+
+type SetDrawingFolderRow struct {
+	ID        string
+	Name      string
+	CreatedAt int64
+	UpdatedAt int64
+	FolderID  sql.NullString
+}
+
+// SetDrawingFolder moves a drawing into a folder, or out of any folder when
+// folder_id is NULL. It leaves updated_at alone: moving is not editing (ADR 0045).
+func (q *Queries) SetDrawingFolder(ctx context.Context, arg SetDrawingFolderParams) (SetDrawingFolderRow, error) {
+	row := q.db.QueryRowContext(ctx, setDrawingFolder, arg.FolderID, arg.ID)
+	var i SetDrawingFolderRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.FolderID,
+	)
+	return i, err
+}
+
 const upsertDrawing = `-- name: UpsertDrawing :one
 INSERT INTO drawings (id, name, schema_version, document, created_at, updated_at)
 VALUES (?1, ?2, ?3, ?4, ?5, ?5)
@@ -83,7 +121,7 @@ ON CONFLICT (id) DO UPDATE SET
     schema_version = excluded.schema_version,
     document       = excluded.document,
     updated_at     = excluded.updated_at
-RETURNING id, name, created_at, updated_at
+RETURNING id, name, created_at, updated_at, folder_id
 `
 
 type UpsertDrawingParams struct {
@@ -99,6 +137,7 @@ type UpsertDrawingRow struct {
 	Name      string
 	CreatedAt int64
 	UpdatedAt int64
+	FolderID  sql.NullString
 }
 
 // UpsertDrawing inserts or replaces a drawing in one statement, so created_at
@@ -117,6 +156,7 @@ func (q *Queries) UpsertDrawing(ctx context.Context, arg UpsertDrawingParams) (U
 		&i.Name,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.FolderID,
 	)
 	return i, err
 }

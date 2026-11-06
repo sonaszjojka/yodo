@@ -2,9 +2,14 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/pressly/goose/v3"
+
+	"github.com/sonaszjojka/yodo/server/migrations"
 )
 
 func TestOpenAppliesMigrationsAndPragmas(t *testing.T) {
@@ -33,7 +38,7 @@ func TestOpenAppliesMigrationsAndPragmas(t *testing.T) {
 		}
 	}
 	if _, err := sqlDB.ExecContext(ctx,
-		"INSERT INTO drawings VALUES ('a', 'A', 1, '{}', 1, 1)"); err != nil {
+		"INSERT INTO drawings (id, name, schema_version, document, created_at, updated_at) VALUES ('a', 'A', 1, '{}', 1, 1)"); err != nil {
 		t.Fatalf("insert: %v", err)
 	}
 	if err := sqlDB.Close(); err != nil {
@@ -78,5 +83,48 @@ func TestOpenEscapesPath(t *testing.T) {
 	_ = sqlDB.Close()
 	if _, err := os.Stat(path); err != nil {
 		t.Errorf("database not created at %q: %v", path, err)
+	}
+}
+
+// A database created before folders (migration 1 only) keeps its drawings,
+// outside any folder, when the server upgrades it (ADR 0045).
+func TestOpenUpgradesADatabaseWithDrawings(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "yodo.db")
+	ctx := context.Background()
+
+	old, err := sql.Open("sqlite", "file:"+filepath.ToSlash(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider, err := goose.NewProvider(goose.DialectSQLite3, old, migrations.FS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := provider.UpTo(ctx, 1); err != nil {
+		t.Fatalf("migrate to 1: %v", err)
+	}
+	if _, err := old.ExecContext(ctx,
+		"INSERT INTO drawings VALUES ('a', 'A', 1, '{}', 10, 20)"); err != nil {
+		t.Fatal(err)
+	}
+	if err := old.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	sqlDB, err := Open(ctx, path)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer func() { _ = sqlDB.Close() }()
+	var name string
+	var created, updated int64
+	var folder sql.NullString
+	if err := sqlDB.QueryRowContext(ctx,
+		"SELECT name, created_at, updated_at, folder_id FROM drawings WHERE id = 'a'").
+		Scan(&name, &created, &updated, &folder); err != nil {
+		t.Fatalf("select: %v", err)
+	}
+	if name != "A" || created != 10 || updated != 20 || folder.Valid {
+		t.Errorf("got %q %d %d %+v, want A 10 20 and no folder", name, created, updated, folder)
 	}
 }

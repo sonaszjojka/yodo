@@ -7,7 +7,7 @@ Rule: every stage ends with a **file of decisions**, not just a conversation. Co
 
 **Language:** from now on all communication, code, docs and other output are in English.
 
-## Status (2026-11-05)
+## Status (2026-11-06)
 Read this section, not the whole file; finished work is logged in `docs/history.md`.
 - Done before: roadmap 2.9 (issue #85): Excalidraw import (ADR 0014). **Import Excalidraw** on Home converts a `.excalidraw` file into a new drawing (shapes, text, arrows, pencil, images) and lists what was skipped or simplified.
 - Done before: roadmap 2.8 (issue #84): `.yodo` export / import (ADR 0013, 0040). **Export** in the editor downloads the drawing with its images inlined as base64; **Import file** on Home takes a `.yodo` or `.excalidraw` file and saves it as a new drawing.
@@ -16,9 +16,10 @@ Read this section, not the whole file; finished work is logged in `docs/history.
 - Done before: roadmap 2.7a (issue #83, with 2.7b and 2.7c split off): PNG export (ADR 0041). An **Export image** button (top right, next to the `.yodo` Export from 2.8; Shift+Ctrl/Cmd+E) opens a dialog: whole drawing or selection, background on/off, dark version, 1x/2x/3x scale, file name, Copy and Download. The scene is drawn again with `renderScene` on an offscreen canvas, so pasted images export too.
 - Done before: roadmap 2.10 (issue #86): shortcuts modal. A native `<dialog>` lists every shortcut in groups (Tools, Editing, View) with a search box; it opens from the editor's bottom bar, the `?` key and Home's Settings menu, and keys, clipboard and zoom gestures stay away from the drawing behind it.
 - Done before: roadmap 2.7b (issue #116): SVG export (ADR 0043). The export dialog now has PNG and SVG tabs. SVG keeps scope, background, dark version and file name, drops the scale, previews the generated file, and Copy puts the source text on the clipboard. A pure renderer in `core/export/svg/` uses the rough.js generator with the canvas's seeds and options, so the wobble matches; the file embeds the fonts it uses (latin, latin-ext, cyrillic, greek, vietnamese per family) and pasted images as base64.
-- **Last done:** roadmap 2.7c (issue #117, finishes the 2.7 split and M2): export visual baselines (ADR 0044). Three reference scenes (shapes and fills, text and labels, a mixed one) are exported as PNG and SVG in light and dark and compared with 12 committed baselines. `npm run test:visual` (and `test:visual:update`) in `e2e/` run it in the pinned Playwright Docker image, and a new CI `visual` job runs it in the same image.
+- Done before: roadmap 2.7c (issue #117, finishes the 2.7 split and M2): export visual baselines (ADR 0044). Three reference scenes (shapes and fills, text and labels, a mixed one) are exported as PNG and SVG in light and dark and compared with 12 committed baselines. `npm run test:visual` (and `test:visual:update`) in `e2e/` run it in the pinned Playwright Docker image, and a new CI `visual` job runs it in the same image.
+- **Last done:** roadmap 3.1 (issue #89): folders (ADR 0045). Home has a left sidebar listing folders with icon, colour and drawing count; the **+** and ⋯ menu create, edit (name, icon, colour) and delete folders, and deleting one deletes its drawings after a confirmation that states how many. **Move to folder** is in the card menu, a new drawing made inside a folder belongs to it, and `#/f/<id>` is the folder route. Folder membership is `DrawingSummary.folderId` set by `DrawingRepository.move`; `FolderRepository` has memory, IndexedDB (db version 3) and HTTP (`/api/folders`, migration 00002) implementations on one contract suite.
 - Open items: `review` issues from the 1.14, 1.15, 1.16, 2.2a, 2.2b and 2.3 reviews, and #118 from 2.7a.
-- **Next step:** roadmap 3.1 (issue #89): folders.
+- **Next step:** roadmap 3.2 (issue #90): trash.
 
 ## Working mode: an educational project
 The goal is both the app and learning how to program with Claude as effectively as possible, so that the knowledge stays with you. The rules (you decide and I explain, no silent automation, features introduced on first use, a short recap after each task, "just do it" to skip explanations) live in the global `~/.claude/CLAUDE.md` and the `educational-working-mode` memory, so they apply in every session.

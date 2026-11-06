@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/sonaszjojka/yodo/server/internal/db"
@@ -24,6 +25,16 @@ type summary struct {
 	Name      string `json:"name"`
 	CreatedAt int64  `json:"createdAt"`
 	UpdatedAt int64  `json:"updatedAt"`
+	// FolderID is left out of the JSON for a drawing in no folder (ADR 0045).
+	FolderID *string `json:"folderId,omitempty"`
+}
+
+func newSummary(id, name string, createdAt, updatedAt int64, folderID sql.NullString) summary {
+	s := summary{ID: id, Name: name, CreatedAt: createdAt, UpdatedAt: updatedAt}
+	if folderID.Valid {
+		s.FolderID = &folderID.String
+	}
+	return s
 }
 
 // drawingsAPI serves /api/drawings, one route per DrawingRepository method
@@ -39,6 +50,7 @@ func (a drawingsAPI) register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/drawings/{id}", a.get)
 	mux.HandleFunc("PUT /api/drawings/{id}", a.put)
 	mux.HandleFunc("DELETE /api/drawings/{id}", a.delete)
+	mux.HandleFunc("PUT /api/drawings/{id}/folder", a.move)
 }
 
 func (a drawingsAPI) list(w http.ResponseWriter, r *http.Request) {
@@ -50,7 +62,7 @@ func (a drawingsAPI) list(w http.ResponseWriter, r *http.Request) {
 	// make, not nil: an empty list must encode as [] rather than null.
 	out := make([]summary, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, summary(row))
+		out = append(out, newSummary(row.ID, row.Name, row.CreatedAt, row.UpdatedAt, row.FolderID))
 	}
 	writeJSON(w, r, http.StatusOK, out)
 }
@@ -139,7 +151,7 @@ func (a drawingsAPI) put(w http.ResponseWriter, r *http.Request) {
 		serverError(w, r, err)
 		return
 	}
-	writeJSON(w, r, http.StatusOK, summary(row))
+	writeJSON(w, r, http.StatusOK, newSummary(row.ID, row.Name, row.CreatedAt, row.UpdatedAt, row.FolderID))
 }
 
 func (a drawingsAPI) delete(w http.ResponseWriter, r *http.Request) {
@@ -148,6 +160,58 @@ func (a drawingsAPI) delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// maxMoveBytes bounds the body of a move: one id or null.
+const maxMoveBytes = 1 << 10
+
+// move puts a drawing into a folder, or out of any folder with null (ADR 0045).
+// It never touches the document or updatedAt.
+func (a drawingsAPI) move(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxMoveBytes))
+	if err != nil {
+		http.Error(w, "could not read body", http.StatusBadRequest)
+		return
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(body, &fields); err != nil {
+		http.Error(w, "body must be a JSON object", http.StatusBadRequest)
+		return
+	}
+	raw, ok := fields["folderId"]
+	if !ok {
+		http.Error(w, "folderId is missing", http.StatusBadRequest)
+		return
+	}
+	var folderID *string
+	if err := json.Unmarshal(raw, &folderID); err != nil {
+		http.Error(w, "folderId must be a string or null", http.StatusBadRequest)
+		return
+	}
+	param := sql.NullString{}
+	if folderID != nil {
+		param = sql.NullString{String: *folderID, Valid: true}
+	}
+	row, err := a.queries.SetDrawingFolder(r.Context(), db.SetDrawingFolderParams{
+		ID:       r.PathValue("id"),
+		FolderID: param,
+	})
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		http.Error(w, "drawing not found", http.StatusNotFound)
+	case isForeignKeyError(err):
+		http.Error(w, "folder not found", http.StatusBadRequest)
+	case err != nil:
+		serverError(w, r, err)
+	default:
+		writeJSON(w, r, http.StatusOK, newSummary(row.ID, row.Name, row.CreatedAt, row.UpdatedAt, row.FolderID))
+	}
+}
+
+// isForeignKeyError reports a violated FOREIGN KEY constraint, here a folder
+// id that does not exist. The modernc driver puts SQLite's message in the error.
+func isForeignKeyError(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "FOREIGN KEY constraint failed")
 }
 
 func writeJSON(w http.ResponseWriter, r *http.Request, status int, v any) {

@@ -5,6 +5,7 @@ import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 import { migrate } from '../core/document/migrate.ts'
 import type { YodoDocument } from '../core/document/types.ts'
 import type { RepositoryOptions } from './memory.ts'
+import type { Folder, FolderInput, FolderRepository } from './folders.ts'
 import { sha256Hex, type ImageRepository } from './images.ts'
 import type { DrawingRepository, DrawingSummary } from './repository.ts'
 
@@ -12,7 +13,7 @@ import type { DrawingRepository, DrawingSummary } from './repository.ts'
 export const DEFAULT_DB_NAME = 'yodo-data'
 
 // Bump together with a new step in `upgrade`; never edit a released step.
-const DB_VERSION = 2
+const DB_VERSION = 3
 
 // Summaries and documents live in separate stores so `list()` reads only the
 // small summaries, never every drawing's elements.
@@ -21,6 +22,8 @@ interface YodoDb extends DBSchema {
   documents: { key: string; value: YodoDocument }
   /** Image blobs by content hash (ADR 0040). Bytes, not a Blob, so every browser clones them the same way. */
   blobs: { key: string; value: StoredBlob }
+  /** Folders (ADR 0045). A drawing's summary names its folder in `folderId`. */
+  folders: { key: string; value: Folder }
 }
 
 interface StoredBlob {
@@ -60,6 +63,10 @@ class YodoDbConnection {
         // Existing drawings are untouched (ADR 0040).
         if (oldVersion < 2) {
           db.createObjectStore('blobs', { keyPath: 'hash' })
+        }
+        // Existing drawings simply have no folder (ADR 0045).
+        if (oldVersion < 3) {
+          db.createObjectStore('folders', { keyPath: 'id' })
         }
       },
       // Another tab wants a newer schema: close so its upgrade isn't blocked.
@@ -119,6 +126,8 @@ export class IndexedDbDrawingRepository implements DrawingRepository {
       createdAt: existing?.createdAt ?? time,
       updatedAt: time,
     }
+    // Auto-save must not undo a move (ADR 0045).
+    if (existing?.folderId !== undefined) summary.folderId = existing.folderId
     const pending: Promise<unknown>[] = [tx.done]
     try {
       pending.push(drawings.put(summary))
@@ -136,6 +145,29 @@ export class IndexedDbDrawingRepository implements DrawingRepository {
     return summary
   }
 
+  async move(
+    id: string,
+    folderId: string | null,
+  ): Promise<DrawingSummary | undefined> {
+    const db = await this.#open()
+    const tx = db.transaction(['drawings', 'folders'], 'readwrite')
+    const existing = await tx.objectStore('drawings').get(id)
+    if (!existing) {
+      await tx.done
+      return undefined
+    }
+    if (folderId !== null && !(await tx.objectStore('folders').get(folderId))) {
+      tx.abort()
+      tx.done.catch(() => {})
+      throw new Error(`Folder ${folderId} does not exist`)
+    }
+    const { folderId: _old, ...rest } = existing
+    const summary: DrawingSummary =
+      folderId === null ? rest : { ...rest, folderId }
+    await Promise.all([tx.objectStore('drawings').put(summary), tx.done])
+    return summary
+  }
+
   async delete(id: string): Promise<void> {
     const db = await this.#open()
     const tx = db.transaction(['drawings', 'documents'], 'readwrite')
@@ -144,6 +176,55 @@ export class IndexedDbDrawingRepository implements DrawingRepository {
       tx.objectStore('documents').delete(id),
       tx.done,
     ])
+  }
+}
+
+/** The hosted-mode FolderRepository, in the same database as the drawings (ADR 0045). */
+export class IndexedDbFolderRepository implements FolderRepository {
+  readonly #now: () => number
+  readonly #connection: YodoDbConnection
+
+  constructor({
+    now = Date.now,
+    dbName = DEFAULT_DB_NAME,
+  }: IndexedDbRepositoryOptions = {}) {
+    this.#now = now
+    this.#connection = new YodoDbConnection(dbName)
+  }
+
+  async list(): Promise<Folder[]> {
+    const db = await this.#connection.open()
+    return db.getAll('folders')
+  }
+
+  async save(input: FolderInput): Promise<Folder> {
+    const db = await this.#connection.open()
+    const tx = db.transaction('folders', 'readwrite')
+    const existing = await tx.store.get(input.id)
+    const folder: Folder = {
+      id: input.id,
+      name: input.name,
+      icon: input.icon,
+      color: input.color,
+      createdAt: existing?.createdAt ?? this.#now(),
+    }
+    await Promise.all([tx.store.put(folder), tx.done])
+    return folder
+  }
+
+  async delete(id: string): Promise<void> {
+    const db = await this.#connection.open()
+    // One transaction, so a folder never outlives its drawings or the reverse.
+    // Drawings have no folder index, so this scans the summaries (ADR 0045).
+    const tx = db.transaction(['folders', 'drawings', 'documents'], 'readwrite')
+    const drawings = tx.objectStore('drawings')
+    const documents = tx.objectStore('documents')
+    const removals: Promise<unknown>[] = [tx.objectStore('folders').delete(id)]
+    for (const summary of await drawings.getAll()) {
+      if (summary.folderId !== id) continue
+      removals.push(drawings.delete(summary.id), documents.delete(summary.id))
+    }
+    await Promise.all([...removals, tx.done])
   }
 }
 

@@ -39,6 +39,7 @@ function deferredRepository() {
     list: async () => [],
     get: async () => undefined,
     delete: async () => {},
+    move: async () => undefined,
     save: (doc) =>
       new Promise((resolve, reject) => {
         saves.push({
