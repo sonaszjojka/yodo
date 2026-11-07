@@ -961,12 +961,61 @@ describe('resize', () => {
   })
 })
 
-test('drawing selects the new element and switches to Select', () => {
+test.each(['rectangle', 'diamond', 'ellipse', 'line', 'arrow'] as const)(
+  'drawing a %s keeps the tool active and selects nothing',
+  (tool) => {
+    const editor = setup()
+    editor.setTool(tool)
+    drag(editor, [0, 0], [30, 40])
+    drag(editor, [100, 0], [130, 40])
+    const state = editor.store.getState()
+    expect(state.tool).toBe(tool)
+    expect(state.selectedIds).toEqual([])
+    expect(state.document.elements.map((e) => e.type)).toEqual([tool, tool])
+    editor.undo()
+    expect(editor.store.getState().document.elements).toHaveLength(1)
+  },
+)
+
+test('Escape returns a drawing tool to Select, then clears the selection', () => {
   const editor = setup()
+  editor.setTool('rectangle')
   drag(editor, [0, 0], [30, 40])
-  const { tool, selectedIds, document } = editor.store.getState()
-  expect(tool).toBe('select')
-  expect(selectedIds).toEqual([document.elements[0]!.id])
+  editor.cancel()
+  expect(editor.store.getState().tool).toBe('select')
+
+  editor.pointerDown(1, [0, 10], primary)
+  editor.pointerUp(1)
+  expect(editor.store.getState().selectedIds).toHaveLength(1)
+  editor.cancel()
+  expect(editor.store.getState()).toMatchObject({
+    tool: 'select',
+    selectedIds: [],
+  })
+})
+
+test('Escape during a draw drops the shape and keeps the tool', () => {
+  const editor = setup()
+  editor.setTool('rectangle')
+  editor.pointerDown(1, [0, 0], primary)
+  editor.pointerMove(1, [30, 40], false)
+  editor.cancel()
+  expect(editor.store.getState()).toMatchObject({
+    tool: 'rectangle',
+    draft: null,
+  })
+})
+
+test('a tool picked mid-drag wins over the sticky one', () => {
+  const editor = setup()
+  editor.setTool('rectangle')
+  editor.pointerDown(1, [0, 0], primary)
+  editor.pointerMove(1, [30, 40], false)
+  editor.setTool('ellipse')
+  editor.pointerUp(1)
+  const { tool, document } = editor.store.getState()
+  expect(tool).toBe('ellipse')
+  expect(document.elements).toHaveLength(1)
 })
 
 test('changing tool mid-draw still draws the shape but keeps the new tool', () => {
@@ -1100,6 +1149,9 @@ describe('undo and redo', () => {
   test('the selection keeps only elements that exist after the step', () => {
     const editor = setup()
     drag(editor, [10, 10], [60, 60])
+    editor.setTool('select')
+    editor.pointerDown(1, [30, 10], primary)
+    editor.pointerUp(1)
     expect(editor.store.getState().selectedIds).toHaveLength(1)
 
     editor.undo()
@@ -1749,6 +1801,7 @@ describe('attached arrows', () => {
     editor.drawTool.pointerDown(1, [95, 50], false)
     editor.drawTool.pointerMove(1, [206, 50], false)
     editor.drawTool.pointerUp(1)
+    editor.setTool('select')
     const arrow = () =>
       editor.store
         .getState()

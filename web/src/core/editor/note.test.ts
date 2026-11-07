@@ -58,12 +58,25 @@ describe('the note tool', () => {
       width: NOTE_SIZE,
       height: NOTE_SIZE,
     })
-    expect(tool).toBe('select')
+    expect(tool).toBe('note')
     expect(editing).toMatchObject({
       target: 'label',
       id: document.elements[0]!.id,
     })
     expect(selectedIds).toEqual([])
+  })
+
+  test('picking another tool mid-drag draws the note but opens no editor', () => {
+    const editor = setup()
+    editor.pointerDown(1, [10, 20], { button: 0, shift: false })
+    editor.pointerMove(1, [110, 80], false)
+    editor.setTool('rectangle')
+    editor.pointerUp(1)
+
+    const { document, editing, tool } = editor.store.getState()
+    expect(document.elements).toHaveLength(1)
+    expect(editing).toBeNull()
+    expect(tool).toBe('rectangle')
   })
 
   test('a drag sizes the note', () => {
@@ -82,7 +95,7 @@ describe('the note tool', () => {
     })
   })
 
-  test('typing and committing sets the label and selects the note', () => {
+  test('typing and committing sets the label and keeps the note tool, selecting nothing', () => {
     const editor = setup()
     editor.pointerDown(1, [100, 100], { button: 0, shift: false })
     editor.pointerUp(1)
@@ -90,10 +103,11 @@ describe('the note tool', () => {
     editor.setEditingText('Buy milk')
     editor.commitText()
 
-    const { document, selectedIds, editing } = editor.store.getState()
+    const { document, selectedIds, editing, tool } = editor.store.getState()
     const placed = document.elements[0] as NoteElement
     expect(placed.label?.text).toBe('Buy milk')
-    expect(selectedIds).toEqual([placed.id])
+    expect(selectedIds).toEqual([])
+    expect(tool).toBe('note')
     expect(editing).toBeNull()
   })
 
@@ -127,6 +141,7 @@ describe('the note tool', () => {
     editor.setEditingText('Hi')
     editor.commitText()
 
+    editor.setTool('select')
     editor.doubleClick([100, 100])
 
     expect(editor.store.getState().editing).toMatchObject({

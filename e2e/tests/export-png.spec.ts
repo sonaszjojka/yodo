@@ -131,6 +131,12 @@ test('exports only the selection, and the dialog does not edit the drawing behin
   await dragRectangle(page, [100, 100], [500, 400])
   await dragRectangle(page, [600, 150], [700, 210])
   await expectInk(page)
+  // The tool stays active and selects nothing (ADR 0050): select the small
+  // rectangle by its left edge.
+  await page.keyboard.press('Escape')
+  const box = await editorCanvas(page).boundingBox()
+  if (!box) throw new Error('the editor canvas is not visible')
+  await page.mouse.click(box.x + 600, box.y + 180)
 
   await page.keyboard.press('ControlOrMeta+Shift+e')
   const dialog = page.getByRole('dialog', { name: 'Export image' })

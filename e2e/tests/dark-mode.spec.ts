@@ -46,6 +46,10 @@ async function drawReferenceScene(page: Page) {
   await page.mouse.up()
   await expectInk(page)
 
+  // The Rectangle tool stays active and selects nothing (ADR 0050): go back
+  // to Select and pick the rectangle by its left edge to style it.
+  await page.keyboard.press('Escape')
+  await page.mouse.click(box.x + 200, box.y + 280)
   await page.getByRole('button', { name: /^Fill/ }).click()
   await page.getByRole('button', { name: 'Rose' }).click()
   // Click empty canvas so the selection overlay doesn't tint the sample.

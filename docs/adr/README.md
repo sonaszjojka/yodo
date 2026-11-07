@@ -60,3 +60,4 @@ Why Yodo is built the way it is. See [0001](0001-record-architecture-decisions.m
 | [0047](0047-search-index-in-the-repository-matched-on-the-client.md) | Search: an index in the repository (`searchIndex()`, `X-Yodo-Search-Text` header), matched on the client | Accepted |
 | [0048](0048-attached-arrows-as-bindings-on-the-arrow.md) | Attached arrows: optional `startBinding`/`endBinding` (`elementId` + box `ratio`) on the arrow, geometry kept in sync | Accepted |
 | [0049](0049-releases-semver-tags-publish-the-image.md) | Releases: a semver tag on `main` publishes the versioned image; `latest` is the newest release, `edge` is `main` | Accepted |
+| [0050](0050-drawing-tools-stay-active.md) | Drawing tools stay active after each element; `Esc` or `V` returns to Select; the new element is not selected | Accepted |

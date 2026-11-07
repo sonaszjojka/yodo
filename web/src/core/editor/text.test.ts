@@ -63,7 +63,7 @@ describe('the text tool', () => {
     expect(elements(editor)).toEqual([])
   })
 
-  test('committing adds one text sized to its lines, selects it, and is one undo step', () => {
+  test('committing adds one text sized to its lines, keeps the text tool, and is one undo step', () => {
     const editor = setup()
     editor.setTool('text')
     click(editor, [100, 100])
@@ -80,8 +80,8 @@ describe('the text tool', () => {
     })
     expect(state(editor)).toMatchObject({
       editing: null,
-      tool: 'select',
-      selectedIds: [text.id],
+      tool: 'text',
+      selectedIds: [],
     })
 
     editor.undo()
