@@ -69,7 +69,7 @@ Goal: open Yodo, draw basic shapes, close the browser, come back to the same dra
 | # | Task | Done when… |
 |---|---|---|
 | 4.1 | Drawing tool stays active ✓ (PR [#140](https://github.com/sonaszjojka/yodo/pull/140)) ([#131](https://github.com/sonaszjojka/yodo/issues/131)) | The chosen drawing tool stays active after each element; `Esc` or `V` returns to Select; the new element is not selected (ADR 0050). |
-| 4.2 | Eraser cursor and hover feedback ([#132](https://github.com/sonaszjojka/yodo/issues/132)) | The eraser shows a circle cursor matching its hit size; elements under the eraser while dragging are dimmed before they are removed; still undoable as one step. |
+| 4.2 | Eraser cursor and hover feedback ✓ (PR [#141](https://github.com/sonaszjojka/yodo/pull/141)) ([#132](https://github.com/sonaszjojka/yodo/issues/132)) | The eraser shows a circle cursor matching its hit size; elements under the eraser while dragging are dimmed before they are removed; still undoable as one step. |
 
 ## Rules for changing this roadmap
 - Tasks may be split, merged or reordered; record why in the commit message.
