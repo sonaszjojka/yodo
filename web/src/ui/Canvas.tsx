@@ -1,12 +1,12 @@
 import rough from 'roughjs'
 import { useEffect, useRef, type MouseEvent, type PointerEvent } from 'react'
 import type { Point } from '../core/document/types.ts'
-import type { Editor, EditorState } from '../core/editor/editor.ts'
+import type { Editor } from '../core/editor/editor.ts'
 import { sceneOf } from '../core/editor/scene.ts'
 import type { Bounds } from '../core/geometry/rect.ts'
-import type { Handle } from '../core/geometry/resize.ts'
 import { wheelZoomFactor } from '../core/geometry/viewport.ts'
 import { canvasSize, renderScene, type Surface } from '../core/render/render.ts'
+import { cursorFor } from './cursors.ts'
 import type { ImageCache } from './imageCache.ts'
 import { getThemeStore } from './useTheme.ts'
 import {
@@ -29,29 +29,6 @@ interface GestureEvent extends UIEvent {
   scale: number
   clientX: number
   clientY: number
-}
-
-/** Opposite handles resize along the same line, so they share a cursor. */
-const HANDLE_CURSORS: Record<Handle, string> = {
-  nw: 'nwse-resize',
-  se: 'nwse-resize',
-  ne: 'nesw-resize',
-  sw: 'nesw-resize',
-  n: 'ns-resize',
-  s: 'ns-resize',
-  e: 'ew-resize',
-  w: 'ew-resize',
-}
-
-function cursorFor(state: EditorState) {
-  const { panning, tool, spaceHeld, move, resize, hoverHandle } = state
-  if (panning) return 'grabbing'
-  if (tool === 'hand' || spaceHeld) return 'grab'
-  const handle = resize?.handle ?? hoverHandle
-  if (handle) return HANDLE_CURSORS[handle]
-  if (move) return 'move'
-  if (tool === 'text') return 'text'
-  return tool === 'select' ? 'default' : 'crosshair'
 }
 
 /**
