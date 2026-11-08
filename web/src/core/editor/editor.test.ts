@@ -1971,6 +1971,12 @@ describe('re-attaching an arrow by dragging an end', () => {
     expect(endOf(arrow())).toEqual([100, 300])
   })
 
+  test('Shift-clicking an end handle toggles the arrow out of the selection', () => {
+    const { editor } = setupFree()
+    click(editor, [100, 300], true)
+    expect(editor.store.getState().selectedIds).toEqual([])
+  })
+
   test('a click on a handle changes nothing', () => {
     const { editor } = setupFree()
     const before = editor.store.getState().document

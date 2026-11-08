@@ -569,6 +569,8 @@ export function createEditor(
         hitId: string | null
         start: Point
         last: Point
+        /** Kept for the click (no drag) that Shift turns into a toggle. */
+        shift: boolean
         moved: boolean
       }
     | {
@@ -739,6 +741,7 @@ export function createEditor(
           hitId,
           start: point,
           last: point,
+          shift,
           moved: false,
         }
         return
@@ -822,7 +825,7 @@ export function createEditor(
       gesture = null
       if (ended.kind === 'endpoint') {
         if (!ended.moved) {
-          if (ended.hitId) clickSelect(ended.hitId, false)
+          if (ended.hitId) clickSelect(ended.hitId, ended.shift)
           return
         }
         // The whole drag becomes one document change.
