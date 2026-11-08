@@ -69,6 +69,38 @@ test('? opens a searchable list; Esc closes it and the search resets', async ({
   await expect(search).toHaveValue('')
 })
 
+test('the list keeps a gap before its scrollbar, with or without one', async ({
+  page,
+}) => {
+  await page.goto('./')
+  await page.getByRole('button', { name: 'Keyboard shortcuts' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Keyboard shortcuts' })
+  await expect(dialog).toBeVisible()
+
+  /** The right edge of the Rectangle row's keys, and the gap to the content edge. */
+  async function keysEdge() {
+    return dialog.locator('.shortcuts-list').evaluate((list) => {
+      const row = [...list.querySelectorAll('li')].find((li) =>
+        li.textContent?.startsWith('Rectangle'),
+      )!
+      const keys = row.querySelector('kbd')!.getBoundingClientRect().right
+      const content = list.getBoundingClientRect().left + list.clientWidth
+      return { keys, gap: content - keys }
+    })
+  }
+
+  // Everything fits only in a tall window; the full list scrolls in this one.
+  const full = await keysEdge()
+  expect(full.gap).toBeGreaterThanOrEqual(8)
+
+  // A search that leaves one row removes the scrollbar; the keys must not move.
+  await dialog.getByRole('searchbox', { name: 'Search shortcuts' }).fill('rect')
+  await expect(dialog.getByRole('listitem')).toHaveCount(1)
+  const filtered = await keysEdge()
+  expect(filtered.gap).toBeGreaterThanOrEqual(8)
+  expect(filtered.keys).toBe(full.keys)
+})
+
 test('keys pressed in the dialog do not reach the drawing', async ({
   page,
 }) => {
