@@ -119,10 +119,11 @@ test('a Space held while the list opens does not leave the canvas panning', asyn
   await expectInk(page)
 })
 
-test('Home: Settings → Keyboard shortcuts opens the list', async ({ page }) => {
+test('Home: the sidebar Keyboard shortcuts button opens the list', async ({
+  page,
+}) => {
   await page.goto('./')
-  await page.getByRole('button', { name: 'Settings' }).click()
-  await page.getByRole('menuitem', { name: 'Keyboard shortcuts' }).click()
+  await page.getByRole('button', { name: 'Keyboard shortcuts' }).click()
   await expect(
     page.getByRole('dialog', { name: 'Keyboard shortcuts' }),
   ).toBeVisible()
