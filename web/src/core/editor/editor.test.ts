@@ -7,7 +7,7 @@ import {
 } from '../document/create.ts'
 import { lineFromDrag } from '../geometry/line.ts'
 import { MAX_ZOOM, MIN_ZOOM } from '../geometry/viewport.ts'
-import type { ArrowElement } from '../document/types.ts'
+import type { ArrowElement, LineElement } from '../document/types.ts'
 import { createEditor, type Tool } from './editor.ts'
 import { sceneOf } from './scene.ts'
 
@@ -905,10 +905,15 @@ describe('resize', () => {
     expect(editor.store.getState().selectedIds).toEqual([a.id])
   })
 
-  test('a flat line moves when pressed beside it, as it has no height to resize', () => {
+  test('flat lines in a group move when pressed beside them, as the group has no height to resize', () => {
     const line = createLinear('line', lineFromDrag([0, 0], [100, 0], false))
-    const editor = createEditor({ ...createDocument(), elements: [line] })
+    const other = createLinear('line', lineFromDrag([200, 0], [300, 0], false))
+    const editor = createEditor({
+      ...createDocument(),
+      elements: [line, other],
+    })
     click(editor, [50, 0])
+    click(editor, [250, 0], true)
     // Within hit tolerance of the line and on the outline's top side.
     editor.pointerMove(1, [50, -5], false)
     expect(editor.store.getState().hoverHandle).toBeNull()
@@ -2048,5 +2053,105 @@ describe('re-attaching an arrow by dragging an end', () => {
     drag(editor, [100, 300], [100, 300])
     expect(editor.store.getState().resize).toBeNull()
     expect(editor.store.getState().document).toBe(before)
+  })
+})
+
+describe('bending lines and arrows (ADR 0053)', () => {
+  function setupLine(type: 'line' | 'arrow' = 'line') {
+    const line = createLinear(type, lineFromDrag([0, 0], [200, 0], false))
+    const editor = createEditor({ ...createDocument(), elements: [line] })
+    click(editor, [100, 0])
+    const current = () =>
+      editor.store.getState().document.elements[0] as LineElement | ArrowElement
+    return { editor, line, current }
+  }
+  const press = { button: 0, shift: false }
+
+  test('dragging the mid-handle inserts a point and makes a curve', () => {
+    const { editor, current } = setupLine()
+    drag(editor, [100, 0], [100, 80])
+    expect(current()).toMatchObject({
+      curved: true,
+      points: [
+        [0, 0],
+        [100, 80],
+        [200, 0],
+      ],
+    })
+  })
+
+  test('the whole bend is one undo step, and redo brings it back', () => {
+    const { editor, line, current } = setupLine('arrow')
+    const before = editor.store.getState().document
+    drag(editor, [100, 0], [100, 80])
+    expect(current().points).toHaveLength(3)
+    editor.undo()
+    expect(editor.store.getState().document).toBe(before)
+    expect(current()).toBe(line)
+    editor.redo()
+    expect(current().points).toHaveLength(3)
+  })
+
+  test('the preview shows the curve, and Esc leaves the document alone', () => {
+    const { editor, line, current } = setupLine()
+    const before = editor.store.getState().document
+    editor.pointerDown(1, [100, 0], press)
+    editor.pointerMove(1, [100, 80], false)
+    const shown = sceneOf(editor.store.getState()).elements[0] as LineElement
+    expect(shown.points).toHaveLength(3)
+    expect(shown.curved).toBe(true)
+    editor.selectTool.cancel()
+    expect(editor.store.getState().endpoint).toBeNull()
+    expect(editor.store.getState().document).toBe(before)
+    expect(current()).toBe(line)
+  })
+
+  test('a click on the mid-handle changes nothing', () => {
+    const { editor } = setupLine()
+    const before = editor.store.getState().document
+    click(editor, [100, 0])
+    expect(editor.store.getState().document).toBe(before)
+  })
+
+  test('a point of a curve is dragged on its own, and never binds', () => {
+    const { editor, current } = setupLine()
+    drag(editor, [100, 0], [100, 80])
+    drag(editor, [100, 80], [120, 40])
+    expect(current().points[1]).toEqual([120, 40])
+    expect(current().points).toHaveLength(3)
+    expect(editor.store.getState().bindTarget).toBeNull()
+  })
+
+  test('a line end is dragged to a new place, and the box is not resized', () => {
+    const { editor, current } = setupLine()
+    drag(editor, [200, 0], [250, 60])
+    expect(current().points).toEqual([
+      [0, 0],
+      [250, 60],
+    ])
+    expect(current()).not.toHaveProperty('curved')
+  })
+
+  test('an arrow end still attaches to a shape after the arrow is bent', () => {
+    const box = createShape('rectangle', {
+      x: 300,
+      y: -50,
+      width: 100,
+      height: 100,
+    })
+    const arrow = createLinear('arrow', lineFromDrag([0, 0], [200, 0], false))
+    const editor = createEditor({ ...createDocument(), elements: [box, arrow] })
+    click(editor, [100, 0])
+    drag(editor, [100, 0], [100, 80])
+    drag(editor, [200, 0], [310, 0])
+    const bent = editor.store.getState().document.elements[1] as ArrowElement
+    expect(bent.endBinding?.elementId).toBe(box.id)
+    expect(bent.curved).toBe(true)
+  })
+
+  test('the pointer over a handle shows the point cursor', () => {
+    const { editor } = setupLine()
+    editor.pointerMove(1, [100, 0], false)
+    expect(editor.store.getState().hoverHandle).toBe('point')
   })
 })

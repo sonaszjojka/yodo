@@ -11,18 +11,14 @@ import {
   type LinearType,
   type ShapeType,
 } from '../document/create.ts'
-import type {
-  ArrowBinding,
-  Point,
-  YodoDocument,
-  YodoElement,
-} from '../document/types.ts'
+import type { Point, YodoDocument, YodoElement } from '../document/types.ts'
 import { appendPoint, startStroke } from '../geometry/freehand.ts'
 import { lineFromDrag } from '../geometry/line.ts'
 import {
   drawsBoxFrame,
-  endpointArrow,
-  endpointAt,
+  handleLine,
+  lineHandleAt,
+  type LineHandle,
   handleAt,
   selectionFrame,
   type SelectionFrame,
@@ -60,7 +56,13 @@ import {
   pasteElements,
   serializeClipboard,
 } from './clipboard.ts'
-import { bindableAt, dropEnd, moveEnd, snapToOutline } from './binding.ts'
+import {
+  applyHandleDrag,
+  bindableAt,
+  dropEnd,
+  snapToOutline,
+  type HandleDrag,
+} from './binding.ts'
 import { arrange, type LayerOrder } from './layers.ts'
 import {
   applyDefaults,
@@ -110,15 +112,11 @@ export interface EditorState {
   /** The selection handle under the pointer, for the cursor. */
   hoverHandle: HoverHandle | null
   /**
-   * The end of an arrow being dragged to a new place (ADR 0052). Previewed
+   * A point of a line or arrow being dragged to a new place, or the bend
+   * handle being pulled (ADR 0052, 0053). Previewed
    * like `move`; the document changes when the drag ends.
    */
-  endpoint: {
-    arrowId: string
-    end: 'start' | 'end'
-    point: Point
-    binding: ArrowBinding | null
-  } | null
+  endpoint: HandleDrag | null
   /** The id of the shape an arrow end would attach to now, for the highlight. */
   bindTarget: string | null
   /** The box of a box-select drag in progress, in world coordinates. */
@@ -148,7 +146,7 @@ export interface EditorState {
 
 /** Tools that draw an element by dragging. */
 /** What the pointer hovers on the selection, for the cursor. */
-export type HoverHandle = Handle | 'arrow-start' | 'arrow-end'
+export type HoverHandle = Handle | 'point'
 
 export type DrawingTool = ShapeType | LinearType | 'pencil' | 'note'
 export type Tool = DrawingTool | 'select' | 'hand' | 'text' | 'eraser'
@@ -563,8 +561,8 @@ export function createEditor(
     | {
         kind: 'endpoint'
         pointerId: number
-        arrowId: string
-        end: 'start' | 'end'
+        elementId: string
+        handle: LineHandle
         /** The element under the press, which a click (no drag) selects. */
         hitId: string | null
         start: Point
@@ -666,31 +664,41 @@ export function createEditor(
       : null
   }
 
-  /** The end handle of the one selected arrow at `point` (ADR 0052). */
-  function endpointUnder(point: Point) {
-    const arrow = endpointArrow(selectedNow(store.getState()))
-    if (!arrow) return null
+  /** The handle of the one selected line or arrow at `point` (ADR 0052, 0053). */
+  function lineHandleUnder(point: Point) {
+    const line = handleLine(selectedNow(store.getState()))
+    if (!line) return null
     const px = 1 / store.getState().viewport.zoom
-    const end = endpointAt(arrow, point, px)
-    return end ? { arrow, end } : null
+    const handle = lineHandleAt(line, point, px)
+    return handle ? { line, handle } : null
   }
 
   function updateEndpoint(g: Extract<SelectGesture, { kind: 'endpoint' }>) {
     const { document, viewport } = store.getState()
-    const arrow = document.elements.find((e) => e.id === g.arrowId)
-    if (arrow?.type !== 'arrow') return
-    const drop = dropEnd(
-      document.elements,
-      arrow,
-      g.end,
-      g.last,
-      HIT_TOLERANCE / viewport.zoom,
-    )
+    const line = document.elements.find((e) => e.id === g.elementId)
+    if (line?.type !== 'arrow' && line?.type !== 'line') return
+    const insert = g.handle.kind === 'bend'
+    const index = g.handle.kind === 'point' ? g.handle.index : 1
+    // Only an arrow's ends attach; bends and line points just follow.
+    const isEnd =
+      line.type === 'arrow' &&
+      !insert &&
+      (index === 0 || index === line.points.length - 1)
+    const drop = isEnd
+      ? dropEnd(
+          document.elements,
+          line,
+          index === 0 ? 'start' : 'end',
+          g.last,
+          HIT_TOLERANCE / viewport.zoom,
+        )
+      : { point: g.last, binding: null, target: null }
     store.setState((prev) => ({
       ...prev,
       endpoint: {
-        arrowId: g.arrowId,
-        end: g.end,
+        elementId: g.elementId,
+        index,
+        insert,
         point: drop.point,
         binding: drop.binding,
       },
@@ -731,13 +739,13 @@ export function createEditor(
       )
       // Handles come first: they may lie over another element. Only a drag
       // resizes; a click there still selects the element under it.
-      const end = endpointUnder(point)
-      if (end) {
+      const grabbedPoint = lineHandleUnder(point)
+      if (grabbedPoint) {
         gesture = {
           kind: 'endpoint',
           pointerId,
-          arrowId: end.arrow.id,
-          end: end.end,
+          elementId: grabbedPoint.line.id,
+          handle: grabbedPoint.handle,
           hitId,
           start: point,
           last: point,
@@ -833,9 +841,7 @@ export function createEditor(
           const { endpoint } = prev
           if (!endpoint) return prev
           const elements = prev.document.elements.map((e) =>
-            e.id === endpoint.arrowId && e.type === 'arrow'
-              ? moveEnd(e, endpoint.end, endpoint.point, endpoint.binding)
-              : e,
+            applyHandleDrag(e, endpoint),
           )
           return {
             ...prev,
@@ -1093,8 +1099,9 @@ export function createEditor(
     const world = pointerAt ? toWorld(pointerAt) : null
     let hover: HoverHandle | null = null
     if (tool === 'select' && world) {
-      const end = endpointUnder(world)
-      hover = end ? `arrow-${end.end}` : (handleUnder(world)?.handle ?? null)
+      hover = lineHandleUnder(world)
+        ? 'point'
+        : (handleUnder(world)?.handle ?? null)
     }
     // With the arrow tool, the shape under the pointer is where the arrow
     // would start attached (ADR 0052).

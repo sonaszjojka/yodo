@@ -75,6 +75,7 @@ function fakeRough() {
     polygon: vi.fn(),
     ellipse: vi.fn(),
     linearPath: vi.fn(),
+    curve: vi.fn(),
     path: vi.fn(),
   } satisfies SceneRough
 }
@@ -422,7 +423,7 @@ describe('arrow overlay (ADR 0052)', () => {
     height: 100,
   })
 
-  test('a lone selected arrow gets a handle on each end and no box or badge', () => {
+  test('a lone selected arrow gets a handle on each end, a mid-handle and no box or badge', () => {
     const ctx = fakeContext()
     renderScene(ctx, fakeRough(), [arrow], SURFACE, IDENTITY, {
       selected: [arrow],
@@ -430,9 +431,10 @@ describe('arrow overlay (ADR 0052)', () => {
     })
     expect(ctx.rect).not.toHaveBeenCalled()
     expect(ctx.fillText).not.toHaveBeenCalled()
-    expect(ctx.roundRect).toHaveBeenCalledTimes(2)
+    expect(ctx.roundRect).toHaveBeenCalledTimes(3)
     expect(ctx.roundRect).toHaveBeenCalledWith(6, 16, 8, 8, 4)
     expect(ctx.roundRect).toHaveBeenCalledWith(106, 66, 8, 8, 4)
+    expect(ctx.roundRect).toHaveBeenCalledWith(56, 41, 8, 8, 4)
   })
 
   test('the attach target is outlined along its own outline', () => {
@@ -1016,5 +1018,79 @@ describe('viewport culling (roadmap 2.12)', () => {
     })
 
     expect(ctx.stroke).toHaveBeenCalled()
+  })
+})
+
+describe('curved lines and arrows (ADR 0053)', () => {
+  const points: [number, number][] = [
+    [0, 0],
+    [60, 60],
+    [120, 0],
+  ]
+  const curved = (type: 'line' | 'arrow') => ({
+    ...createLinear(type, lineFromDrag([0, 0], [120, 0], false)),
+    x: 0,
+    y: 0,
+    width: 120,
+    height: 60,
+    points,
+    curved: true as const,
+  })
+
+  test('a curved line is drawn as a curve through its points, not a polyline', () => {
+    const rough = fakeRough()
+    renderScene(fakeContext(), rough, [curved('line')], SURFACE, IDENTITY)
+    expect(rough.curve).toHaveBeenCalledTimes(1)
+    // rough.js repeats the end points itself, so the points go in as they are.
+    expect(rough.curve.mock.calls[0]![0]).toEqual([
+      [0, 0],
+      [60, 60],
+      [120, 0],
+    ])
+    expect(rough.linearPath).not.toHaveBeenCalled()
+  })
+
+  test('the head follows the curve tangent and keeps the size of a straight head', () => {
+    const rough = fakeRough()
+    renderScene(fakeContext(), rough, [curved('arrow')], SURFACE, IDENTITY)
+    const [wingA, tip, wingB] = rough.linearPath.mock.calls[0]![0] as [
+      number,
+      number,
+    ][]
+    expect(tip).toEqual([120, 0])
+    // Wings are 20 long (ARROWHEAD_LENGTH), as for a straight segment of the
+    // same chord, not shrunk to a share of the control point's distance.
+    expect(Math.hypot(wingA![0] - 120, wingA![1])).toBeCloseTo(20)
+    expect(Math.hypot(wingB![0] - 120, wingB![1])).toBeCloseTo(20)
+    // The head points back along the tangent, toward (60, 60): the middle of
+    // the wings lies on that line from the tip.
+    const mid = [(wingA![0] + wingB![0]) / 2 - 120, (wingA![1] + wingB![1]) / 2]
+    expect(mid[0]).toBeCloseTo(-mid[1]!)
+    expect(mid[1]).toBeGreaterThan(0)
+  })
+
+  test('is not culled when only the curve reaches into view', () => {
+    const wide = {
+      ...curved('line'),
+      width: 10000,
+      height: 10000,
+      points: [
+        [0, 0],
+        [10000, 0],
+        [10000, 10000],
+        [0, 10000],
+      ] as [number, number][],
+      strokeWidth: 1,
+    }
+    const rough = fakeRough()
+    // The points' box ends at x = 10000, but the curve swings out to about 11250.
+    renderScene(
+      fakeContext(),
+      rough,
+      [wide],
+      { width: 30, height: 20, dpr: 1 },
+      { x: 11240, y: 4990, zoom: 1 },
+    )
+    expect(rough.curve).toHaveBeenCalledTimes(1)
   })
 })

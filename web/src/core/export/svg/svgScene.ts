@@ -13,6 +13,7 @@ import type {
   YodoElement,
 } from '../../document/types.ts'
 import { smoothPath } from '../../geometry/freehand.ts'
+import { headFrom, isCurved } from '../../geometry/curve.ts'
 import { arrowhead } from '../../geometry/line.ts'
 import {
   cornerRadius,
@@ -49,7 +50,13 @@ export interface SvgDeps {
   measure: Measure
   generator: Pick<
     RoughGenerator,
-    'rectangle' | 'polygon' | 'ellipse' | 'linearPath' | 'path' | 'toPaths'
+    | 'rectangle'
+    | 'polygon'
+    | 'ellipse'
+    | 'linearPath'
+    | 'curve'
+    | 'path'
+    | 'toPaths'
   >
   /** `@font-face` rules for the embedded fonts (see `fonts.ts`); may be empty. */
   fontCss: string
@@ -312,13 +319,17 @@ function elementNodes(
     case 'line':
     case 'arrow': {
       const points = element.points.map(([dx, dy]): Point => [x + dx, y + dy])
+      const curved = isCurved(element)
       const nodes = drawablePaths(
-        generator.linearPath(points, options),
+        curved
+          ? generator.curve(points, options)
+          : generator.linearPath(points, options),
         deps,
         element,
       )
-      const [from, to] = points.slice(-2)
-      if (!from || !to) return nodes
+      if (points.length < 2) return nodes
+      const to = points.at(-1)!
+      const from = headFrom(points, curved)
       const hasLength = from[0] !== to[0] || from[1] !== to[1]
       if (element.type === 'arrow' && element.endArrowhead && hasLength) {
         nodes.push(

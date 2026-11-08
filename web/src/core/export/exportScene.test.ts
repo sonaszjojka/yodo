@@ -47,6 +47,26 @@ describe('exportFrame', () => {
     })
   })
 
+  test('covers a curve that swings out of its points box (ADR 0053)', () => {
+    const curve = {
+      ...createLinear('line', {
+        x: 0,
+        y: 0,
+        width: 10000,
+        height: 10000,
+        points: [
+          [0, 0],
+          [10000, 0],
+          [10000, 10000],
+          [0, 10000],
+        ] as [number, number][],
+      }),
+      curved: true as const,
+    }
+    const frame = exportFrame([curve], measure)!
+    expect(frame.x + frame.width).toBeGreaterThan(10000 + EXPORT_PADDING + 100)
+  })
+
   test('is undefined with nothing to export', () => {
     expect(exportFrame([], measure)).toBeUndefined()
   })
@@ -137,6 +157,7 @@ describe('renderExport', () => {
       polygon: vi.fn(),
       ellipse: vi.fn(),
       linearPath: vi.fn(),
+      curve: vi.fn(),
       path: vi.fn(),
     }
     return { ctx, canvas, rough }

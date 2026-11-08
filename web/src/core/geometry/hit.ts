@@ -8,6 +8,7 @@ import {
   diamondPoints,
   roundedPolygonOutline,
 } from './rect.ts'
+import { flattenCurve, isCurved } from './curve.ts'
 
 /** Shortest distance from `p` to the segment `a`–`b`. */
 export function distanceToSegment(p: Point, a: Point, b: Point): number {
@@ -143,7 +144,12 @@ export function hitTest(
     case 'pencil': {
       // Open strokes have no inside, filled or not.
       const absolute = element.points.map(([dx, dy]): Point => [x + dx, y + dy])
-      return nearPolyline(point, absolute, reach)
+      // A curve is tested as a polyline within half the reach of it (ADR 0053).
+      return nearPolyline(
+        point,
+        isCurved(element) ? flattenCurve(absolute, reach / 2) : absolute,
+        reach,
+      )
     }
   }
 }

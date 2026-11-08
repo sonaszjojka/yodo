@@ -94,9 +94,15 @@ export interface ImageElement extends BaseElement {
   fileId: string
 }
 
+/**
+ * Format note (ADR 0053): `curved` is optional, so schemaVersion stays 1. With
+ * it and at least three points, the element is a smooth curve through every
+ * point instead of a polyline.
+ */
 export interface LineElement extends BaseElement {
   type: 'line'
   points: Point[]
+  curved?: true
 }
 
 /**
@@ -109,14 +115,15 @@ export interface ArrowBinding {
 }
 
 /**
- * Format note (ADR 0013, 0048): `startBinding` and `endBinding` are optional,
- * so schemaVersion stays 1. The arrow's own geometry is always kept in sync
+ * Format note (ADR 0013, 0048, 0053): `startBinding`, `endBinding` and
+ * `curved` are optional, so schemaVersion stays 1. The arrow's own geometry is always kept in sync
  * with its bindings.
  */
 export interface ArrowElement extends BaseElement {
   type: 'arrow'
   points: Point[]
   endArrowhead: 'arrow' | null
+  curved?: true
   startBinding?: ArrowBinding
   endBinding?: ArrowBinding
 }

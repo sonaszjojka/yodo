@@ -7,6 +7,7 @@ import type {
   Point,
   YodoElement,
 } from '../document/types.ts'
+import type { LinearElement } from '../geometry/frame.ts'
 import { hitTest } from '../geometry/hit.ts'
 import {
   boxCorners,
@@ -144,28 +145,66 @@ export function snapToOutline(
   }
 }
 
-/** The arrow with its first or last point put at `world`, geometry rebuilt. */
-function withEnd(
-  arrow: ArrowElement,
-  end: 'start' | 'end',
+/**
+ * `element` with its point `index` put at `world` (and, with `insert`, a new
+ * point inserted there first). The origin and size are recomputed so the points
+ * stay relative to the first one.
+ */
+function withPoint<T extends LinearElement>(
+  element: T,
+  index: number,
   world: Point,
-): ArrowElement {
-  const absolute = arrow.points.map(([dx, dy]): Point => [
-    arrow.x + dx,
-    arrow.y + dy,
+  insert = false,
+): T {
+  const absolute = element.points.map(([dx, dy]): Point => [
+    element.x + dx,
+    element.y + dy,
   ])
-  absolute[end === 'start' ? 0 : absolute.length - 1] = world
+  if (insert) absolute.splice(index, 0, world)
+  else absolute[index] = world
   const [x, y] = absolute[0]!
   const xs = absolute.map((p) => p[0])
   const ys = absolute.map((p) => p[1])
   return {
-    ...arrow,
+    ...element,
     x,
     y,
     width: Math.max(...xs) - Math.min(...xs),
     height: Math.max(...ys) - Math.min(...ys),
     points: absolute.map(([px, py]): Point => [px - x, py - y]),
   }
+}
+
+/**
+ * The line or arrow with point `index` moved to `world`. Bends stay; an arrow's
+ * ends go through `moveEnd` instead, to keep their bindings in sync (ADR 0053).
+ */
+export function movePoint<T extends LinearElement>(
+  element: T,
+  index: number,
+  world: Point,
+): T {
+  return withPoint(element, index, world)
+}
+
+/**
+ * The two-point line or arrow bent through `world`: a point is inserted there
+ * and the element becomes a curve (ADR 0053).
+ */
+export function bendLine<T extends LinearElement>(element: T, world: Point): T {
+  return { ...withPoint(element, 1, world, true), curved: true }
+}
+
+function withEnd<T extends LinearElement>(
+  element: T,
+  end: 'start' | 'end',
+  world: Point,
+): T {
+  return withPoint(
+    element,
+    end === 'start' ? 0 : element.points.length - 1,
+    world,
+  )
 }
 
 /**
@@ -185,6 +224,37 @@ export function moveEnd(
     end,
     world,
   )
+}
+
+/** A handle drag of a line or arrow in progress (ADR 0052, 0053). */
+export interface HandleDrag {
+  elementId: string
+  /** The point being moved; with `insert`, where the new point goes. */
+  index: number
+  /** The bend handle: insert a point and make the element a curve. */
+  insert: boolean
+  point: Point
+  /** The binding an arrow end gets, or null when it stays free. */
+  binding: ArrowBinding | null
+}
+
+/** `element` with the drag applied; any other element comes back as it is. */
+export function applyHandleDrag(
+  element: YodoElement,
+  drag: HandleDrag,
+): YodoElement {
+  if (element.id !== drag.elementId) return element
+  if (element.type !== 'arrow' && element.type !== 'line') return element
+  if (drag.insert) return bendLine(element, drag.point)
+  const last = element.points.length - 1
+  if (element.type === 'arrow' && (drag.index === 0 || drag.index === last))
+    return moveEnd(
+      element,
+      drag.index === 0 ? 'start' : 'end',
+      drag.point,
+      drag.binding,
+    )
+  return movePoint(element, drag.index, drag.point)
 }
 
 /** Where an arrow end dragged to `point` lands. */

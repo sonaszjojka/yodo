@@ -2,7 +2,8 @@
 // dialog's options are unit-tested without a canvas. The drawing itself is
 // `renderExport`, which reuses the editor's `renderScene`.
 import type { YodoElement } from '../document/types.ts'
-import { elementBounds, unionBounds, type Bounds } from '../geometry/rect.ts'
+import { drawnBounds } from '../geometry/curve.ts'
+import { unionBounds, type Bounds } from '../geometry/rect.ts'
 import { canvasColor, type Theme } from '../render/colors.ts'
 import {
   renderScene,
@@ -89,7 +90,7 @@ export function exportFrame(
 ): Bounds | undefined {
   const boxes = elements.flatMap((element) => {
     const label = labelTextBounds(element, measure)
-    return label ? [elementBounds(element), label] : [elementBounds(element)]
+    return label ? [drawnBounds(element), label] : [drawnBounds(element)]
   })
   const union = unionBounds(boxes)
   if (!union) return undefined

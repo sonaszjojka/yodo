@@ -128,21 +128,30 @@ function isBinding(value: unknown) {
 }
 
 /**
- * A valid element with its arrow bindings checked: a malformed binding is
- * removed and the arrow kept, since it still draws fine as a free arrow
- * (ADR 0048). Anything else comes back as it is.
+ * A valid element with its optional fields checked: a malformed arrow binding
+ * is removed (ADR 0048) and a `curved` that is not `true` is dropped (ADR
+ * 0053), keeping the element, since it still draws fine without them.
+ * Anything else comes back as it is.
  */
 export function sanitizeElement(element: YodoElement): YodoElement {
+  if (element.type === 'line') return sanitizeCurved(element)
   if (element.type !== 'arrow') return element
-  const { startBinding, endBinding, ...rest } = element
+  const { startBinding, endBinding, ...rest } = sanitizeCurved(element)
   const kept = {
     ...(isBinding(startBinding) ? { startBinding } : {}),
     ...(isBinding(endBinding) ? { endBinding } : {}),
   }
   const same =
     (startBinding === undefined) === !('startBinding' in kept) &&
-    (endBinding === undefined) === !('endBinding' in kept)
+    (endBinding === undefined) === !('endBinding' in kept) &&
+    rest.curved === element.curved
   return same ? element : { ...rest, ...kept }
+}
+
+function sanitizeCurved<T extends { curved?: true }>(element: T): T {
+  if (element.curved === undefined || element.curved === true) return element
+  const { curved: _dropped, ...rest } = element
+  return rest as T
 }
 
 /**

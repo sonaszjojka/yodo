@@ -3,7 +3,7 @@
 import type { YodoElement } from '../document/types.ts'
 import type { Bounds } from '../geometry/rect.ts'
 import type { EditorState } from './editor.ts'
-import { moveEnd } from './binding.ts'
+import { applyHandleDrag } from './binding.ts'
 import { moveElements, resizeElements, selectedOf } from './selection.ts'
 
 export interface Scene {
@@ -55,11 +55,7 @@ export function sceneOf(state: EditorState): Scene {
   if (move) shown = moveElements(shown, ids, move.dx, move.dy)
   if (resize) shown = resizeElements(shown, ids, resize)
   if (endpoint) {
-    shown = shown.map((e) =>
-      e.id === endpoint.arrowId && e.type === 'arrow'
-        ? moveEnd(e, endpoint.end, endpoint.point, endpoint.binding)
-        : e,
-    )
+    shown = shown.map((e) => applyHandleDrag(e, endpoint))
   }
   const elements = draft ? [...shown, draft] : [...shown]
   return {

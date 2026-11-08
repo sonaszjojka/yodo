@@ -14,11 +14,12 @@ import type {
 } from '../document/types.ts'
 import { adaptColor, type Theme } from './colors.ts'
 import { smoothPath } from '../geometry/freehand.ts'
+import { drawnBounds, headFrom, isCurved } from '../geometry/curve.ts'
 import { ARROWHEAD_LENGTH, arrowhead } from '../geometry/line.ts'
 import {
   drawsBoxFrame,
-  endpointArrow,
-  endpointsOf,
+  handleLine,
+  lineHandles,
   GAP,
   grow,
   HANDLE_SIZE,
@@ -28,7 +29,6 @@ import { bindOutline, isBindable } from '../editor/binding.ts'
 import {
   cornerRadius,
   diamondPoints,
-  elementBounds,
   roundedPolygonPath,
   type Bounds,
 } from '../geometry/rect.ts'
@@ -80,6 +80,7 @@ export interface SceneRough {
   polygon(...args: Parameters<RoughCanvas['polygon']>): unknown
   ellipse(...args: Parameters<RoughCanvas['ellipse']>): unknown
   linearPath(...args: Parameters<RoughCanvas['linearPath']>): unknown
+  curve(...args: Parameters<RoughCanvas['curve']>): unknown
   path(...args: Parameters<RoughCanvas['path']>): unknown
 }
 
@@ -333,10 +334,13 @@ function drawElement(
     case 'line':
     case 'arrow': {
       const points = element.points.map(([dx, dy]): Point => [x + dx, y + dy])
-      rough.linearPath(points, options)
+      const curved = isCurved(element)
+      if (curved) rough.curve(points, options)
+      else rough.linearPath(points, options)
       // Stored documents aren't validated, so fewer than two points can occur.
-      const [from, to] = points.slice(-2)
-      if (!from || !to) return
+      if (points.length < 2) return
+      const to = points.at(-1)!
+      const from = headFrom(points, curved)
       const hasLength = from[0] !== to[0] || from[1] !== to[1]
       if (element.type === 'arrow' && element.endArrowhead && hasLength) {
         // Same seed, so the head keeps its wobble from frame to frame too.
@@ -462,17 +466,19 @@ function drawOverlay(
   ctx.save()
   ctx.strokeStyle = colors.accent
   const frame = selectionFrame(overlay.selected, px)
-  const arrow = endpointArrow(overlay.selected)
-  if (arrow) {
-    // One selected arrow: handles on its two ends instead of a box (ADR 0052).
-    const ends = endpointsOf(arrow)
-    ctx.fillStyle = colors.handleFill
+  const line = handleLine(overlay.selected)
+  if (line) {
+    // One selected line or arrow: handles on its points instead of a box
+    // (ADR 0052, 0053). The mid-handle that bends a straight one is hollow.
     ctx.lineWidth = OUTLINE_WIDTH * px
-    for (const end of [ends.start, ends.end]) {
+    for (const { handle, at } of lineHandles(line)) {
       ctx.beginPath()
       const size = HANDLE_SIZE * px
-      ctx.roundRect(end[0] - size / 2, end[1] - size / 2, size, size, size / 2)
-      ctx.fill()
+      ctx.roundRect(at[0] - size / 2, at[1] - size / 2, size, size, size / 2)
+      if (handle.kind === 'point') {
+        ctx.fillStyle = colors.handleFill
+        ctx.fill()
+      }
       ctx.stroke()
     }
   }
@@ -572,7 +578,7 @@ function mayBeVisible(
   view: Bounds,
   zoom: number,
 ): boolean {
-  const box = withLabel(element, elementBounds(element))
+  const box = withLabel(element, drawnBounds(element))
   // rough.js bends a shape by a share of its size, so big shapes need more.
   const margin =
     ARROWHEAD_LENGTH +

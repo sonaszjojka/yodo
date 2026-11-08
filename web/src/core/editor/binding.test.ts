@@ -8,6 +8,8 @@ import {
   type BindableElement,
   dropEnd,
   moveEnd,
+  bendLine,
+  movePoint,
   followBindings,
   pointOf,
   remapBindings,
@@ -379,5 +381,60 @@ describe('dropEnd', () => {
     )
     expect(drop.binding).toBeNull()
     expect(drop.target).toBeNull()
+  })
+})
+
+describe('bending and moving points (ADR 0053)', () => {
+  const line = createLinear('line', lineFromDrag([10, 10], [110, 10], false))
+  const arrow = arrowBetween(
+    rect,
+    { ...rect, id: 'far', x: 300 },
+    [100, 50],
+    [300, 50],
+  )
+
+  test('bendLine inserts a point where it is dragged and makes a curve', () => {
+    const bent = bendLine(line, [60, 70])
+    expect(bent.curved).toBe(true)
+    expect(bent.points).toEqual([
+      [0, 0],
+      [50, 60],
+      [100, 0],
+    ])
+    expect(bent.x).toBe(10)
+  })
+
+  test('the first point stays the origin, so points can be negative', () => {
+    const bent = bendLine(line, [60, -40])
+    expect(bent).toMatchObject({ x: 10, y: 10, width: 100, height: 50 })
+    expect(bent.points[1]).toEqual([50, -50])
+  })
+
+  test('bending a bound arrow keeps its bindings and ends', () => {
+    const bent = bendLine(arrow, [200, 0])
+    expect(bent.startBinding).toEqual(arrow.startBinding)
+    expect(bent.endBinding).toEqual(arrow.endBinding)
+    expect(bent.points).toHaveLength(3)
+    expect(bent.points.at(-1)).toEqual(arrow.points.at(-1))
+  })
+
+  test('movePoint moves one point and recomputes the box', () => {
+    const bent = bendLine(line, [60, 70])
+    const moved = movePoint(bent, 1, [60, 10 - 30])
+    expect(moved.points).toEqual([
+      [0, 0],
+      [50, -30],
+      [100, 0],
+    ])
+    expect(moved).toMatchObject({ width: 100, height: 30, curved: true })
+  })
+
+  test('followBindings keeps the curve of an arrow that follows its shape', () => {
+    const bent = bendLine(arrow, [200, 0])
+    const [, , followed] = followBindings(
+      [rect, { ...rect, id: 'far', x: 300 }, bent],
+      new Set(['far']),
+    ) as ArrowElement[]
+    expect(followed!.curved).toBe(true)
   })
 })

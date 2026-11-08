@@ -3,9 +3,10 @@ import { createLinear, createShape } from '../document/create.ts'
 import { lineFromDrag } from './line.ts'
 import {
   drawsBoxFrame,
-  endpointAt,
-  endpointArrow,
   handleAt,
+  handleLine,
+  lineHandleAt,
+  lineHandles,
   selectionFrame,
 } from './frame.ts'
 
@@ -81,34 +82,65 @@ describe('handleAt', () => {
   })
 })
 
-describe('arrow endpoints', () => {
+describe('line and arrow handles', () => {
   const arrow = createLinear('arrow', lineFromDrag([10, 10], [110, 60], false))
   const line = createLinear('line', lineFromDrag([10, 10], [110, 60], false))
   const rect = createShape('rectangle', { x: 0, y: 0, width: 10, height: 10 })
 
-  test('only a lone arrow has endpoint handles and no box frame', () => {
-    expect(endpointArrow([arrow])).toBe(arrow)
+  test('only a lone line or arrow has point handles and no box frame', () => {
+    expect(handleLine([arrow])).toBe(arrow)
     expect(drawsBoxFrame([arrow])).toBe(false)
-    expect(endpointArrow([line])).toBeNull()
-    expect(drawsBoxFrame([line])).toBe(true)
-    expect(endpointArrow([arrow, rect])).toBeNull()
+    expect(handleLine([line])).toBe(line)
+    expect(drawsBoxFrame([line])).toBe(false)
+    expect(handleLine([arrow, rect])).toBeNull()
     expect(drawsBoxFrame([arrow, rect])).toBe(true)
-    expect(endpointArrow([{ ...arrow, points: [] }])).toBeNull()
+    expect(handleLine([rect])).toBeNull()
+    expect(handleLine([{ ...arrow, points: [] }])).toBeNull()
   })
 
-  test('a press within reach of an end grabs it', () => {
-    expect(endpointAt(arrow, [12, 12], 1)).toBe('start')
-    expect(endpointAt(arrow, [108, 62], 1)).toBe('end')
-    expect(endpointAt(arrow, [60, 35], 1)).toBeNull()
+  test('a two-point element has a mid-handle, a longer one does not', () => {
+    const kinds = lineHandles(line).map((s) => s.handle.kind)
+    expect(kinds).toEqual(['point', 'point', 'bend'])
+    expect(lineHandles(line)[2]!.at).toEqual([60, 35])
+    const bent = {
+      ...line,
+      curved: true as const,
+      points: [
+        [0, 0],
+        [50, 40],
+        [100, 50],
+      ] as [number, number][],
+    }
+    expect(lineHandles(bent).map((s) => s.handle.kind)).toEqual([
+      'point',
+      'point',
+      'point',
+    ])
+  })
+
+  test('a press within reach of a handle grabs it', () => {
+    expect(lineHandleAt(arrow, [12, 12], 1)).toEqual({
+      kind: 'point',
+      index: 0,
+    })
+    expect(lineHandleAt(line, [108, 62], 1)).toEqual({
+      kind: 'point',
+      index: 1,
+    })
+    expect(lineHandleAt(arrow, [60, 35], 1)).toEqual({ kind: 'bend' })
+    expect(lineHandleAt(arrow, [30, 20], 1)).toBeNull()
   })
 
   test('the reach is the same on screen at any zoom', () => {
     // 6 screen px: 6 world units at zoom 1, 3 at zoom 2.
-    expect(endpointAt(arrow, [15, 10], 1)).toBe('start')
-    expect(endpointAt(arrow, [15, 10], 0.5)).toBeNull()
+    expect(lineHandleAt(arrow, [15, 10], 1)).toEqual({
+      kind: 'point',
+      index: 0,
+    })
+    expect(lineHandleAt(arrow, [15, 10], 0.5)).toBeNull()
   })
 
-  test('on a tiny arrow the end wins', () => {
+  test('on a tiny element the last point wins, and points beat the mid-handle', () => {
     const tiny = {
       ...arrow,
       points: [
@@ -116,6 +148,9 @@ describe('arrow endpoints', () => {
         [1, 0],
       ] as [number, number][],
     }
-    expect(endpointAt(tiny, [10.5, 10], 1)).toBe('end')
+    expect(lineHandleAt(tiny, [10.5, 10], 1)).toEqual({
+      kind: 'point',
+      index: 1,
+    })
   })
 })

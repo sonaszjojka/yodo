@@ -25,8 +25,7 @@ describe('cursorFor', () => {
   })
 
   test('an arrow end handle shows the crosshair', () => {
-    expect(cursorFor(state({ hoverHandle: 'arrow-end' }))).toBe('crosshair')
-    expect(cursorFor(state({ hoverHandle: 'arrow-start' }))).toBe('crosshair')
+    expect(cursorFor(state({ hoverHandle: 'point' }))).toBe('crosshair')
   })
 
   test('holding space with the eraser still pans', () => {

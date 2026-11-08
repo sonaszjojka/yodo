@@ -221,6 +221,45 @@ describe('rough shapes', () => {
   })
 })
 
+describe('curved lines and arrows (ADR 0053)', () => {
+  const curved = (type: 'line' | 'arrow') => ({
+    ...createLinear(
+      type,
+      {
+        x: 0,
+        y: 0,
+        width: 120,
+        height: 60,
+        points: [
+          [0, 0],
+          [60, 60],
+          [120, 0],
+        ] as [number, number][],
+      },
+      4,
+    ),
+    curved: true as const,
+    roughness: 0,
+  })
+  const d = (e: YodoElement) =>
+    all(treeOf([e], { background: false }), 'path')[0]!.attrs.d as string
+
+  test('a curved line passes through its middle point and differs from the polyline', () => {
+    const straight = { ...curved('line'), curved: undefined }
+    expect(d(curved('line'))).toContain('60 60')
+    expect(d(curved('line'))).not.toBe(d(straight))
+  })
+
+  test('the head of a curved arrow is as big as a straight arrow with the same chord', () => {
+    const paths = all(treeOf([curved('arrow')], { background: false }), 'path')
+    expect(paths.length).toBeGreaterThan(1)
+    const head = paths.at(-1)!.attrs.d as string
+    const numbers = head.match(/-?\d+(\.\d+)?/g)!.map(Number)
+    // Some wing coordinate lies close to 20 units from the tip (x = 120).
+    expect(Math.max(...numbers.map((n) => Math.abs(n)))).toBeGreaterThan(90)
+  })
+})
+
 describe('pencil', () => {
   test('is a smoothed path with round caps and no wobble', () => {
     const pencil = createPencil(

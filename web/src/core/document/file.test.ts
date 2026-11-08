@@ -2,7 +2,8 @@ import { describe, expect, test } from 'vitest'
 import v1Fixture from './fixtures/v1-every-element.json?raw'
 import v1Export from './fixtures/v1-export.yodo?raw'
 import { parseYodoFile, serializeYodoFile, type YodoFileEntry } from './file.ts'
-import { createImage } from './create.ts'
+import { createImage, createLinear } from './create.ts'
+import { lineFromDrag } from '../geometry/line.ts'
 import { DocumentError, type Migrations } from './migrate.ts'
 import type { YodoDocument } from './types.ts'
 
@@ -33,6 +34,23 @@ describe('parseYodoFile bindings', () => {
     }
     const { document } = parseYodoFile(JSON.stringify(broken))
     expect(document.elements).toEqual([arrow])
+  })
+})
+
+describe('curves', () => {
+  test('a curved line and arrow survive a save and load (ADR 0053)', () => {
+    const bent = (type: 'line' | 'arrow') => ({
+      ...createLinear(type, lineFromDrag([0, 0], [100, 0], false)),
+      points: [
+        [0, 0],
+        [50, 40],
+        [100, 0],
+      ] as [number, number][],
+      curved: true as const,
+    })
+    const doc = { ...everyElement, elements: [bent('line'), bent('arrow')] }
+    const parsed = parseYodoFile(serializeYodoFile(doc, {}))
+    expect(parsed.document.elements).toEqual(doc.elements)
   })
 })
 

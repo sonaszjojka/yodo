@@ -362,3 +362,38 @@ describe('hasLosses', () => {
     expect(hasLosses((await convert(shapes)).summary)).toBe(true)
   })
 })
+
+describe('curves (ADR 0053)', () => {
+  function withLine(
+    type: 'line' | 'arrow',
+    points: number[][],
+    roundness: unknown,
+  ) {
+    const doc = JSON.parse(shapes)
+    const template = doc.elements.find(
+      (e: { type: string }) => e.type === 'line',
+    )
+    doc.elements = [{ ...template, type, points, roundness }]
+    return convertExcalidraw(doc, options())
+  }
+  const bent = [
+    [0, 0],
+    [50, 40],
+    [100, 0],
+  ]
+
+  test.each(['line', 'arrow'] as const)(
+    'a round %s with a bend imports as curved',
+    async (type) => {
+      const { document } = await withLine(type, bent, { type: 2 })
+      expect(document.elements[0]).toMatchObject({ type, curved: true })
+    },
+  )
+
+  test('a sharp one, or a round one with two points, stays straight', async () => {
+    const sharp = await withLine('arrow', bent, null)
+    expect(sharp.document.elements[0]).not.toHaveProperty('curved')
+    const straight = await withLine('arrow', bent.slice(0, 2), { type: 2 })
+    expect(straight.document.elements[0]).not.toHaveProperty('curved')
+  })
+})
