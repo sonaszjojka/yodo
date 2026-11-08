@@ -58,7 +58,8 @@ Why Yodo is built the way it is. See [0001](0001-record-architecture-decisions.m
 | [0045](0045-folders-as-metadata-with-a-folder-repository.md) | Folders are metadata outside the document, behind a `FolderRepository` | Accepted |
 | [0046](0046-trash-as-a-deleted-at-timestamp-on-the-summary.md) | Trash is a `deletedAt` timestamp on the drawing summary; folder delete trashes; 30-day client-side purge | Accepted |
 | [0047](0047-search-index-in-the-repository-matched-on-the-client.md) | Search: an index in the repository (`searchIndex()`, `X-Yodo-Search-Text` header), matched on the client | Accepted |
-| [0048](0048-attached-arrows-as-bindings-on-the-arrow.md) | Attached arrows: optional `startBinding`/`endBinding` (`elementId` + box `ratio`) on the arrow, geometry kept in sync | Accepted |
+| [0048](0048-attached-arrows-as-bindings-on-the-arrow.md) | Attached arrows: optional `startBinding`/`endBinding` (`elementId` + box `ratio`) on the arrow, geometry kept in sync | Accepted (re-attaching clause superseded by [0052](0052-arrow-endpoint-handles-and-reattaching.md)) |
 | [0049](0049-releases-semver-tags-publish-the-image.md) | Releases: a semver tag on `main` publishes the versioned image; `latest` is the newest release, `edge` is `main` | Accepted |
 | [0050](0050-drawing-tools-stay-active.md) | Drawing tools stay active after each element; `Esc` or `V` returns to Select; the new element is not selected | Accepted |
 | [0051](0051-text-tool-always-creates-free-text.md) | The text tool always creates free text; labels are edited with the Select tool (double-click or Enter); amends 0026 | Accepted |
+| [0052](0052-arrow-endpoint-handles-and-reattaching.md) | Arrow endpoint handles: drag an end of a selected arrow to attach or detach it; the target shape is highlighted; amends 0048 | Accepted |
