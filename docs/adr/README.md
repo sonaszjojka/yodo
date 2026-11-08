@@ -36,7 +36,7 @@ Why Yodo is built the way it is. See [0001](0001-record-architecture-decisions.m
 | [0023](0023-undo-redo-document-snapshots.md) | Undo/redo with snapshots of the immutable document | Accepted |
 | [0024](0024-pencil-strokes-smoothed-canvas-path.md) | Pencil strokes drawn as a smoothed Canvas path, not with rough.js | Accepted |
 | [0025](0025-ship-fonts-with-fontsource.md) | Fonts as Fontsource npm packages bundled by Vite | Accepted |
-| [0026](0026-shape-text-as-label-field.md) | Text inside a shape is a `label` field on the shape | Accepted |
+| [0026](0026-shape-text-as-label-field.md) | Text inside a shape is a `label` field on the shape | Accepted (text-tool clause superseded by [0051](0051-text-tool-always-creates-free-text.md)) |
 | [0027](0027-edit-text-in-textarea-overlay.md) | Edit text in an HTML textarea over the canvas | Accepted |
 | [0028](0028-ui-icons-phosphor-react.md) | UI icons from the `@phosphor-icons/react` package | Accepted |
 | [0029](0029-storage-layer-in-web-src-storage.md) | Storage code in its own `web/src/storage` layer | Accepted |
@@ -61,3 +61,4 @@ Why Yodo is built the way it is. See [0001](0001-record-architecture-decisions.m
 | [0048](0048-attached-arrows-as-bindings-on-the-arrow.md) | Attached arrows: optional `startBinding`/`endBinding` (`elementId` + box `ratio`) on the arrow, geometry kept in sync | Accepted |
 | [0049](0049-releases-semver-tags-publish-the-image.md) | Releases: a semver tag on `main` publishes the versioned image; `latest` is the newest release, `edge` is `main` | Accepted |
 | [0050](0050-drawing-tools-stay-active.md) | Drawing tools stay active after each element; `Esc` or `V` returns to Select; the new element is not selected | Accepted |
+| [0051](0051-text-tool-always-creates-free-text.md) | The text tool always creates free text; labels are edited with the Select tool (double-click or Enter); amends 0026 | Accepted |

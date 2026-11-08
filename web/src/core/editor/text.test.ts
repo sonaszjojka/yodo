@@ -4,6 +4,7 @@ import {
   BUILT_IN_STYLE,
   createDocument,
   createLinear,
+  createNote,
   createShape,
   createText,
 } from '../document/create.ts'
@@ -16,7 +17,7 @@ import {
   LINE_HEIGHT,
 } from '../text/layout.ts'
 import { createEditor, type Editor } from './editor.ts'
-import { commitEdit, editBox } from './text.ts'
+import { commitEdit, editBox, freeTextAt } from './text.ts'
 
 function setup(elements: YodoElement[] = []) {
   return createEditor({ ...createDocument(), elements })
@@ -128,7 +129,7 @@ describe('the text tool', () => {
     })
   })
 
-  test('a click inside a transparent shape edits its label', () => {
+  test('a click inside a transparent shape starts a new free text, not a label (ADR 0051)', () => {
     const rect = createShape('rectangle', {
       x: 0,
       y: 0,
@@ -139,10 +140,45 @@ describe('the text tool', () => {
     editor.setTool('text')
     click(editor, [100, 50])
 
-    expect(state(editor).editing).toEqual({
-      target: 'label',
-      id: rect.id,
-      text: '',
+    expect(state(editor).editing).toMatchObject({ target: 'new', text: '' })
+  })
+
+  test('over a filled shape and over a note it starts a new free text', () => {
+    const filled = {
+      ...createShape('rectangle', { x: 0, y: 0, width: 200, height: 100 }),
+      backgroundColor: '#FFD966',
+    }
+    const note = createNote({ x: 400, y: 0, width: 200, height: 200 })
+    const editor = setup([filled, note])
+    editor.setTool('text')
+    click(editor, [100, 50])
+    expect(state(editor).editing?.target).toBe('new')
+    editor.commitText()
+    click(editor, [note.x + 10, note.y + 10])
+    expect(state(editor).editing?.target).toBe('new')
+  })
+
+  test('free text placed over a shape sits above it, keeps the shape label-free, and a second click edits it', () => {
+    const rect = createShape('rectangle', {
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+    })
+    const editor = setup([rect])
+    editor.setTool('text')
+    click(editor, [60, 50])
+    type(editor, 'Hello')
+    editor.commitText()
+
+    const [shape, text] = elements(editor)
+    expect(shape).toEqual(rect)
+    expect(text).toMatchObject({ type: 'text', text: 'Hello' })
+
+    click(editor, [70, 50])
+    expect(state(editor).editing).toMatchObject({
+      target: 'text',
+      id: text!.id,
     })
   })
 
@@ -552,5 +588,85 @@ describe('arrows attached to a shape whose label grows', () => {
     const [grown, moved] = document.elements as [typeof shape, typeof arrow]
     expect(grown.height).toBeGreaterThan(100)
     expect(moved.y).toBeCloseTo(grown.y + grown.height, 5)
+  })
+})
+
+describe('freeTextAt (text tool target)', () => {
+  const text = { ...createText([50, 40], 1), text: 'Hi', width: 30, height: 25 }
+  const rect = createShape('rectangle', { x: 0, y: 0, width: 200, height: 100 })
+
+  test('returns a text under the point, even below a later transparent shape', () => {
+    expect(freeTextAt([text, rect], [60, 50], 5)).toBe(text)
+  })
+
+  test('returns null on a shape, labelled or not, and on empty canvas', () => {
+    const labelled = {
+      ...rect,
+      label: {
+        text: 'A',
+        fontFamily: 'hand',
+        fontSize: 20,
+        textAlign: 'center',
+      },
+    } as typeof rect
+    expect(freeTextAt([labelled], [100, 50], 5)).toBeNull()
+    expect(freeTextAt([rect], [0, 50], 5)).toBeNull()
+    expect(freeTextAt([rect], [500, 500], 5)).toBeNull()
+  })
+})
+
+describe('editSelected (Enter on the selection)', () => {
+  const rect = createShape('rectangle', { x: 0, y: 0, width: 200, height: 100 })
+
+  function selected(...els: YodoElement[]) {
+    const editor = setup(els)
+    editor.selectAll()
+    return editor
+  }
+
+  test('edits the label of one selected shape', () => {
+    const editor = selected(rect)
+    editor.editSelected()
+    expect(state(editor).editing).toEqual({
+      target: 'label',
+      id: rect.id,
+      text: '',
+    })
+  })
+
+  test('edits one selected free text', () => {
+    const text = {
+      ...createText([0, 0], 1),
+      text: 'old',
+      width: 33,
+      height: 25,
+    }
+    const editor = selected(text)
+    editor.editSelected()
+    expect(state(editor).editing).toEqual({
+      target: 'text',
+      id: text.id,
+      text: 'old',
+    })
+  })
+
+  test('does nothing for an arrow, several elements, no selection or another tool', () => {
+    const arrow = createLinear('arrow', lineFromDrag([0, 0], [300, 300], false))
+    const arrowEditor = selected(arrow)
+    arrowEditor.editSelected()
+    expect(state(arrowEditor).editing).toBeNull()
+
+    const many = selected(rect, arrow)
+    many.editSelected()
+    expect(state(many).editing).toBeNull()
+
+    const none = setup([rect])
+    none.editSelected()
+    expect(state(none).editing).toBeNull()
+
+    const other = selected(rect)
+    other.setTool('rectangle')
+    other.editSelected()
+    expect(state(other).editing).toBeNull()
   })
 })

@@ -5,6 +5,7 @@ import {
   handleClipboardEvent,
   handleEditShortcut,
   isEditable,
+  isInteractiveControl,
   isExportShortcut,
   isInsideDialog,
   type ClipboardLike,
@@ -252,4 +253,20 @@ describe('isExportShortcut', () => {
   ])('is not %o', (change) => {
     expect(isExportShortcut({ ...base, ...change })).toBe(false)
   })
+})
+
+test('isInteractiveControl recognises buttons, links and widgets', () => {
+  const el = (tagName: string, role?: string) =>
+    ({
+      tagName,
+      closest: (selector: string) =>
+        selector.includes('[role=button]') && role === 'button' ? {} : null,
+    }) as unknown as EventTarget
+  expect(isInteractiveControl(el('BUTTON'))).toBe(true)
+  expect(isInteractiveControl(el('A'))).toBe(true)
+  expect(isInteractiveControl(el('SELECT'))).toBe(true)
+  expect(isInteractiveControl(el('DIV', 'button'))).toBe(true)
+  expect(isInteractiveControl(el('CANVAS'))).toBe(false)
+  expect(isInteractiveControl(el('BODY'))).toBe(false)
+  expect(isInteractiveControl(null)).toBe(false)
 })

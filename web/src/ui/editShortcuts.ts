@@ -20,6 +20,29 @@ export function isEditable(target: EventTarget | null) {
 }
 
 /**
+ * A button, link or other widget. Enter on one activates it, so the canvas
+ * must not also use that Enter (ADR 0051). The canvas itself and the page body
+ * are not controls.
+ */
+export function isInteractiveControl(target: EventTarget | null) {
+  const element = target as {
+    tagName?: string
+    closest?: (selector: string) => unknown
+  } | null
+  if (!element) return false
+  if (
+    element.tagName === 'BUTTON' ||
+    element.tagName === 'A' ||
+    element.tagName === 'SELECT' ||
+    element.tagName === 'SUMMARY'
+  )
+    return true
+  return !!element.closest?.(
+    '[role=button],[role=menuitem],[role=radio],[role=tab],[role=switch],[role=checkbox]',
+  )
+}
+
+/**
  * Whether an event comes from inside an open modal dialog. The editor listens
  * on `window`, so without this a key or paste in the dialog would also edit
  * the drawing behind it.

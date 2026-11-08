@@ -82,6 +82,34 @@ test('draw shapes, label one, attach an arrow, move, undo and redo', async ({
     )
   })
 
+  await test.step('the Text tool makes free text over the rectangle, not a label', async () => {
+    await tool(page, 'Text').click()
+    await page.locator('canvas.canvas').click({ position: { x: 200, y: 190 } })
+    await page.getByRole('textbox', { name: 'Text' }).fill('Over')
+    await page.keyboard.press('Escape')
+    const elements = await saved(3)
+    expect(elements.find((e) => e.type === 'text')?.text).toBe('Over')
+    expect(elements.find((e) => e.type === 'rectangle')?.label?.text).toBe(
+      'Plan',
+    )
+    // Undo removes just the free text, so the later steps see two shapes.
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('ControlOrMeta+z')
+    await saved(2)
+  })
+
+  await test.step('Enter on the selected rectangle edits its label', async () => {
+    await tool(page, 'Select').click()
+    // The rectangle has no fill: click its left edge to select it.
+    await page.locator('canvas.canvas').click({ position: { x: 150, y: 225 } })
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('textbox', { name: 'Text' })).toHaveValue(
+      'Plan',
+    )
+    await page.keyboard.press('Escape')
+    await saved(2)
+  })
+
   let before: ReturnType<typeof arrowEnds>
   let rectangleId: string
   await test.step('draw an arrow from the rectangle to the ellipse', async () => {

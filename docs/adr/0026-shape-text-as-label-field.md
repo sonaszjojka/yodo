@@ -1,6 +1,6 @@
 # 0026. Store text inside a shape as a `label` field on the shape
 
-- Status: Accepted
+- Status: Accepted (the clause "or clicking it with the text tool" is superseded by [0051](0051-text-tool-always-creates-free-text.md))
 - Date: 2026-11-02
 
 ## Context
