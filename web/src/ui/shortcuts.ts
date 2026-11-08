@@ -44,6 +44,10 @@ export const SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
       { action: 'Export image', keys: [['Shift', MOD, 'E']] },
       { action: 'Delete', keys: [['Delete'], ['Backspace']] },
       { action: 'Cancel the gesture or selection', keys: [['Esc']] },
+      {
+        action: 'Edit the label or text of the selected element',
+        keys: [['Enter']],
+      },
       { action: 'Finish editing text', keys: [['Esc'], [MOD, 'Enter']] },
       {
         action: 'Draw a square, circle or snapped line (hold)',

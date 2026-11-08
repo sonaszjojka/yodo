@@ -14,6 +14,7 @@ import {
   handleEditShortcut,
   isEditable,
   isInsideDialog,
+  isInteractiveControl,
 } from './editShortcuts.ts'
 import { pointerSamples } from './pointerSamples.ts'
 import { TOOL_KEYS } from './tools.ts'
@@ -144,6 +145,16 @@ export function Canvas({
         // Backspace would otherwise navigate back in some browsers.
         event.preventDefault()
         editor.deleteSelected()
+      } else if (
+        event.key === 'Enter' &&
+        !mod &&
+        !event.altKey &&
+        !event.shiftKey &&
+        !event.repeat &&
+        !isInteractiveControl(event.target)
+      ) {
+        // Edit the selected shape's label or text (ADR 0051).
+        if (editor.editSelected()) event.preventDefault()
       } else if (handleEditShortcut(editor, event)) {
         // Select all (Ctrl/Cmd+A) or duplicate (Ctrl/Cmd+D).
       } else if (mod && !event.altKey && event.key.toLowerCase() === 'z') {

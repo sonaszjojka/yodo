@@ -60,7 +60,14 @@ import {
   sharedStyle,
   type StylePatch,
 } from './style.ts'
-import { commitEdit, editFor, textTargetAt, type TextEdit } from './text.ts'
+import {
+  commitEdit,
+  editFor,
+  freeTextAt,
+  isLabelled,
+  textTargetAt,
+  type TextEdit,
+} from './text.ts'
 
 export interface EditorState {
   document: YodoDocument
@@ -271,6 +278,8 @@ export interface Editor {
    * starts a new text there on empty space (a line or stroke does nothing).
    */
   doubleClick(screen: Point): void
+  /** Enter on the selection: edit the label of one selected shape, or one selected text (ADR 0051). Returns whether an edit started. */
+  editSelected(): boolean
   /** The textarea's value changed; not a document change until commit. */
   setEditingText(text: string): void
   /**
@@ -1096,7 +1105,11 @@ export function createEditor(
         if (textPress.pointerId !== pointerId) return
         const { point } = textPress
         textPress = null
-        startEdit(point)
+        const { document, viewport } = store.getState()
+        startEdit(
+          point,
+          freeTextAt(document.elements, point, HIT_TOLERANCE / viewport.zoom),
+        )
       } else if (pan) {
         if (pan.pointerId === pointerId) endPan()
       } else {
@@ -1303,6 +1316,17 @@ export function createEditor(
         if (hitId) return
       }
       startEdit(point, target)
+    },
+    editSelected() {
+      const { tool, editing, document, selectedIds } = store.getState()
+      if (tool !== 'select' || editing || pan || drag || gesture || erase)
+        return false
+      if (selectedIds.length !== 1) return false
+      const element = document.elements.find((e) => e.id === selectedIds[0])
+      if (!element || (element.type !== 'text' && !isLabelled(element)))
+        return false
+      startEdit([0, 0], element)
+      return true
     },
     setEditingText(text) {
       store.setState((prev) =>

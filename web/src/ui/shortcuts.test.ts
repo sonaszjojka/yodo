@@ -72,6 +72,7 @@ test('lists the non-tool shortcuts the app implements', () => {
     'Export image',
     'Delete',
     'Cancel the gesture or selection',
+    'Edit the label or text of the selected element',
     'Finish editing text',
     'Draw a square, circle or snapped line (hold)',
     'Keep proportions while resizing (hold)',
@@ -85,7 +86,10 @@ test('lists the non-tool shortcuts the app implements', () => {
 })
 
 test('the contextual keys are searchable', () => {
-  expect(actions('enter')).toEqual(['Finish editing text'])
+  expect(actions('enter')).toEqual([
+    'Edit the label or text of the selected element',
+    'Finish editing text',
+  ])
   expect(actions('esc')).toEqual([
     'Cancel the gesture or selection',
     'Finish editing text',

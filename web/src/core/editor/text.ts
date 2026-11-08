@@ -82,6 +82,25 @@ export function textTargetAt(
   return null
 }
 
+/**
+ * The text a text-tool click at `point` edits (ADR 0051). The text tool never
+ * edits a shape's label: a click on a shape, labelled or not, is a new text.
+ * Same real-hit rule as `textTargetAt`, so a text under a later transparent
+ * shape stays editable.
+ */
+export function freeTextAt(
+  elements: readonly YodoElement[],
+  point: Point,
+  tolerance: number,
+): TextElement | null {
+  for (let i = elements.length - 1; i >= 0; i--) {
+    const element = elements[i]!
+    if (!hitTest(element, point, tolerance)) continue
+    return element.type === 'text' ? element : null
+  }
+  return null
+}
+
 /** The edit a click on `target` starts, or a new text at `point` with no target. */
 export function editFor(
   target: TextElement | LabelledShape | null,

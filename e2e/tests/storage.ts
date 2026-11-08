@@ -10,6 +10,7 @@ export interface StoredElement {
   width: number
   height: number
   label?: { text: string }
+  text?: string
   points?: [number, number][]
   startBinding?: { elementId: string }
   endBinding?: { elementId: string }
