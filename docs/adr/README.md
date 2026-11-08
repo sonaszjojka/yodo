@@ -63,3 +63,4 @@ Why Yodo is built the way it is. See [0001](0001-record-architecture-decisions.m
 | [0050](0050-drawing-tools-stay-active.md) | Drawing tools stay active after each element; `Esc` or `V` returns to Select; the new element is not selected | Accepted |
 | [0051](0051-text-tool-always-creates-free-text.md) | The text tool always creates free text; labels are edited with the Select tool (double-click or Enter); amends 0026 | Accepted |
 | [0052](0052-arrow-endpoint-handles-and-reattaching.md) | Arrow endpoint handles: drag an end of a selected arrow to attach or detach it; the target shape is highlighted; amends 0048 | Accepted |
+| [0053](0053-bendable-lines-and-arrows.md) | Bendable lines and arrows: optional `curved` flag + extra points, a Catmull-Rom curve through every point; amends 0052 | Accepted |
