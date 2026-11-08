@@ -40,7 +40,6 @@ import {
 } from './homeSearch.ts'
 import { createCanvasMeasure } from './measure.ts'
 import { navigate, routeHash } from './route.ts'
-import { SettingsMenu } from './SettingsMenu.tsx'
 import { withoutDrawing } from './homeTrash.ts'
 import { Sidebar } from './Sidebar.tsx'
 import { TrashView } from './TrashView.tsx'
@@ -582,16 +581,13 @@ export function HomeView({
         onDeleteFolder={onDeleteFolder}
       />
       <div className="home-content">
-        <header className="home-header">
-          <SettingsMenu />
-        </header>
         <main className="home-main">
           <div className="home-title-row">
             <h1>
               {inTrash ? 'Trash' : current ? current.name : 'All drawings'}
             </h1>
             {!inTrash && (
-              <>
+              <div className="home-toolbar">
                 <input
                   type="search"
                   className="home-search"
@@ -642,7 +638,7 @@ export function HomeView({
                     ))}
                   </select>
                 </label>
-              </>
+              </div>
             )}
           </div>
           {message && (

@@ -2,7 +2,6 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { expect, test, vi } from 'vitest'
 import { ShortcutsButton, ShortcutsDialog } from './ShortcutsDialog.tsx'
 import { SHORTCUT_GROUPS } from './shortcuts.ts'
-import { SettingsMenu } from './SettingsMenu.tsx'
 
 test('an open dialog lists every group with its keys and a search box', () => {
   const html = renderToStaticMarkup(<ShortcutsDialog open onClose={vi.fn()} />)
@@ -31,11 +30,4 @@ test('the bottom-bar button is labelled with its key', () => {
   const html = renderToStaticMarkup(<ShortcutsButton onClick={vi.fn()} />)
   expect(html).toContain('aria-label="Keyboard shortcuts"')
   expect(html).toContain('title="Keyboard shortcuts (?)"')
-})
-
-test('Settings offers Keyboard shortcuts once opened', () => {
-  // Closed menu: the entry is not in the page yet, only the dialog shell is.
-  const html = renderToStaticMarkup(<SettingsMenu />)
-  expect(html).not.toContain('role="menuitem"')
-  expect(html).toContain('<dialog')
 })

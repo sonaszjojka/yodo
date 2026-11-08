@@ -23,7 +23,8 @@ test('lists All drawings with its count, then the folders by name, then Trash', 
   const html = render()
   expect(html).toMatch(/href="#\/"[^>]*aria-current="page"/)
   expect(html).toContain('>5</span>')
-  const names = [...html.matchAll(/sidebar-link-name">([^<]*)</g)].map(
+  const nav = html.match(/<nav[\s\S]*<\/nav>/)![0]
+  const names = [...nav.matchAll(/sidebar-link-name">([^<]*)</g)].map(
     (m) => m[1],
   )
   expect(names).toEqual(['All drawings', 'archive', 'Work', 'Trash'])

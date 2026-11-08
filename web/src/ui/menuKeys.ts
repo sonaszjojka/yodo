@@ -23,3 +23,24 @@ export function nextMenuIndex(
       return null
   }
 }
+
+/**
+ * Which radio a key selects in a radio group of `count` (WAI-ARIA radio
+ * group: arrows move and wrap, vertical ones too), or null for other keys.
+ */
+export function nextRadioIndex(
+  key: string,
+  index: number,
+  count: number,
+): number | null {
+  switch (key) {
+    case 'ArrowRight':
+    case 'ArrowDown':
+      return (index + 1) % count
+    case 'ArrowLeft':
+    case 'ArrowUp':
+      return (index - 1 + count) % count
+    default:
+      return null
+  }
+}

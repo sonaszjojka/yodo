@@ -56,6 +56,30 @@ describe('HomeView', () => {
     )
   })
 
+  test('puts the theme control in the sidebar and no Settings button', () => {
+    const html = render()
+
+    expect(html).not.toContain('aria-label="Settings"')
+    expect(html).not.toContain('home-header')
+    expect(html).toMatch(/<aside[\s\S]*role="radiogroup"[\s\S]*<\/aside>/)
+  })
+
+  test('lays out search, Import file and Sort by in one toolbar under the title', () => {
+    for (const html of [render(), render({ query: 'alpha' })]) {
+      const toolbar = html.match(
+        /class="home-toolbar">[\s\S]*?<\/label><\/div>/,
+      )
+      expect(toolbar?.[0]).toContain('type="search"')
+      expect(toolbar?.[0]).toContain('Import file')
+      expect(toolbar?.[0]).toContain('Sort by')
+      expect(html.indexOf('</h1>')).toBeLessThan(html.indexOf('home-toolbar'))
+    }
+  })
+
+  test('has no toolbar in Trash', () => {
+    expect(render({ view: 'trash' })).not.toContain('home-toolbar')
+  })
+
   test('starts the grid with the New drawing tile', () => {
     const html = render()
 

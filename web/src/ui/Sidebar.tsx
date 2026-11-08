@@ -10,6 +10,7 @@ import { FolderGlyph } from './FolderGlyph.tsx'
 import { Logo } from './Logo.tsx'
 import { isOutside } from './outsidePress.ts'
 import { routeHash } from './route.ts'
+import { SidebarFooter } from './SidebarFooter.tsx'
 
 export interface SidebarProps {
   folders: readonly Folder[]
@@ -111,6 +112,7 @@ export function Sidebar({
           )}
         </a>
       </nav>
+      <SidebarFooter />
       <FolderDialog
         open={open && dialog?.kind !== 'delete'}
         folder={editing}

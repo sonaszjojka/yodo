@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { nextMenuIndex } from './menuKeys.ts'
+import { nextMenuIndex, nextRadioIndex } from './menuKeys.ts'
 
 describe('nextMenuIndex', () => {
   test.each([
@@ -15,5 +15,21 @@ describe('nextMenuIndex', () => {
 
   test('other keys move nothing', () => {
     expect(nextMenuIndex('a', 1, 4)).toBeNull()
+  })
+})
+
+describe('nextRadioIndex', () => {
+  test.each([
+    ['ArrowRight', 0, 1],
+    ['ArrowRight', 2, 0],
+    ['ArrowDown', 1, 2],
+    ['ArrowLeft', 0, 2],
+    ['ArrowUp', 2, 1],
+  ])('%s from %i of 3 goes to %i', (key, from, to) => {
+    expect(nextRadioIndex(key, from, 3)).toBe(to)
+  })
+
+  test('ignores other keys', () => {
+    expect(nextRadioIndex('Enter', 1, 3)).toBeNull()
   })
 })

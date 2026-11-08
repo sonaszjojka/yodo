@@ -62,15 +62,14 @@ async function pageBackground(page: Page) {
   )
 }
 
-test('Dark in Settings recolours the page and the drawing, and is remembered', async ({
+test('Dark in the sidebar recolours the page and the drawing, and is remembered', async ({
   page,
 }) => {
   await page.goto('./')
   await page.emulateMedia({ colorScheme: 'light' })
   expect(await pageBackground(page)).toBe(PAGE_LIGHT)
 
-  await page.getByRole('button', { name: 'Settings' }).click()
-  await page.getByRole('menuitemradio', { name: 'Dark' }).click()
+  await page.getByRole('radio', { name: 'Dark' }).click()
   expect(await pageBackground(page)).toBe(PAGE_DARK)
 
   await page.getByRole('button', { name: 'New drawing' }).click()
@@ -112,4 +111,31 @@ test('System follows the OS live, in the page and on the canvas', async ({
 
   await page.emulateMedia({ colorScheme: 'light' })
   await expect.poll(() => pixelsNear(page, INK_LIGHT)).toBeGreaterThan(50)
+})
+
+test('the Home theme switch moves and selects with the arrow keys', async ({
+  page,
+}) => {
+  await page.goto('./')
+  await page.emulateMedia({ colorScheme: 'light' })
+  const system = page.getByRole('radio', { name: 'System' })
+  const light = page.getByRole('radio', { name: 'Light' })
+  const dark = page.getByRole('radio', { name: 'Dark' })
+
+  // Only the checked radio is in the Tab order; arrows move focus and select.
+  await system.focus()
+  await page.keyboard.press('ArrowRight')
+  await expect(light).toBeFocused()
+  await expect(light).toHaveAttribute('aria-checked', 'true')
+  await page.keyboard.press('ArrowRight')
+  await expect(dark).toBeFocused()
+  await expect(dark).toHaveAttribute('aria-checked', 'true')
+  expect(await pageBackground(page)).toBe(PAGE_DARK)
+
+  // It wraps at both ends.
+  await page.keyboard.press('ArrowRight')
+  await expect(system).toBeFocused()
+  await page.keyboard.press('ArrowLeft')
+  await expect(dark).toBeFocused()
+  await expect(dark).toHaveAttribute('aria-checked', 'true')
 })

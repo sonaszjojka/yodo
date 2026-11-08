@@ -70,6 +70,7 @@ Goal: open Yodo, draw basic shapes, close the browser, come back to the same dra
 |---|---|---|
 | 4.1 | Drawing tool stays active ✓ (PR [#140](https://github.com/sonaszjojka/yodo/pull/140)) ([#131](https://github.com/sonaszjojka/yodo/issues/131)) | The chosen drawing tool stays active after each element; `Esc` or `V` returns to Select; the new element is not selected (ADR 0050). |
 | 4.2 | Eraser cursor and hover feedback ✓ (PR [#141](https://github.com/sonaszjojka/yodo/pull/141)) ([#132](https://github.com/sonaszjojka/yodo/issues/132)) | The eraser shows a circle cursor matching its hit size; elements under the eraser while dragging are dimmed before they are removed; still undoable as one step. |
+| 4.3 | Home layout: theme control, settings placement, toolbar row ([#133](https://github.com/sonaszjojka/yodo/issues/133)) | Theme is a three-icon segmented control, not a dropdown list; Settings moves to the bottom of the sidebar; the title row, search (capped width, left) and Sort / Import lay out cleanly at wide and narrow widths, including the search-results state; `docs/ui.md`, `SettingsMenu` and `Home` tests updated. |
 
 ## Rules for changing this roadmap
 - Tasks may be split, merged or reordered; record why in the commit message.
