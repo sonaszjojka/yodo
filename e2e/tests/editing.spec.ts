@@ -166,7 +166,7 @@ test('draw shapes, label one, attach an arrow, move, undo and redo', async ({
   })
 })
 
-test('re-attach an arrow by dragging its end, then move the shape and detach it', async ({
+test('re-attach an arrow by dragging its end, then move and resize the shape, and detach it', async ({
   page,
   mode,
 }) => {
@@ -218,6 +218,39 @@ test('re-attach an arrow by dragging its end, then move the shape and detach it'
     const arrow = (await storedArrow())!
     expect(arrow.endBinding).toBeDefined()
     attachedEnd = arrowEnds(arrow).end
+  })
+
+  await test.step('resizing the ellipse keeps the arrow end on its outline', async () => {
+    const before = (await storedDocument(page, mode, id))!.find(
+      (e) => e.type === 'ellipse',
+    )!
+    // The ellipse is still selected from the move. Pull its bottom-right
+    // corner handle, which sits just outside the box (stroke and gap).
+    const corner = [before.x + before.width + 8, before.y + before.height + 8]
+    await drag(
+      page,
+      [corner[0]!, corner[1]!],
+      [corner[0]! + 100, corner[1]! + 100],
+    )
+    await expect
+      .poll(async () => {
+        const ellipse = (await storedDocument(page, mode, id))!.find(
+          (e) => e.type === 'ellipse',
+        )!
+        return ellipse.width
+      })
+      .toBeGreaterThan(before.width + 50)
+    const elements = (await storedDocument(page, mode, id))!
+    const ellipse = elements.find((e) => e.type === 'ellipse')!
+    const arrow = elements.find((e) => e.type === 'arrow')!
+    expect(arrow.endBinding?.elementId).toBe(ellipse.id)
+    // The end lies on the resized ellipse's curve.
+    const [x, y] = arrowEnds(arrow).end
+    const [rx, ry] = [ellipse.width / 2, ellipse.height / 2]
+    const onCurve =
+      ((x! - ellipse.x - rx) / rx) ** 2 + ((y! - ellipse.y - ry) / ry) ** 2
+    expect(onCurve).toBeCloseTo(1, 1)
+    attachedEnd = [x!, y!]
   })
 
   await test.step('dragging the end away detaches it', async () => {
