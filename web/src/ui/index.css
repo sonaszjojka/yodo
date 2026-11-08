@@ -1545,6 +1545,10 @@ a.drawing-card-body:focus-visible,
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* Keep the keys off the scrollbar, and the rows the same width whether or
+     not the list scrolls (a search can remove the scrollbar). */
+  padding-right: 12px;
+  scrollbar-gutter: stable;
 }
 
 .shortcuts-list h3 {
