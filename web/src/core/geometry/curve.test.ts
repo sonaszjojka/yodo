@@ -214,3 +214,20 @@ describe('headFrom', () => {
     expect(from[1]).toBeCloseTo(60)
   })
 })
+
+describe('Codex review round 1', () => {
+  test('finding 1: a curve that overshoots along its own chord is not flattened away', () => {
+    // The points are collinear, so the control points lie on the chord's line
+    // but past its end: the curve swings out to about x = 1074.
+    const points: Point[] = [
+      [0, 0],
+      [1000, 0],
+      [1001, 0],
+    ]
+    const flat = flattenCurve(points, 0.25)
+    expect(Math.max(...flat.map((p) => p[0]))).toBeGreaterThan(1070)
+    const line = { ...bent(points), strokeWidth: 1 }
+    expect(curveBounds(line).width).toBeGreaterThan(1070)
+    expect(hitTest(line, [1074, 0], 2)).toBe(true)
+  })
+})

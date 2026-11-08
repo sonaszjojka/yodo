@@ -53,11 +53,21 @@ function midpoint(a: Point, b: Point): Point {
   return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]
 }
 
-function distanceToLine(p: Point, a: Point, b: Point) {
+/** Distance from `p` to the finite segment `a`-`b`, not to its infinite line. */
+function distanceToChord(p: Point, a: Point, b: Point) {
   const [dx, dy] = [b[0] - a[0], b[1] - a[1]]
-  const length = Math.hypot(dx, dy)
-  if (length === 0) return Math.hypot(p[0] - a[0], p[1] - a[1])
-  return Math.abs((p[0] - a[0]) * dy - (p[1] - a[1]) * dx) / length
+  const lengthSquared = dx * dx + dy * dy
+  const t =
+    lengthSquared === 0
+      ? 0
+      : Math.max(
+          0,
+          Math.min(
+            1,
+            ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / lengthSquared,
+          ),
+        )
+  return Math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy))
 }
 
 /** Splits a cubic at t = 0.5 (de Casteljau). */
@@ -83,10 +93,11 @@ function flattenSegment(
   depth = 0,
 ) {
   // A cubic lies within its control polygon, so when both control points are
-  // within `tolerance` of the chord, the chord is within `tolerance` of it.
+  // within `tolerance` of the chord (the segment, so an overshoot past either
+  // end counts), the chord is within `tolerance` of it.
   const flat =
-    distanceToLine(s.c1, s.from, s.to) <= tolerance &&
-    distanceToLine(s.c2, s.from, s.to) <= tolerance
+    distanceToChord(s.c1, s.from, s.to) <= tolerance &&
+    distanceToChord(s.c2, s.from, s.to) <= tolerance
   if (flat || depth >= MAX_DEPTH) {
     out.push(s.to)
     return
