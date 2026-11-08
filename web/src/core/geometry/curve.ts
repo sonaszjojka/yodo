@@ -137,15 +137,16 @@ export function curveBounds(element: LineElement | ArrowElement): Bounds {
     element.y + dy,
   ])
   const flat = flattenCurve(absolute, BOUNDS_TOLERANCE)
-  const xs = flat.map((p) => p[0])
-  const ys = flat.map((p) => p[1])
-  const [minX, minY] = [Math.min(...xs), Math.min(...ys)]
-  return {
-    x: minX,
-    y: minY,
-    width: Math.max(...xs) - minX,
-    height: Math.max(...ys) - minY,
+  // A loop, not Math.min(...xs): a long curve flattens to more samples than a
+  // call can take as arguments.
+  let [minX, minY, maxX, maxY] = [Infinity, Infinity, -Infinity, -Infinity]
+  for (const [x, y] of flat) {
+    minX = Math.min(minX, x)
+    maxX = Math.max(maxX, x)
+    minY = Math.min(minY, y)
+    maxY = Math.max(maxY, y)
   }
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY }
 }
 
 /**

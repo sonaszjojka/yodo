@@ -230,4 +230,12 @@ describe('Codex review round 1', () => {
     expect(curveBounds(line).width).toBeGreaterThan(1070)
     expect(hitTest(line, [1074, 0], 2)).toBe(true)
   })
+
+  test('finding 2: bounds of a curve with many points do not overflow the argument limit', () => {
+    const points: Point[] = Array.from({ length: 20000 }, (_, i) => [
+      i * 10,
+      (i % 2) * 1000,
+    ])
+    expect(() => curveBounds(bent(points))).not.toThrow()
+  })
 })
