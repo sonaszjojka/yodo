@@ -46,7 +46,7 @@ Shipped in usable milestones; the split into milestones and tasks is in `docs/ro
 | Rectangle, diamond, circle | Click-drag draws the shape at the dragged size; Shift keeps proportions (square / perfect circle). |
 | Arrow, line | Click-drag draws a straight line; the arrow has an arrowhead at the end. |
 | Pencil | Freehand strokes follow the cursor smoothly and can be selected and moved as one element. |
-| Text | Click places a text box and starts typing; double-click edits existing text; text can be placed inside shapes. |
+| Text | Click places a text box and starts typing; double-click edits existing text; text can be placed over shapes, and a shape's own label is edited by double-click or Enter. |
 | Sticky notes | A coloured note with text that can be placed, moved, resized and edited like in Miro. |
 | Eraser | Dragging over elements removes them; undo brings them back. |
 | Undo / redo | Every change (create, move, resize, style, delete) can be undone and redone with Ctrl/Cmd+Z and Shift+Ctrl/Cmd+Z. |
