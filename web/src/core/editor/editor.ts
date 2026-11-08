@@ -11,10 +11,18 @@ import {
   type LinearType,
   type ShapeType,
 } from '../document/create.ts'
-import type { Point, YodoDocument, YodoElement } from '../document/types.ts'
+import type {
+  ArrowBinding,
+  Point,
+  YodoDocument,
+  YodoElement,
+} from '../document/types.ts'
 import { appendPoint, startStroke } from '../geometry/freehand.ts'
 import { lineFromDrag } from '../geometry/line.ts'
 import {
+  drawsBoxFrame,
+  endpointArrow,
+  endpointAt,
   handleAt,
   selectionFrame,
   type SelectionFrame,
@@ -52,7 +60,7 @@ import {
   pasteElements,
   serializeClipboard,
 } from './clipboard.ts'
-import { bindableAt, snapToOutline } from './binding.ts'
+import { bindableAt, dropEnd, moveEnd, snapToOutline } from './binding.ts'
 import { arrange, type LayerOrder } from './layers.ts'
 import {
   applyDefaults,
@@ -100,7 +108,19 @@ export interface EditorState {
    */
   resize: (ResizeTransform & { handle: Handle }) | null
   /** The selection handle under the pointer, for the cursor. */
-  hoverHandle: Handle | null
+  hoverHandle: HoverHandle | null
+  /**
+   * The end of an arrow being dragged to a new place (ADR 0052). Previewed
+   * like `move`; the document changes when the drag ends.
+   */
+  endpoint: {
+    arrowId: string
+    end: 'start' | 'end'
+    point: Point
+    binding: ArrowBinding | null
+  } | null
+  /** The id of the shape an arrow end would attach to now, for the highlight. */
+  bindTarget: string | null
   /** The box of a box-select drag in progress, in world coordinates. */
   marquee: Bounds | null
   /**
@@ -127,6 +147,9 @@ export interface EditorState {
 }
 
 /** Tools that draw an element by dragging. */
+/** What the pointer hovers on the selection, for the cursor. */
+export type HoverHandle = Handle | 'arrow-start' | 'arrow-end'
+
 export type DrawingTool = ShapeType | LinearType | 'pencil' | 'note'
 export type Tool = DrawingTool | 'select' | 'hand' | 'text' | 'eraser'
 
@@ -320,6 +343,8 @@ export function createEditor(
     move: null,
     resize: null,
     hoverHandle: null,
+    endpoint: null,
+    bindTarget: null,
     marquee: null,
     editing: null,
     erasing: null,
@@ -365,17 +390,22 @@ export function createEditor(
     return bindableAt(document.elements, point, HIT_TOLERANCE / viewport.zoom)
   }
 
+  function setBindTarget(id: string | null) {
+    store.setState((prev) =>
+      prev.bindTarget === id ? prev : { ...prev, bindTarget: id },
+    )
+  }
+
   function updateDraft() {
     // A stroke grows sample by sample in pointerMove; Shift doesn't reshape it.
     if (!drag || drag.tool === 'pencil') return
     if (drag.tool === 'arrow') {
       // The end snaps onto a shape under the pointer and remembers it; a
       // snapped end ignores Shift, since it has a place of its own.
-      const target = bindableUnder(drag.last)
-      const snap =
-        target && target.id !== drag.startTargetId
-          ? snapToOutline(target, drag.last)
-          : null
+      const found = bindableUnder(drag.last)
+      const target = found && found.id !== drag.startTargetId ? found : null
+      const snap = target ? snapToOutline(target, drag.last) : null
+      setBindTarget(target?.id ?? null)
       const geometry = lineFromDrag(
         drag.start,
         snap?.point ?? drag.last,
@@ -492,10 +522,11 @@ export function createEditor(
                 height: NOTE_SIZE,
               }
             : dragged
-        if (!isVisible(draft)) return { ...prev, draft: null }
+        if (!isVisible(draft)) return { ...prev, draft: null, bindTarget: null }
         const committed = {
           ...prev,
           draft: null,
+          bindTarget: null,
           document: {
             ...prev.document,
             elements: [...prev.document.elements, draft],
@@ -521,7 +552,7 @@ export function createEditor(
     cancel() {
       if (!drag) return
       drag = null
-      store.setState((prev) => ({ ...prev, draft: null }))
+      store.setState((prev) => ({ ...prev, draft: null, bindTarget: null }))
     },
   }
 
@@ -529,6 +560,17 @@ export function createEditor(
   // handle of the selection), a move of the selection (pressed on an element)
   // or a box select (pressed on empty space).
   type SelectGesture =
+    | {
+        kind: 'endpoint'
+        pointerId: number
+        arrowId: string
+        end: 'start' | 'end'
+        /** The element under the press, which a click (no drag) selects. */
+        hitId: string | null
+        start: Point
+        last: Point
+        moved: boolean
+      }
     | {
         kind: 'resize'
         pointerId: number
@@ -614,12 +656,44 @@ export function createEditor(
    */
   function handleUnder(point: Point) {
     const frame = currentFrame()
-    if (!frame) return null
+    if (!frame || !drawsBoxFrame(selectedNow(store.getState()))) return null
     const px = 1 / store.getState().viewport.zoom
     const handle = handleAt(frame.outline, point, px)
     return handle && canResize(frame.box, handle)
       ? { handle, box: frame.box }
       : null
+  }
+
+  /** The end handle of the one selected arrow at `point` (ADR 0052). */
+  function endpointUnder(point: Point) {
+    const arrow = endpointArrow(selectedNow(store.getState()))
+    if (!arrow) return null
+    const px = 1 / store.getState().viewport.zoom
+    const end = endpointAt(arrow, point, px)
+    return end ? { arrow, end } : null
+  }
+
+  function updateEndpoint(g: Extract<SelectGesture, { kind: 'endpoint' }>) {
+    const { document, viewport } = store.getState()
+    const arrow = document.elements.find((e) => e.id === g.arrowId)
+    if (arrow?.type !== 'arrow') return
+    const drop = dropEnd(
+      document.elements,
+      arrow,
+      g.end,
+      g.last,
+      HIT_TOLERANCE / viewport.zoom,
+    )
+    store.setState((prev) => ({
+      ...prev,
+      endpoint: {
+        arrowId: g.arrowId,
+        end: g.end,
+        point: drop.point,
+        binding: drop.binding,
+      },
+      bindTarget: drop.target?.id ?? null,
+    }))
   }
 
   function updateResize(g: Extract<SelectGesture, { kind: 'resize' }>) {
@@ -655,6 +729,20 @@ export function createEditor(
       )
       // Handles come first: they may lie over another element. Only a drag
       // resizes; a click there still selects the element under it.
+      const end = endpointUnder(point)
+      if (end) {
+        gesture = {
+          kind: 'endpoint',
+          pointerId,
+          arrowId: end.arrow.id,
+          end: end.end,
+          hitId,
+          start: point,
+          last: point,
+          moved: false,
+        }
+        return
+      }
       const grabbed = handleUnder(point)
       if (grabbed) {
         gesture = {
@@ -704,7 +792,10 @@ export function createEditor(
       const { zoom } = store.getState().viewport
       if (!gesture.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD / zoom) return
       gesture = { ...gesture, moved: true }
-      if (gesture.kind === 'resize') {
+      if (gesture.kind === 'endpoint') {
+        gesture = { ...gesture, last: point }
+        updateEndpoint(gesture)
+      } else if (gesture.kind === 'resize') {
         gesture = { ...gesture, last: point, shift }
         updateResize(gesture)
       } else if (gesture.kind === 'move') {
@@ -729,7 +820,28 @@ export function createEditor(
       if (gesture?.pointerId !== pointerId) return
       const ended = gesture
       gesture = null
-      if (ended.kind === 'resize' && !ended.moved) {
+      if (ended.kind === 'endpoint') {
+        if (!ended.moved) {
+          if (ended.hitId) clickSelect(ended.hitId, false)
+          return
+        }
+        // The whole drag becomes one document change.
+        store.setState((prev) => {
+          const { endpoint } = prev
+          if (!endpoint) return prev
+          const elements = prev.document.elements.map((e) =>
+            e.id === endpoint.arrowId && e.type === 'arrow'
+              ? moveEnd(e, endpoint.end, endpoint.point, endpoint.binding)
+              : e,
+          )
+          return {
+            ...prev,
+            endpoint: null,
+            bindTarget: null,
+            document: { ...prev.document, elements },
+          }
+        })
+      } else if (ended.kind === 'resize' && !ended.moved) {
         if (ended.hitId) clickSelect(ended.hitId, ended.shift)
       } else if (ended.kind === 'resize') {
         // The whole drag becomes one document change.
@@ -780,6 +892,8 @@ export function createEditor(
       const ended = gesture
       gesture = null
       store.setState((prev) => {
+        if (ended.kind === 'endpoint')
+          return { ...prev, endpoint: null, bindTarget: null }
         if (ended.kind === 'resize') return { ...prev, resize: null }
         if (ended.kind === 'move') return { ...prev, move: null }
         return { ...prev, marquee: null, selectedIds: ended.base }
@@ -837,6 +951,7 @@ export function createEditor(
       tool,
       selectedIds: [],
       hoverHandle: null,
+      bindTarget: null,
     }))
   }
 
@@ -852,8 +967,15 @@ export function createEditor(
     eraserTool.cancel()
     gesture = null
     store.setState((prev) =>
-      prev.move || prev.resize || prev.marquee
-        ? { ...prev, move: null, resize: null, marquee: null }
+      prev.move || prev.resize || prev.marquee || prev.endpoint
+        ? {
+            ...prev,
+            move: null,
+            resize: null,
+            marquee: null,
+            endpoint: null,
+            bindTarget: null,
+          }
         : prev,
     )
   }
@@ -965,12 +1087,20 @@ export function createEditor(
   function refreshHover() {
     if (pan || drag || gesture || erase) return
     const { tool } = store.getState()
-    const hover =
-      tool === 'select' && pointerAt
-        ? (handleUnder(toWorld(pointerAt))?.handle ?? null)
-        : null
+    const world = pointerAt ? toWorld(pointerAt) : null
+    let hover: HoverHandle | null = null
+    if (tool === 'select' && world) {
+      const end = endpointUnder(world)
+      hover = end ? `arrow-${end.end}` : (handleUnder(world)?.handle ?? null)
+    }
+    // With the arrow tool, the shape under the pointer is where the arrow
+    // would start attached (ADR 0052).
+    const target =
+      tool === 'arrow' && world ? (bindableUnder(world)?.id ?? null) : null
     store.setState((prev) =>
-      prev.hoverHandle === hover ? prev : { ...prev, hoverHandle: hover },
+      prev.hoverHandle === hover && prev.bindTarget === target
+        ? prev
+        : { ...prev, hoverHandle: hover, bindTarget: target },
     )
   }
 
@@ -1026,8 +1156,15 @@ export function createEditor(
       // Drop a move or resize preview or a box; a no-op Delete with none is
       // no change.
       const ended =
-        prev.move || prev.resize || prev.marquee
-          ? { ...prev, move: null, resize: null, marquee: null }
+        prev.move || prev.resize || prev.marquee || prev.endpoint
+          ? {
+              ...prev,
+              move: null,
+              resize: null,
+              marquee: null,
+              endpoint: null,
+              bindTarget: null,
+            }
           : prev
       if (ended.selectedIds.length === 0) return ended
       const elements = deleteElements(

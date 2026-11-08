@@ -1,5 +1,11 @@
 import { expect, test } from 'vitest'
-import { createDocument, createShape, createText } from '../document/create.ts'
+import {
+  createDocument,
+  createLinear,
+  createShape,
+  createText,
+} from '../document/create.ts'
+import { lineFromDrag } from '../geometry/line.ts'
 import { createEditor } from './editor.ts'
 import { sceneOf } from './scene.ts'
 
@@ -13,7 +19,12 @@ function stateWith(patch: object) {
 
 test('shows the document as it is when nothing is going on', () => {
   const scene = sceneOf(stateWith({}))
-  expect(scene).toEqual({ elements: [a, b], selected: [], marquee: null })
+  expect(scene).toEqual({
+    elements: [a, b],
+    selected: [],
+    marquee: null,
+    bindTarget: null,
+  })
 })
 
 test('shows the selection shifted by the move in progress', () => {
@@ -75,4 +86,28 @@ test('shows the elements the eraser marked faded', () => {
   const scene = sceneOf(stateWith({ erasing: [b.id] }))
   expect(scene.elements[0]).toBe(a)
   expect(scene.elements[1]).toMatchObject({ id: b.id, opacity: 30 })
+})
+
+test('shows an arrow end being dragged, and resolves the highlight', () => {
+  const arrow = createLinear('arrow', lineFromDrag([0, 30], [20, 30], false))
+  const editor = createEditor({ ...createDocument(), elements: [a, b, arrow] })
+  const scene = sceneOf({
+    ...editor.store.getState(),
+    endpoint: {
+      arrowId: arrow.id,
+      end: 'end',
+      point: [50, 5],
+      binding: { elementId: b.id, ratio: [0, 0.5] },
+    },
+    bindTarget: b.id,
+  })
+  expect(scene.elements[0]).toBe(a)
+  expect(scene.elements[2]).toMatchObject({
+    points: [
+      [0, 0],
+      [50, -25],
+    ],
+    endBinding: { elementId: b.id },
+  })
+  expect(scene.bindTarget).toBe(b)
 })

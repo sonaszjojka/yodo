@@ -1,7 +1,7 @@
 // The selection frame: the outline drawn around the selection and where its
 // handles are. The renderer draws it and the select tool hit-tests it, so
 // both read these sizes from one place.
-import type { Point, YodoElement } from '../document/types.ts'
+import type { ArrowElement, Point, YodoElement } from '../document/types.ts'
 import { elementBounds, unionBounds, type Bounds } from './rect.ts'
 import type { Handle } from './resize.ts'
 
@@ -98,5 +98,49 @@ export function handleAt(
   if (alongX && near(bottom - y, side, capY)) return 's'
   if (alongY && near(x - left, side, capX)) return 'w'
   if (alongY && near(right - x, side, capX)) return 'e'
+  return null
+}
+
+/**
+ * The arrow whose ends can be dragged: the selection is exactly that one
+ * arrow (ADR 0052). Everything else is resized by the box frame.
+ */
+export function endpointArrow(
+  selected: readonly YodoElement[],
+): ArrowElement | null {
+  const [only] = selected
+  return selected.length === 1 &&
+    only!.type === 'arrow' &&
+    only!.points.length >= 2
+    ? only!
+    : null
+}
+
+/** Whether the selection draws the box outline, corner handles and badge. */
+export function drawsBoxFrame(selected: readonly YodoElement[]): boolean {
+  return endpointArrow(selected) === null
+}
+
+/** The ends of `arrow` in world coordinates. */
+export function endpointsOf(arrow: ArrowElement): { start: Point; end: Point } {
+  const [first, last] = [arrow.points[0]!, arrow.points.at(-1)!]
+  return {
+    start: [arrow.x + first[0], arrow.y + first[1]],
+    end: [arrow.x + last[0], arrow.y + last[1]],
+  }
+}
+
+/** The end of `arrow` whose handle is at `point`, or null. The end wins a tie. */
+export function endpointAt(
+  arrow: ArrowElement,
+  point: Point,
+  px: number,
+): 'start' | 'end' | null {
+  const reach = (HANDLE_SIZE / 2 + HANDLE_SLOP) * px
+  const ends = endpointsOf(arrow)
+  for (const end of ['end', 'start'] as const) {
+    if (Math.hypot(point[0] - ends[end][0], point[1] - ends[end][1]) <= reach)
+      return end
+  }
   return null
 }

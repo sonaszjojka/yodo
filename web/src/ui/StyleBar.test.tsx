@@ -2,9 +2,11 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, test } from 'vitest'
 import {
   createDocument,
+  createLinear,
   createNote,
   createShape,
 } from '../core/document/create.ts'
+import { lineFromDrag } from '../core/geometry/line.ts'
 import type { YodoElement } from '../core/document/types.ts'
 import { createEditor } from '../core/editor/editor.ts'
 import {
@@ -56,6 +58,16 @@ describe('StyleBar', () => {
     const editor = editorWith([rect])
     editor.store.setState((prev) => ({ ...prev, tool: 'rectangle' }))
     expect(renderToStaticMarkup(<StyleBar editor={editor} />)).toBe('')
+  })
+
+  test('one selected arrow, which has no box frame, still gets its bar', () => {
+    const arrow = createLinear(
+      'arrow',
+      lineFromDrag([300, 300], [400, 350], false),
+    )
+    const html = renderToStaticMarkup(<StyleBar editor={editorWith([arrow])} />)
+    expect(controls(html)).toContain('All styles')
+    expect(controls(html)).toContain('More')
   })
 
   test('a shape gets stroke, fill, width and look, showing its values', () => {

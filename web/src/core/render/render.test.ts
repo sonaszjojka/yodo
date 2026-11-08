@@ -413,6 +413,41 @@ describe('pencil strokes (ADR 0024)', () => {
   })
 })
 
+describe('arrow overlay (ADR 0052)', () => {
+  const arrow = createLinear('arrow', lineFromDrag([10, 20], [110, 70], false))
+  const target = createShape('rectangle', {
+    x: 200,
+    y: 0,
+    width: 100,
+    height: 100,
+  })
+
+  test('a lone selected arrow gets a handle on each end and no box or badge', () => {
+    const ctx = fakeContext()
+    renderScene(ctx, fakeRough(), [arrow], SURFACE, IDENTITY, {
+      selected: [arrow],
+      marquee: null,
+    })
+    expect(ctx.rect).not.toHaveBeenCalled()
+    expect(ctx.fillText).not.toHaveBeenCalled()
+    expect(ctx.roundRect).toHaveBeenCalledTimes(2)
+    expect(ctx.roundRect).toHaveBeenCalledWith(6, 16, 8, 8, 4)
+    expect(ctx.roundRect).toHaveBeenCalledWith(106, 66, 8, 8, 4)
+  })
+
+  test('the attach target is outlined along its own outline', () => {
+    const ctx = fakeContext()
+    renderScene(ctx, fakeRough(), [target], SURFACE, IDENTITY, {
+      selected: [],
+      marquee: null,
+      bindTarget: target,
+    })
+    expect(ctx.moveTo).toHaveBeenCalledWith(200, 0)
+    expect(ctx.lineWidth).toBe(2.5)
+    expect(ctx.stroke).toHaveBeenCalled()
+  })
+})
+
 describe('selection overlay', () => {
   const rect = createShape('rectangle', {
     x: 10,

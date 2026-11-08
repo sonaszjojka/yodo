@@ -1,9 +1,10 @@
-import type { EditorState } from '../core/editor/editor.ts'
-import type { Handle } from '../core/geometry/resize.ts'
+import type { EditorState, HoverHandle } from '../core/editor/editor.ts'
 import { ERASER_CURSOR } from './eraserCursor.ts'
 
 /** Opposite handles resize along the same line, so they share a cursor. */
-const HANDLE_CURSORS: Record<Handle, string> = {
+const HANDLE_CURSORS: Record<HoverHandle, string> = {
+  'arrow-start': 'crosshair',
+  'arrow-end': 'crosshair',
   nw: 'nwse-resize',
   se: 'nwse-resize',
   ne: 'nesw-resize',

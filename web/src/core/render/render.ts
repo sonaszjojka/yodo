@@ -15,7 +15,16 @@ import type {
 import { adaptColor, type Theme } from './colors.ts'
 import { smoothPath } from '../geometry/freehand.ts'
 import { ARROWHEAD_LENGTH, arrowhead } from '../geometry/line.ts'
-import { GAP, grow, HANDLE_SIZE, selectionFrame } from '../geometry/frame.ts'
+import {
+  drawsBoxFrame,
+  endpointArrow,
+  endpointsOf,
+  GAP,
+  grow,
+  HANDLE_SIZE,
+  selectionFrame,
+} from '../geometry/frame.ts'
+import { bindOutline, isBindable } from '../editor/binding.ts'
 import {
   cornerRadius,
   diamondPoints,
@@ -359,6 +368,8 @@ function drawElement(
 export interface Overlay {
   selected: readonly YodoElement[]
   marquee: Bounds | null
+  /** The shape an arrow end would attach to (ADR 0052). */
+  bindTarget?: YodoElement | null
 }
 
 const NO_OVERLAY: Overlay = { selected: [], marquee: null }
@@ -386,6 +397,8 @@ const OVERLAY_COLORS: Record<Theme, OverlayColors> = {
   },
 }
 const OUTLINE_WIDTH = 1.25
+/** The outline of the shape an arrow end would attach to. */
+const BIND_OUTLINE_WIDTH = 2.5
 const ELEMENT_OUTLINE_WIDTH = 1
 const HANDLE_RADIUS = 2
 const BADGE_FONT = '600 11px Manrope, system-ui, sans-serif'
@@ -449,7 +462,21 @@ function drawOverlay(
   ctx.save()
   ctx.strokeStyle = colors.accent
   const frame = selectionFrame(overlay.selected, px)
-  if (frame) {
+  const arrow = endpointArrow(overlay.selected)
+  if (arrow) {
+    // One selected arrow: handles on its two ends instead of a box (ADR 0052).
+    const ends = endpointsOf(arrow)
+    ctx.fillStyle = colors.handleFill
+    ctx.lineWidth = OUTLINE_WIDTH * px
+    for (const end of [ends.start, ends.end]) {
+      ctx.beginPath()
+      const size = HANDLE_SIZE * px
+      ctx.roundRect(end[0] - size / 2, end[1] - size / 2, size, size, size / 2)
+      ctx.fill()
+      ctx.stroke()
+    }
+  }
+  if (frame && drawsBoxFrame(overlay.selected)) {
     const { elementBoxes, outline } = frame
     // With several selected, a thin outline shows which ones are in the group.
     if (elementBoxes.length > 1) {
@@ -477,6 +504,17 @@ function drawOverlay(
       }
     }
     drawSizeBadge(ctx, frame.box, outline, viewport, dpr, colors)
+  }
+  const { bindTarget } = overlay
+  if (bindTarget && isBindable(bindTarget)) {
+    const outline = bindOutline(bindTarget)
+    ctx.beginPath()
+    outline.forEach(([x, y], i) =>
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y),
+    )
+    ctx.lineTo(outline[0]![0], outline[0]![1])
+    ctx.lineWidth = BIND_OUTLINE_WIDTH * px
+    ctx.stroke()
   }
   if (overlay.marquee) {
     const { x, y, width, height } = overlay.marquee

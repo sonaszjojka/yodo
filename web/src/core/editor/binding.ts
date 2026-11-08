@@ -57,7 +57,7 @@ export function bindableAt(
 const ELLIPSE_STEPS = 96
 
 /** The closed outline a shape is drawn with, as a polygon. */
-function outlineOf(element: BindableElement): Point[] {
+export function bindOutline(element: BindableElement): Point[] {
   if (element.type === 'ellipse') {
     const [cx, cy] = [
       element.x + element.width / 2,
@@ -120,7 +120,7 @@ export function snapToOutline(
   target: BindableElement,
   point: Point,
 ): { point: Point; binding: ArrowBinding } {
-  const outline = outlineOf(target)
+  const outline = bindOutline(target)
   let best: Point = point
   let bestDistance = Infinity
   for (let i = 0; i < outline.length; i++) {
@@ -166,6 +166,57 @@ function withEnd(
     height: Math.max(...ys) - Math.min(...ys),
     points: absolute.map(([px, py]): Point => [px - x, py - y]),
   }
+}
+
+/**
+ * The arrow with one end put at `world` and bound to `binding`, or free when
+ * `binding` is null. The other end and any bends keep their position and
+ * binding (ADR 0052).
+ */
+export function moveEnd(
+  arrow: ArrowElement,
+  end: 'start' | 'end',
+  world: Point,
+  binding: ArrowBinding | null,
+): ArrowElement {
+  const key = end === 'start' ? 'startBinding' : 'endBinding'
+  return withEnd(
+    binding ? { ...arrow, [key]: binding } : without(arrow, key),
+    end,
+    world,
+  )
+}
+
+/** Where an arrow end dragged to `point` lands. */
+export interface EndDrop {
+  point: Point
+  /** The binding it gets, or null when it stays free. */
+  binding: ArrowBinding | null
+  /** The shape it attaches to, for the highlight. */
+  target: BindableElement | null
+}
+
+/**
+ * Where `end` of `arrow` lands when dragged to `point`: on the outline of the
+ * shape under it, or at `point` itself. The shape the other end is attached
+ * to is no target, as when drawing.
+ */
+export function dropEnd(
+  elements: readonly YodoElement[],
+  arrow: ArrowElement,
+  end: 'start' | 'end',
+  point: Point,
+  tolerance: number,
+): EndDrop {
+  const other = end === 'start' ? arrow.endBinding : arrow.startBinding
+  const target = bindableAt(
+    elements.filter((e) => e.id !== other?.elementId),
+    point,
+    tolerance,
+  )
+  if (!target) return { point, binding: null, target: null }
+  const snap = snapToOutline(target, point)
+  return { point: snap.point, binding: snap.binding, target }
 }
 
 /**

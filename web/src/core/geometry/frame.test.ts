@@ -1,6 +1,13 @@
 import { describe, expect, test } from 'vitest'
-import { createShape } from '../document/create.ts'
-import { handleAt, selectionFrame } from './frame.ts'
+import { createLinear, createShape } from '../document/create.ts'
+import { lineFromDrag } from './line.ts'
+import {
+  drawsBoxFrame,
+  endpointAt,
+  endpointArrow,
+  handleAt,
+  selectionFrame,
+} from './frame.ts'
 
 // roughness 0 and strokeWidth 2 put the drawn stroke 1 unit outside the box.
 const a = {
@@ -71,5 +78,44 @@ describe('handleAt', () => {
   test('reach is in screen pixels, so it shrinks in world units when zoomed in', () => {
     expect(handleAt(outline, [50, 3], 1)).toBe('n')
     expect(handleAt(outline, [50, 3], 0.5)).toBeNull()
+  })
+})
+
+describe('arrow endpoints', () => {
+  const arrow = createLinear('arrow', lineFromDrag([10, 10], [110, 60], false))
+  const line = createLinear('line', lineFromDrag([10, 10], [110, 60], false))
+  const rect = createShape('rectangle', { x: 0, y: 0, width: 10, height: 10 })
+
+  test('only a lone arrow has endpoint handles and no box frame', () => {
+    expect(endpointArrow([arrow])).toBe(arrow)
+    expect(drawsBoxFrame([arrow])).toBe(false)
+    expect(endpointArrow([line])).toBeNull()
+    expect(drawsBoxFrame([line])).toBe(true)
+    expect(endpointArrow([arrow, rect])).toBeNull()
+    expect(drawsBoxFrame([arrow, rect])).toBe(true)
+    expect(endpointArrow([{ ...arrow, points: [] }])).toBeNull()
+  })
+
+  test('a press within reach of an end grabs it', () => {
+    expect(endpointAt(arrow, [12, 12], 1)).toBe('start')
+    expect(endpointAt(arrow, [108, 62], 1)).toBe('end')
+    expect(endpointAt(arrow, [60, 35], 1)).toBeNull()
+  })
+
+  test('the reach is the same on screen at any zoom', () => {
+    // 6 screen px: 6 world units at zoom 1, 3 at zoom 2.
+    expect(endpointAt(arrow, [15, 10], 1)).toBe('start')
+    expect(endpointAt(arrow, [15, 10], 0.5)).toBeNull()
+  })
+
+  test('on a tiny arrow the end wins', () => {
+    const tiny = {
+      ...arrow,
+      points: [
+        [0, 0],
+        [1, 0],
+      ] as [number, number][],
+    }
+    expect(endpointAt(tiny, [10.5, 10], 1)).toBe('end')
   })
 })

@@ -64,7 +64,7 @@ export function Canvas({
     function draw() {
       frame = 0
       const state = editor.store.getState()
-      const { elements, selected, marquee } = sceneOf(state)
+      const { elements, selected, marquee, bindTarget } = sceneOf(state)
       renderScene(
         ctx,
         rc,
@@ -75,7 +75,7 @@ export function Canvas({
           images: imageCache.get,
         },
         state.viewport,
-        { selected, marquee },
+        { selected, marquee, bindTarget },
       )
       canvas.style.cursor = cursorFor(state)
     }
