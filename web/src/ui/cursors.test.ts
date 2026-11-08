@@ -24,6 +24,11 @@ describe('cursorFor', () => {
     expect(cursorFor(state({ tool: 'rectangle' }))).toBe('crosshair')
   })
 
+  test('an arrow end handle shows the crosshair', () => {
+    expect(cursorFor(state({ hoverHandle: 'arrow-end' }))).toBe('crosshair')
+    expect(cursorFor(state({ hoverHandle: 'arrow-start' }))).toBe('crosshair')
+  })
+
   test('holding space with the eraser still pans', () => {
     expect(cursorFor(state({ tool: 'eraser', spaceHeld: true }))).toBe('grab')
   })

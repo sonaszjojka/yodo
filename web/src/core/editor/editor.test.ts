@@ -1892,3 +1892,161 @@ describe('attached arrows', () => {
     expect(arrow().startBinding?.elementId).toBe(a.id)
   })
 })
+
+describe('re-attaching an arrow by dragging an end', () => {
+  /** Squares a (0..100) and b (200..300), and a free arrow below them, selected. */
+  function setupFree() {
+    const { editor, a, b } = setupSelection()
+    editor.setTool('arrow')
+    editor.drawTool.pointerDown(1, [0, 300], false)
+    editor.drawTool.pointerMove(1, [100, 300], false)
+    editor.drawTool.pointerUp(1)
+    editor.setTool('select')
+    click(editor, [50, 300])
+    const arrow = () =>
+      editor.store
+        .getState()
+        .document.elements.find((e) => e.type === 'arrow') as ArrowElement
+    return { editor, a, b, arrow }
+  }
+  const endOf = (arrow: ArrowElement): [number, number] => {
+    const last = arrow.points.at(-1)!
+    return [arrow.x + last[0], arrow.y + last[1]]
+  }
+
+  test('dragging the end onto a shape binds it and snaps it to the outline', () => {
+    const { editor, b, arrow } = setupFree()
+    drag(editor, [100, 300], [220, 50])
+    expect(arrow().endBinding).toEqual({ elementId: b.id, ratio: [0, 0.5] })
+    expect(endOf(arrow())).toEqual([200, 50])
+    expect(arrow()).not.toHaveProperty('startBinding')
+  })
+
+  test('the whole drag is one undo step', () => {
+    const { editor, arrow } = setupFree()
+    const before = editor.store.getState().document
+    drag(editor, [100, 300], [220, 50])
+    editor.undo()
+    expect(editor.store.getState().document).toBe(before)
+    editor.redo()
+    expect(arrow().endBinding).toBeDefined()
+  })
+
+  test('dragging a bound end away detaches it', () => {
+    const { editor, arrow } = setupFree()
+    drag(editor, [100, 300], [220, 50])
+    drag(editor, [200, 50], [250, 400])
+    expect(arrow()).not.toHaveProperty('endBinding')
+    expect(endOf(arrow())).toEqual([250, 400])
+  })
+
+  test('the start can be re-attached too, and the other end stays', () => {
+    const { editor, a, arrow } = setupFree()
+    drag(editor, [0, 300], [90, 50])
+    expect(arrow().startBinding?.elementId).toBe(a.id)
+    expect(endOf(arrow())).toEqual([100, 300])
+  })
+
+  test('an end cannot attach to the shape the other end is attached to', () => {
+    const { editor, a, arrow } = setupFree()
+    drag(editor, [0, 300], [90, 50])
+    drag(editor, [100, 300], [50, 50])
+    expect(arrow().startBinding?.elementId).toBe(a.id)
+    expect(arrow()).not.toHaveProperty('endBinding')
+  })
+
+  test('the preview shows the end following, and Esc leaves the document alone', () => {
+    const { editor, arrow } = setupFree()
+    const before = editor.store.getState().document
+    editor.pointerDown(1, [100, 300], { button: 0, shift: false })
+    editor.pointerMove(1, [220, 50], false)
+    const shown = sceneOf(editor.store.getState()).elements.find(
+      (e) => e.type === 'arrow',
+    ) as ArrowElement
+    expect(endOf(shown)).toEqual([200, 50])
+    editor.selectTool.cancel()
+    expect(editor.store.getState().endpoint).toBeNull()
+    expect(editor.store.getState().bindTarget).toBeNull()
+    expect(editor.store.getState().document).toBe(before)
+    expect(endOf(arrow())).toEqual([100, 300])
+  })
+
+  test('Shift-clicking an end handle toggles the arrow out of the selection', () => {
+    const { editor } = setupFree()
+    click(editor, [100, 300], true)
+    expect(editor.store.getState().selectedIds).toEqual([])
+  })
+
+  test('a click on a handle changes nothing', () => {
+    const { editor } = setupFree()
+    const before = editor.store.getState().document
+    click(editor, [100, 300])
+    expect(editor.store.getState().document).toBe(before)
+  })
+
+  test('the target is highlighted while the end is over a shape', () => {
+    const { editor, b } = setupFree()
+    editor.pointerDown(1, [100, 300], { button: 0, shift: false })
+    editor.pointerMove(1, [220, 50], false)
+    expect(editor.store.getState().bindTarget).toBe(b.id)
+    editor.pointerMove(1, [250, 400], false)
+    expect(editor.store.getState().bindTarget).toBeNull()
+    editor.pointerMove(1, [220, 50], false)
+    editor.pointerUp(1)
+    expect(editor.store.getState().bindTarget).toBeNull()
+  })
+
+  test.each([
+    ['duplicate', (e: ReturnType<typeof setup>) => e.duplicateSelected()],
+    ['select all', (e: ReturnType<typeof setup>) => e.selectAll()],
+    ['delete', (e: ReturnType<typeof setup>) => e.deleteSelected()],
+  ])('%s during the drag leaves no stale preview', (_name, act) => {
+    const { editor } = setupFree()
+    editor.pointerDown(1, [100, 300], { button: 0, shift: false })
+    editor.pointerMove(1, [220, 50], false)
+    act(editor)
+    editor.pointerUp(1)
+    const { endpoint, bindTarget } = editor.store.getState()
+    expect(endpoint).toBeNull()
+    expect(bindTarget).toBeNull()
+  })
+
+  test('moving and resizing the shape keeps a re-attached arrow on it', () => {
+    const { editor, arrow } = setupFree()
+    drag(editor, [100, 300], [220, 50])
+    click(editor, [250, 50])
+    drag(editor, [250, 50], [250, 150])
+    expect(endOf(arrow())).toEqual([200, 150])
+    // b is now at y 100..200; its bottom-right handle resizes it.
+    drag(editor, [307, 207], [407, 307])
+    expect(endOf(arrow())).toEqual([200, 200])
+  })
+
+  test('with the arrow tool, the shape under the pointer is highlighted', () => {
+    const { editor, a } = setupSelection()
+    editor.setTool('arrow')
+    editor.pointerMove(1, [50, 50], false)
+    expect(editor.store.getState().bindTarget).toBe(a.id)
+    editor.pointerMove(1, [150, 50], false)
+    expect(editor.store.getState().bindTarget).toBeNull()
+  })
+
+  test('the target is highlighted while an arrow is drawn over a shape', () => {
+    const { editor, b } = setupSelection()
+    editor.setTool('arrow')
+    editor.drawTool.pointerDown(1, [150, 50], false)
+    editor.drawTool.pointerMove(1, [250, 50], false)
+    expect(editor.store.getState().bindTarget).toBe(b.id)
+    editor.drawTool.pointerUp(1)
+    expect(editor.store.getState().bindTarget).toBeNull()
+  })
+
+  test('a single selected arrow has no box handles', () => {
+    const { editor } = setupFree()
+    // The bottom-right of the arrow's box is its end handle, never a resize.
+    const before = editor.store.getState().document
+    drag(editor, [100, 300], [100, 300])
+    expect(editor.store.getState().resize).toBeNull()
+    expect(editor.store.getState().document).toBe(before)
+  })
+})

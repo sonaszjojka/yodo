@@ -1,6 +1,6 @@
 # 0048. Store attached arrows as bindings on the arrow
 
-- Status: Accepted
+- Status: Accepted (the sentence "existing arrows cannot be re-attached yet" is superseded by [0052](0052-arrow-endpoint-handles-and-reattaching.md))
 - Date: 2026-11-06
 
 ## Context

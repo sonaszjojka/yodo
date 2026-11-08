@@ -6,6 +6,8 @@ import { resizeTransform } from '../geometry/resize.ts'
 import {
   bindableAt,
   type BindableElement,
+  dropEnd,
+  moveEnd,
   followBindings,
   pointOf,
   remapBindings,
@@ -291,5 +293,91 @@ describe('remapBindings', () => {
     expect(copy.startBinding?.elementId).toBe('a2')
     expect(copy.startBinding?.ratio).toEqual(arrow.startBinding?.ratio)
     expect(copy).not.toHaveProperty('endBinding')
+  })
+})
+
+describe('moveEnd', () => {
+  const free = createLinear('arrow', lineFromDrag([0, 300], [100, 300], false))
+  const binding = { elementId: 'x', ratio: [0, 0.5] as [number, number] }
+
+  test('puts the end at the point and binds it', () => {
+    const moved = moveEnd(free, 'end', [200, 50], binding)
+    expect(moved).toMatchObject({
+      x: 0,
+      y: 300,
+      width: 200,
+      height: 250,
+      points: [
+        [0, 0],
+        [200, -250],
+      ],
+      endBinding: binding,
+    })
+    expect(moved).not.toHaveProperty('startBinding')
+  })
+
+  test('with no binding it frees the end and keeps the other one', () => {
+    const attached = { ...free, startBinding: binding, endBinding: binding }
+    const moved = moveEnd(attached, 'end', [5, 5], null)
+    expect(moved).not.toHaveProperty('endBinding')
+    expect(moved.startBinding).toEqual(binding)
+  })
+
+  test('moving the start rebases the origin and keeps the end and a bend', () => {
+    const bent: ArrowElement = {
+      ...free,
+      points: [
+        [0, 0],
+        [50, 40],
+        [100, 0],
+      ],
+    }
+    const moved = moveEnd(bent, 'start', [-20, 290], null)
+    const world = moved.points.map(([px, py]) => [moved.x + px, moved.y + py])
+    expect(world).toEqual([
+      [-20, 290],
+      [50, 340],
+      [100, 300],
+    ])
+  })
+})
+
+describe('dropEnd', () => {
+  const target = { ...rect, id: 'target', backgroundColor: '#E0E9FB' }
+  const other = {
+    ...createShape('rectangle', { x: 300, y: 0, width: 100, height: 100 }),
+    id: 'other',
+  }
+  const free = createLinear('arrow', lineFromDrag([0, 300], [100, 300], false))
+
+  test('snaps onto the outline of the shape under the point', () => {
+    const drop = dropEnd([target, free], free, 'end', [90, 50], 6)
+    expect(drop.point).toEqual([100, 50])
+    expect(drop.binding).toEqual({ elementId: 'target', ratio: [1, 0.5] })
+    expect(drop.target).toBe(target)
+  })
+
+  test('stays free over empty space', () => {
+    expect(dropEnd([target, free], free, 'end', [500, 500], 6)).toEqual({
+      point: [500, 500],
+      binding: null,
+      target: null,
+    })
+  })
+
+  test('the shape at the other end is no target', () => {
+    const attached = {
+      ...free,
+      startBinding: { elementId: 'target', ratio: [0, 0] as [number, number] },
+    }
+    const drop = dropEnd(
+      [target, other, attached],
+      attached,
+      'end',
+      [50, 50],
+      6,
+    )
+    expect(drop.binding).toBeNull()
+    expect(drop.target).toBeNull()
   })
 })

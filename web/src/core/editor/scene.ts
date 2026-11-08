@@ -3,6 +3,7 @@
 import type { YodoElement } from '../document/types.ts'
 import type { Bounds } from '../geometry/rect.ts'
 import type { EditorState } from './editor.ts'
+import { moveEnd } from './binding.ts'
 import { moveElements, resizeElements, selectedOf } from './selection.ts'
 
 export interface Scene {
@@ -11,6 +12,8 @@ export interface Scene {
   /** The selected elements as shown (moved or resized, if a drag is in progress). */
   selected: YodoElement[]
   marquee: Bounds | null
+  /** The shape an arrow end would attach to, for the highlight (ADR 0052). */
+  bindTarget: YodoElement | null
 }
 
 /**
@@ -45,16 +48,24 @@ function faded(elements: YodoElement[], ids: ReadonlySet<string>) {
 }
 
 export function sceneOf(state: EditorState): Scene {
-  const { document, draft, move, resize, marquee, erasing } = state
+  const { document, draft, move, resize, endpoint, marquee, erasing } = state
   const ids = new Set(state.selectedIds)
   let shown = withoutEdited(document.elements, state.editing)
   if (erasing) shown = faded(shown, new Set(erasing))
   if (move) shown = moveElements(shown, ids, move.dx, move.dy)
   if (resize) shown = resizeElements(shown, ids, resize)
+  if (endpoint) {
+    shown = shown.map((e) =>
+      e.id === endpoint.arrowId && e.type === 'arrow'
+        ? moveEnd(e, endpoint.end, endpoint.point, endpoint.binding)
+        : e,
+    )
+  }
   const elements = draft ? [...shown, draft] : [...shown]
   return {
     elements,
     selected: selectedOf(elements, ids),
     marquee,
+    bindTarget: elements.find((e) => e.id === state.bindTarget) ?? null,
   }
 }

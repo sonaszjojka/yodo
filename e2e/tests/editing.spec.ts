@@ -165,3 +165,105 @@ test('draw shapes, label one, attach an arrow, move, undo and redo', async ({
     )
   })
 })
+
+test('re-attach an arrow by dragging its end, then move and resize the shape, and detach it', async ({
+  page,
+  mode,
+}) => {
+  await page.goto('./')
+  await page.getByRole('button', { name: 'New drawing' }).click()
+  await page.waitForURL(/#\/d\/[^/]+$/)
+  const id = decodeURIComponent(new URL(page.url()).hash.slice('#/d/'.length))
+
+  /** The stored arrow, once auto-save (ADR 0032) has stored it. */
+  async function storedArrow() {
+    return (await storedDocument(page, mode, id))?.find(
+      (e) => e.type === 'arrow',
+    )
+  }
+
+  await test.step('draw an ellipse and a free arrow below it', async () => {
+    await tool(page, 'Ellipse').click()
+    await drag(page, [600, 150], [800, 300])
+    await tool(page, 'Arrow').click()
+    await drag(page, [200, 450], [450, 450])
+    await expect.poll(storedArrow).toBeDefined()
+    const arrow = (await storedArrow())!
+    expect(arrow.startBinding).toBeUndefined()
+    expect(arrow.endBinding).toBeUndefined()
+  })
+
+  await test.step('dragging the selected arrow end onto the ellipse attaches it', async () => {
+    await tool(page, 'Select').click()
+    await page.locator('canvas.canvas').click({ position: { x: 325, y: 450 } })
+    await drag(page, [450, 450], [700, 225])
+    await expect
+      .poll(async () => (await storedArrow())?.endBinding)
+      .toBeDefined()
+    const elements = (await storedDocument(page, mode, id))!
+    const ellipse = elements.find((e) => e.type === 'ellipse')!
+    const arrow = elements.find((e) => e.type === 'arrow')!
+    expect(arrow.endBinding?.elementId).toBe(ellipse.id)
+    expect(arrow.startBinding).toBeUndefined()
+  })
+
+  let attachedEnd: number[]
+  await test.step('moving the ellipse keeps the arrow attached', async () => {
+    const before = arrowEnds((await storedArrow())!).end
+    // The ellipse has no fill: grab it by its right edge.
+    await drag(page, [800, 225], [800, 275])
+    await expect
+      .poll(async () => arrowEnds((await storedArrow())!).end[1])
+      .toBeGreaterThan(before[1]! + 20)
+    const arrow = (await storedArrow())!
+    expect(arrow.endBinding).toBeDefined()
+    attachedEnd = arrowEnds(arrow).end
+  })
+
+  await test.step('resizing the ellipse keeps the arrow end on its outline', async () => {
+    const before = (await storedDocument(page, mode, id))!.find(
+      (e) => e.type === 'ellipse',
+    )!
+    // The ellipse is still selected from the move. Pull its bottom-right
+    // corner handle, which sits just outside the box (stroke and gap).
+    const corner = [before.x + before.width + 8, before.y + before.height + 8]
+    await drag(
+      page,
+      [corner[0]!, corner[1]!],
+      [corner[0]! + 100, corner[1]! + 100],
+    )
+    await expect
+      .poll(async () => {
+        const ellipse = (await storedDocument(page, mode, id))!.find(
+          (e) => e.type === 'ellipse',
+        )!
+        return ellipse.width
+      })
+      .toBeGreaterThan(before.width + 50)
+    const elements = (await storedDocument(page, mode, id))!
+    const ellipse = elements.find((e) => e.type === 'ellipse')!
+    const arrow = elements.find((e) => e.type === 'arrow')!
+    expect(arrow.endBinding?.elementId).toBe(ellipse.id)
+    // The end lies on the resized ellipse's curve.
+    const [x, y] = arrowEnds(arrow).end
+    const [rx, ry] = [ellipse.width / 2, ellipse.height / 2]
+    const onCurve =
+      ((x! - ellipse.x - rx) / rx) ** 2 + ((y! - ellipse.y - ry) / ry) ** 2
+    expect(onCurve).toBeCloseTo(1, 1)
+    attachedEnd = [x!, y!]
+  })
+
+  await test.step('dragging the end away detaches it', async () => {
+    const { start, end } = arrowEnds((await storedArrow())!)
+    expect(end).toEqual(attachedEnd)
+    // Select the arrow by its middle, then pull its end into empty space.
+    await page.locator('canvas.canvas').click({
+      position: { x: (start[0]! + end[0]!) / 2, y: (start[1]! + end[1]!) / 2 },
+    })
+    await drag(page, [end[0]!, end[1]!], [450, 520])
+    await expect
+      .poll(async () => (await storedArrow())?.endBinding)
+      .toBeUndefined()
+    expect(arrowEnds((await storedArrow())!).end).toEqual([450, 520])
+  })
+})
