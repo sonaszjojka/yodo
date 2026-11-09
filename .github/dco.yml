@@ -1,0 +1,4 @@
+# DCO app settings (ADR 0059). Maintainers with write access are not required
+# to sign off; outside contributors are.
+require:
+  members: false
