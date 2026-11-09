@@ -140,21 +140,44 @@ export function roughOptions(element: YodoElement, theme: Theme): Options {
   }
 }
 
+/** One drawing pass of a closed head. */
+export interface HeadPass {
+  options: Options
+  /** Drawn at full opacity, whatever the arrow's own (a hiding fill). */
+  opaque: boolean
+}
+
 /**
- * The rough.js options for a closed head: solid in the stroke colour when
- * `filled`, otherwise filled with the canvas colour so the arrow's shaft does
- * not show through the hollow shape, as in Excalidraw (ADR 0055).
+ * How a closed head is drawn (ADR 0055). A filled head is one pass, solid in
+ * the stroke colour. A hollow one is an opaque fill in the canvas colour, so
+ * the arrow's shaft does not show through it even at reduced opacity, then
+ * its outline at the arrow's opacity, as Excalidraw does.
  */
-export function headOptions(
+export function headPasses(
   options: Options,
   filled: boolean,
   theme: Theme,
-): Options {
-  return {
-    ...options,
-    fill: filled ? options.stroke : canvasColor(theme),
-    fillStyle: 'solid',
+): HeadPass[] {
+  if (filled) {
+    return [
+      {
+        options: { ...options, fill: options.stroke, fillStyle: 'solid' },
+        opaque: false,
+      },
+    ]
   }
+  return [
+    {
+      options: {
+        ...options,
+        stroke: 'none',
+        fill: canvasColor(theme),
+        fillStyle: 'solid',
+      },
+      opaque: true,
+    },
+    { options: { ...options, fill: undefined }, opaque: false },
+  ]
 }
 
 /**
@@ -364,17 +387,24 @@ function drawElement(
       if (element.type !== 'arrow') return
       // Same seed, so a head keeps its wobble from frame to frame too.
       for (const op of arrowHeadOps(element, points, curved)) {
-        if (op.kind === 'path') rough.linearPath(op.points, options)
-        else if (op.kind === 'polygon')
-          rough.polygon(op.points, headOptions(options, op.filled, theme))
-        else
-          rough.ellipse(
-            op.center[0],
-            op.center[1],
-            op.diameter,
-            op.diameter,
-            headOptions(options, op.filled, theme),
-          )
+        if (op.kind === 'path') {
+          rough.linearPath(op.points, options)
+          continue
+        }
+        const alpha = ctx.globalAlpha
+        for (const pass of headPasses(options, op.filled, theme)) {
+          if (pass.opaque) ctx.globalAlpha = 1
+          if (op.kind === 'polygon') rough.polygon(op.points, pass.options)
+          else
+            rough.ellipse(
+              op.center[0],
+              op.center[1],
+              op.diameter,
+              op.diameter,
+              pass.options,
+            )
+          ctx.globalAlpha = alpha
+        }
       }
       return
     }

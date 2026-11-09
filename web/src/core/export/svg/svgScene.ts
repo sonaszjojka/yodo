@@ -28,7 +28,7 @@ import {
   IMAGE_PLACEHOLDER,
   NOTE_RADIUS,
   NOTE_SHADOW,
-  headOptions,
+  headPasses,
   roughOptions,
 } from '../../render/render.ts'
 import {
@@ -83,6 +83,8 @@ function drawablePaths(
   drawable: Drawable,
   deps: SvgDeps,
   element: YodoElement,
+  /** Leave out the element's opacity (a fill that hides what is under it). */
+  opaque = false,
 ): SvgNode[] {
   const paths = deps.generator.toPaths(drawable)
   return paths.map((path, i) =>
@@ -92,7 +94,7 @@ function drawablePaths(
       stroke: path.stroke,
       'stroke-width': path.strokeWidth,
       'stroke-dasharray': i === paths.length - 1 ? dashes(element) : undefined,
-      opacity: opacityOf(element),
+      opacity: opaque ? undefined : opacityOf(element),
     }),
   )
 }
@@ -330,22 +332,29 @@ function elementNodes(
       )
       if (element.type !== 'arrow') return nodes
       for (const op of arrowHeadOps(element, points, curved)) {
-        const drawable =
-          op.kind === 'path'
-            ? generator.linearPath(op.points, options)
-            : op.kind === 'polygon'
-              ? generator.polygon(
-                  op.points,
-                  headOptions(options, op.filled, theme),
-                )
+        if (op.kind === 'path') {
+          nodes.push(
+            ...drawablePaths(
+              generator.linearPath(op.points, options),
+              deps,
+              element,
+            ),
+          )
+          continue
+        }
+        for (const pass of headPasses(options, op.filled, theme)) {
+          const drawable =
+            op.kind === 'polygon'
+              ? generator.polygon(op.points, pass.options)
               : generator.ellipse(
                   op.center[0],
                   op.center[1],
                   op.diameter,
                   op.diameter,
-                  headOptions(options, op.filled, theme),
+                  pass.options,
                 )
-        nodes.push(...drawablePaths(drawable, deps, element))
+          nodes.push(...drawablePaths(drawable, deps, element, pass.opaque))
+        }
       }
       return nodes
     }

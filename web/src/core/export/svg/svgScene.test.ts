@@ -220,7 +220,7 @@ describe('rough shapes', () => {
     expect(count({ ...arrow, endArrowhead: null })).toBe(count(line))
   })
 
-  test('a hollow head is filled with the canvas colour, so the shaft is hidden', () => {
+  test('a hollow head hides the shaft: an opaque canvas-coloured fill, then the outline at the arrow opacity', () => {
     const hollow = {
       ...createLinear(
         'arrow',
@@ -237,11 +237,16 @@ describe('rough shapes', () => {
         4,
       ),
       endArrowhead: 'circle_outline' as const,
+      opacity: 50,
     }
-    const fills = all(treeOf([hollow], { background: false }), 'path').map(
-      (node) => node.attrs.fill,
+    const paths = all(treeOf([hollow], { background: false }), 'path')
+    const mask = paths.find((p) => p.attrs.fill === LIGHT_CANVAS)
+    expect(mask).toBeDefined()
+    // Opaque, while the shaft and the outline keep the element's opacity.
+    expect(mask!.attrs.opacity).toBeUndefined()
+    expect(paths.filter((p) => p.attrs.opacity === 0.5).length).toBeGreaterThan(
+      1,
     )
-    expect(fills).toContain(LIGHT_CANVAS)
   })
 
   test('a start head and a closed head add drawings (ADR 0055)', () => {

@@ -295,15 +295,40 @@ describe('renderScene', () => {
     const [points, options] = rough.polygon.mock.calls[0]!
     expect(points[0]).toEqual([0, 0])
     expect(options).toMatchObject({ fill: options.stroke, fillStyle: 'solid' })
-    const [cx, , width, height, outline] = rough.ellipse.mock.calls[0]!
+    const [cx, , width, height, outline] = rough.ellipse.mock.calls[1]!
     expect(cx).toBeLessThan(100)
     expect(width).toBe(height)
-    // A hollow head is filled with the canvas, so the shaft does not show
-    // through it (ADR 0055).
-    expect(outline).toMatchObject({
+    // A hollow head is drawn as an opaque canvas-coloured fill, then its
+    // outline, so the shaft does not show through it (ADR 0055).
+    expect(outline.fill).toBeUndefined()
+    expect(rough.ellipse.mock.calls[0]![4]).toMatchObject({
       fill: canvasColor('light'),
-      fillStyle: 'solid',
+      stroke: 'none',
     })
+  })
+
+  test('a hollow head hides the shaft at reduced opacity too: an opaque fill pass, then the outline', () => {
+    const rough = fakeRough()
+    const ctx = fakeContext()
+    const alphas: number[] = []
+    rough.ellipse.mockImplementation(() => {
+      alphas.push(ctx.globalAlpha)
+    })
+    const arrow = {
+      ...createLinear('arrow', lineFromDrag([0, 0], [100, 0], false), 6),
+      endArrowhead: 'circle_outline' as const,
+      opacity: 50,
+    }
+
+    renderScene(ctx, rough, [arrow], SURFACE, IDENTITY)
+
+    expect(alphas).toEqual([1, 0.5])
+    const [fillPass, outlinePass] = rough.ellipse.mock.calls
+    expect(fillPass![4]).toMatchObject({
+      stroke: 'none',
+      fill: canvasColor('light'),
+    })
+    expect(outlinePass![4].fill).toBeUndefined()
   })
 
   test('a zero-length arrow draws no head', () => {
