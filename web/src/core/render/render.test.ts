@@ -450,6 +450,22 @@ describe('arrow overlay (ADR 0052)', () => {
   })
 })
 
+describe('path attach target', () => {
+  test('a line is outlined along its path, not closed', () => {
+    const line = createLinear('line', lineFromDrag([10, 20], [110, 20], false))
+    const ctx = fakeContext()
+    renderScene(ctx, fakeRough(), [line], SURFACE, IDENTITY, {
+      selected: [],
+      marquee: null,
+      bindTarget: line,
+    })
+    expect(ctx.moveTo).toHaveBeenCalledWith(10, 20)
+    expect(ctx.lineTo).toHaveBeenCalledWith(110, 20)
+    expect(ctx.lineTo).toHaveBeenCalledTimes(1)
+    expect(ctx.lineWidth).toBe(2.5)
+  })
+})
+
 describe('selection overlay', () => {
   const rect = createShape('rectangle', {
     x: 10,

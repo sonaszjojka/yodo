@@ -117,14 +117,23 @@ export function isElement(value: unknown): value is YodoElement {
 }
 
 function isBinding(value: unknown) {
-  return (
-    isRecord(value) &&
-    typeof value.elementId === 'string' &&
-    value.elementId !== '' &&
-    Array.isArray(value.ratio) &&
-    value.ratio.length === 2 &&
-    value.ratio.every(isNumber)
-  )
+  if (
+    !isRecord(value) ||
+    typeof value.elementId !== 'string' ||
+    value.elementId === ''
+  ) {
+    return false
+  }
+  // A shape binding has a box ratio (ADR 0048), a path binding a fraction of
+  // the path's length (ADR 0054).
+  return 'along' in value
+    ? !('ratio' in value) &&
+        isNumber(value.along) &&
+        value.along >= 0 &&
+        value.along <= 1
+    : Array.isArray(value.ratio) &&
+        value.ratio.length === 2 &&
+        value.ratio.every(isNumber)
 }
 
 /**

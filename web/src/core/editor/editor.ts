@@ -58,9 +58,10 @@ import {
 } from './clipboard.ts'
 import {
   applyHandleDrag,
+  followBindings,
   bindableAt,
   dropEnd,
-  snapToOutline,
+  snapToTarget,
   type HandleDrag,
 } from './binding.ts'
 import { arrange, type LayerOrder } from './layers.ts'
@@ -402,7 +403,7 @@ export function createEditor(
       // snapped end ignores Shift, since it has a place of its own.
       const found = bindableUnder(drag.last)
       const target = found && found.id !== drag.startTargetId ? found : null
-      const snap = target ? snapToOutline(target, drag.last) : null
+      const snap = target ? snapToTarget(target, drag.last) : null
       setBindTarget(target?.id ?? null)
       const geometry = lineFromDrag(
         drag.start,
@@ -454,7 +455,7 @@ export function createEditor(
       if (!isDrawingTool(tool)) return
       // An arrow starting on a shape starts on its outline and is attached.
       const target = tool === 'arrow' ? bindableUnder(point) : null
-      const snap = target ? snapToOutline(target, point) : null
+      const snap = target ? snapToTarget(target, point) : null
       const origin = snap?.point ?? point
       drag = {
         pointerId,
@@ -840,8 +841,13 @@ export function createEditor(
         store.setState((prev) => {
           const { endpoint } = prev
           if (!endpoint) return prev
-          const elements = prev.document.elements.map((e) =>
-            applyHandleDrag(e, endpoint),
+          // Arrows attached to the dragged line or arrow follow it, in the
+          // same undo step (ADR 0054).
+          const elements = followBindings(
+            prev.document.elements.map((e) => applyHandleDrag(e, endpoint)),
+            new Set(),
+            { x: false, y: false },
+            new Set([endpoint.elementId]),
           )
           return {
             ...prev,

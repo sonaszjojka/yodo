@@ -25,7 +25,12 @@ import {
   HANDLE_SIZE,
   selectionFrame,
 } from '../geometry/frame.ts'
-import { bindOutline, isBindable } from '../editor/binding.ts'
+import {
+  bindOutline,
+  isBindable,
+  isPathTarget,
+  pathPoints,
+} from '../editor/binding.ts'
 import {
   cornerRadius,
   diamondPoints,
@@ -512,13 +517,15 @@ function drawOverlay(
     drawSizeBadge(ctx, frame.box, outline, viewport, dpr, colors)
   }
   const { bindTarget } = overlay
-  if (bindTarget && isBindable(bindTarget)) {
-    const outline = bindOutline(bindTarget)
+  if (bindTarget && (isBindable(bindTarget) || isPathTarget(bindTarget))) {
+    // A shape is outlined all round; a line or arrow along its path (ADR 0054).
+    const closed = isBindable(bindTarget)
+    const outline = closed ? bindOutline(bindTarget) : pathPoints(bindTarget)
     ctx.beginPath()
     outline.forEach(([x, y], i) =>
       i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y),
     )
-    ctx.lineTo(outline[0]![0], outline[0]![1])
+    if (closed) ctx.lineTo(outline[0]![0], outline[0]![1])
     ctx.lineWidth = BIND_OUTLINE_WIDTH * px
     ctx.stroke()
   }

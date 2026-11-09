@@ -4,9 +4,12 @@
 import type {
   ArrowBinding,
   ArrowElement,
+  PathBinding,
   Point,
+  ShapeBinding,
   YodoElement,
 } from '../document/types.ts'
+import { flattenCurve, isCurved } from '../geometry/curve.ts'
 import type { LinearElement } from '../geometry/frame.ts'
 import { hitTest } from '../geometry/hit.ts'
 import {
@@ -33,19 +36,31 @@ export function isBindable(element: YodoElement): element is BindableElement {
   )
 }
 
+/** The lines and arrows an arrow can attach to (ADR 0054). */
+export type PathElement = Extract<YodoElement, { type: 'line' | 'arrow' }>
+
+export function isPathTarget(element: YodoElement): element is PathElement {
+  return element.type === 'line' || element.type === 'arrow'
+}
+
+/** Anything an arrow end can attach to. */
+export type BindTarget = BindableElement | PathElement
+
 /**
- * The topmost shape an arrow end dropped at `point` attaches to. The empty
- * middle of a transparent shape counts, so the end can land anywhere on it.
+ * The topmost shape, line or arrow an arrow end dropped at `point` attaches
+ * to. The empty middle of a transparent shape counts, so the end can land
+ * anywhere on it; a line or arrow counts within `tolerance` of its path.
  */
 export function bindableAt(
   elements: readonly YodoElement[],
   point: Point,
   tolerance: number,
-): BindableElement | null {
+): BindTarget | null {
   for (let i = elements.length - 1; i >= 0; i--) {
     const element = elements[i]!
     if (
-      isBindable(element) &&
+      (isBindable(element) ||
+        (isPathTarget(element) && element.points.length > 0)) &&
       hitTest({ ...element, backgroundColor: '#000000' }, point, tolerance)
     ) {
       return element
@@ -120,7 +135,7 @@ export function pointOf(element: Bounds, ratio: Point): Point {
 export function snapToOutline(
   target: BindableElement,
   point: Point,
-): { point: Point; binding: ArrowBinding } {
+): { point: Point; binding: ShapeBinding } {
   const outline = bindOutline(target)
   let best: Point = point
   let bestDistance = Infinity
@@ -143,6 +158,87 @@ export function snapToOutline(
     point: best,
     binding: { elementId: target.id, ratio: ratioOf(target, best) },
   }
+}
+
+/** The tolerance (world units) a curved target is flattened to. */
+const PATH_TOLERANCE = 0.25
+
+/**
+ * The drawn path of a line or arrow in world coordinates: its points, or the
+ * curve through them flattened when it is curved (ADR 0053).
+ */
+export function pathPoints(element: PathElement): Point[] {
+  const absolute = element.points.map(([dx, dy]): Point => [
+    element.x + dx,
+    element.y + dy,
+  ])
+  return isCurved(element) ? flattenCurve(absolute, PATH_TOLERANCE) : absolute
+}
+
+function lengthOf(a: Point, b: Point) {
+  return Math.hypot(b[0] - a[0], b[1] - a[1])
+}
+
+/**
+ * The point `along` (0 to 1) of the way along the target's drawn length, or
+ * null for a target with no points. A path with no length is its first point.
+ */
+export function pointAlong(target: PathElement, along: number): Point | null {
+  const path = pathPoints(target)
+  if (path.length === 0) return null
+  let total = 0
+  for (let i = 1; i < path.length; i++)
+    total += lengthOf(path[i - 1]!, path[i]!)
+  if (total === 0) return path[0]!
+  let remaining = Math.min(1, Math.max(0, along)) * total
+  for (let i = 1; i < path.length; i++) {
+    const [a, b] = [path[i - 1]!, path[i]!]
+    const length = lengthOf(a, b)
+    if (remaining <= length && length > 0) {
+      const t = remaining / length
+      return [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])]
+    }
+    remaining -= length
+  }
+  return path.at(-1)!
+}
+
+/**
+ * The point on a line or arrow nearest to `point`, and the binding that
+ * remembers it as a fraction of the path's length (ADR 0054).
+ */
+export function snapToPath(
+  target: PathElement,
+  point: Point,
+): { point: Point; binding: PathBinding } {
+  const path = pathPoints(target)
+  let best: Point = path[0] ?? point
+  let bestDistance = Infinity
+  let bestLength = 0
+  let travelled = 0
+  for (let i = 1; i < path.length; i++) {
+    const [a, b] = [path[i - 1]!, path[i]!]
+    const candidate = closestOnSegment(point, a, b)
+    const distance = lengthOf(candidate, point)
+    if (distance < bestDistance) {
+      best = candidate
+      bestDistance = distance
+      bestLength = travelled + lengthOf(a, candidate)
+    }
+    travelled += lengthOf(a, b)
+  }
+  const along = travelled === 0 ? 0 : Math.min(1, bestLength / travelled)
+  return { point: best, binding: { elementId: target.id, along } }
+}
+
+/** Snaps `point` onto `target`'s outline or path, whichever it has. */
+export function snapToTarget(
+  target: BindTarget,
+  point: Point,
+): { point: Point; binding: ArrowBinding } {
+  return isPathTarget(target)
+    ? snapToPath(target, point)
+    : snapToOutline(target, point)
 }
 
 /**
@@ -263,13 +359,36 @@ export interface EndDrop {
   /** The binding it gets, or null when it stays free. */
   binding: ArrowBinding | null
   /** The shape it attaches to, for the highlight. */
-  target: BindableElement | null
+  target: BindTarget | null
+}
+
+/** `id` and every arrow that is attached, directly or not, to it. */
+function dependantsOf(elements: readonly YodoElement[], id: string) {
+  const ids = new Set([id])
+  let grew = true
+  while (grew) {
+    grew = false
+    for (const e of elements) {
+      if (
+        e.type === 'arrow' &&
+        !ids.has(e.id) &&
+        (ids.has(e.startBinding?.elementId ?? '') ||
+          ids.has(e.endBinding?.elementId ?? ''))
+      ) {
+        ids.add(e.id)
+        grew = true
+      }
+    }
+  }
+  return ids
 }
 
 /**
  * Where `end` of `arrow` lands when dragged to `point`: on the outline of the
- * shape under it, or at `point` itself. The shape the other end is attached
- * to is no target, as when drawing.
+ * shape under it, on the path of a line or arrow under it, or at `point`
+ * itself. The element the other end is attached to is no target, as when
+ * drawing; nor is the arrow itself or any arrow attached to it, which would
+ * make a loop (ADR 0054).
  */
 export function dropEnd(
   elements: readonly YodoElement[],
@@ -279,13 +398,14 @@ export function dropEnd(
   tolerance: number,
 ): EndDrop {
   const other = end === 'start' ? arrow.endBinding : arrow.startBinding
+  const loop = dependantsOf(elements, arrow.id)
   const target = bindableAt(
-    elements.filter((e) => e.id !== other?.elementId),
+    elements.filter((e) => e.id !== other?.elementId && !loop.has(e.id)),
     point,
     tolerance,
   )
   if (!target) return { point, binding: null, target: null }
-  const snap = snapToOutline(target, point)
+  const snap = snapToTarget(target, point)
   return { point: snap.point, binding: snap.binding, target }
 }
 
@@ -312,26 +432,44 @@ export function attachEnd(
 }
 
 /**
- * Fixes up the arrows after the elements in `moved` were moved or resized
- * (`elements` already holds their new geometry):
- * - an end whose shape moved follows it, snapped to the shape's outline (on
- *   the mirrored side if `flipped` says the resize flipped that axis);
- * - an end whose shape stayed put while the arrow itself moved is detached;
- * - an end whose shape is gone or cannot be attached to is detached.
- * Elements that need nothing keep their object identity.
+ * Fixes up the arrows after the elements in `moved` were moved or resized, or
+ * those in `edited` had their points changed (`elements` already holds their
+ * new geometry):
+ * - an end whose target moved or was edited follows it, snapped to the
+ *   outline of a shape (on the mirrored side if `flipped` says the resize
+ *   flipped that axis) or put at the same fraction along a line or arrow;
+ * - an end whose target stayed put while the arrow itself moved is detached;
+ * - an end whose target is gone, of the wrong kind, or would make a loop is
+ *   detached.
+ * An arrow attached to an arrow that follows is resolved after it, so chains
+ * end up right (ADR 0054). Elements that need nothing keep their identity.
  */
 export function followBindings(
   elements: readonly YodoElement[],
   moved: ReadonlySet<string>,
   /** Axes a resize mirrored: attachments on them swap sides. */
   flipped: { x: boolean; y: boolean } = { x: false, y: false },
+  edited: ReadonlySet<string> = new Set(),
 ): YodoElement[] {
   if (!elements.some((e) => e.type === 'arrow' && hasBinding(e))) {
     return [...elements]
   }
   const byId = new Map(elements.map((e) => [e.id, e]))
-  return elements.map((element) => {
+  const done = new Map<string, YodoElement>()
+  const visiting = new Set<string>()
+
+  function resolve(element: YodoElement): YodoElement {
     if (element.type !== 'arrow' || !hasBinding(element)) return element
+    const cached = done.get(element.id)
+    if (cached) return cached
+    visiting.add(element.id)
+    const result = follow(element)
+    visiting.delete(element.id)
+    done.set(element.id, result)
+    return result
+  }
+
+  function follow(element: ArrowElement): ArrowElement {
     // A file can hold an arrow with no points; there is no end to move.
     if (element.points.length < 2)
       return without(without(element, 'startBinding'), 'endBinding')
@@ -340,22 +478,42 @@ export function followBindings(
       const key = end === 'start' ? 'startBinding' : 'endBinding'
       const binding = arrow[key]
       if (!binding) continue
-      const target = byId.get(binding.elementId)
-      if (!target || !isBindable(target)) {
+      const original = byId.get(binding.elementId)
+      const fits =
+        original &&
+        ('along' in binding ? isPathTarget(original) : isBindable(original))
+      if (!fits || visiting.has(original.id)) {
         arrow = without(arrow, key)
-      } else if (moved.has(element.id) && !moved.has(target.id)) {
+        continue
+      }
+      const target = resolve(original)
+      if (moved.has(element.id) && !moved.has(target.id)) {
         arrow = without(arrow, key)
-      } else if (moved.has(target.id)) {
-        const ratio: Point = [
-          flipped.x ? 1 - binding.ratio[0] : binding.ratio[0],
-          flipped.y ? 1 - binding.ratio[1] : binding.ratio[1],
-        ]
-        const world = snapToOutline(target, pointOf(target, ratio))
-        arrow = withEnd({ ...arrow, [key]: world.binding }, end, world.point)
+      } else if (
+        moved.has(target.id) ||
+        edited.has(target.id) ||
+        target !== original
+      ) {
+        if ('along' in binding) {
+          const world = pointAlong(target as PathElement, binding.along)
+          arrow = world ? withEnd(arrow, end, world) : without(arrow, key)
+        } else {
+          const ratio: Point = [
+            flipped.x ? 1 - binding.ratio[0] : binding.ratio[0],
+            flipped.y ? 1 - binding.ratio[1] : binding.ratio[1],
+          ]
+          const world = snapToOutline(
+            target as BindableElement,
+            pointOf(target, ratio),
+          )
+          arrow = withEnd({ ...arrow, [key]: world.binding }, end, world.point)
+        }
       }
     }
     return arrow
-  })
+  }
+
+  return elements.map(resolve)
 }
 
 function hasBinding(arrow: ArrowElement) {

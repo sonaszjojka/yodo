@@ -116,6 +116,23 @@ describe('shapes, lines, arrows and pencil', () => {
     })
   })
 
+  test('a binding to another arrow is not kept, since Excalidraw has none (ADR 0054)', async () => {
+    const input = JSON.parse(shapes)
+    const arrows = input.elements.filter(
+      (e: { type: string }) => e.type === 'arrow',
+    )
+    arrows[0].endBinding = { elementId: arrows[1].id, focus: 0, gap: 0 }
+    const { document, summary } = await convertExcalidraw(input, options())
+    expect(
+      document.elements.some(
+        (e) => e.type === 'arrow' && 'along' in (e.endBinding ?? {}),
+      ),
+    ).toBe(false)
+    expect(summary.simplified.map((s) => s.reason)).toContain(
+      'arrows no longer attached to shapes',
+    )
+  })
+
   test('a bound arrow with a bend follows its shape when it moves', async () => {
     const input = JSON.parse(shapes)
     const a1 = input.elements.find((e: { id: string }) => e.id === 'a1')
