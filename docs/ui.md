@@ -28,6 +28,7 @@
 - **Contextual bar** above the selection:
   - shape: stroke, fill, width, look (hand-drawn / clean), **All styles**, more;
   - text: font, size S/M/L/XL, **All styles**, more;
+  - arrow: the shape controls plus **Start head** and **End head**, each a popover of none and the 14 heads (arrow, bar, circle, triangle, diamond and the crow's-foot ones), drawn as a line ending in that head; the panel has the same two sections before Opacity (ADR 0055);
   - note (sticky note, tool `N`): text colour and note colour (the 7 fills, never "None"), **All styles**, more; opacity in the panel. A new note is Sand and opens for typing at once (ADR 0038);
   - more (any selection): duplicate, copy/paste style, bring to front, delete.
   - Each control opens one small popover at a time. No bar when nothing is selected.
@@ -41,7 +42,7 @@
 - Bar and panel edit the same state and always agree.
 
 ## Selection
-Thin solid accent outline (1.25 px) with a small gap around the element, 8 px rounded white corner handles, a rotate handle above, and a size badge below (e.g. `220 × 120`). The rotate handle appears once rotation is in scope (not in the MVP). Dragging a corner handle resizes; dragging an outline side resizes that axis only (the sides have no drawn handle). Shift keeps proportions, and dragging past the opposite side flips the selection. **One selected line or arrow** has no box, corner handles or badge: it has a round handle on each point instead, and a hollow mid-handle on a straight one; dragging the mid-handle bends it into a curve (ADR 0053). Dragging an end moves just that end; over a shape it snaps to the outline and attaches, anywhere else it detaches (ADR 0052). While an arrow end is being placed, and while the Arrow tool hovers over a shape, that shape is outlined in the accent colour, along its own outline.
+Thin solid accent outline (1.25 px) with a small gap around the element, 8 px rounded white corner handles, a rotate handle above, and a size badge below (e.g. `220 × 120`). The rotate handle appears once rotation is in scope (not in the MVP). Dragging a corner handle resizes; dragging an outline side resizes that axis only (the sides have no drawn handle). Shift keeps proportions, and dragging past the opposite side flips the selection. **One selected line or arrow** has no box, corner handles or badge: it has a round handle on each point instead, and a hollow mid-handle on a straight one; dragging the mid-handle bends it into a curve (ADR 0053). Dragging an end moves just that end; over a shape it snaps to the outline and attaches, over a line or another arrow it snaps to the path and attaches at that point (ADR 0054), anywhere else it detaches (ADR 0052). While an arrow end is being placed, and while the Arrow tool hovers over a shape, line or arrow, that target is outlined in the accent colour, along its own outline or path.
 
 ## Visual tokens
 **Typography:** UI in Manrope. Canvas fonts: Hand (Caveat), Sans (Manrope), Mono (JetBrains Mono). Caveat is bundled from Fontsource (OFL-1.1, ADR 0025); the other fonts' licences are checked when they are added.

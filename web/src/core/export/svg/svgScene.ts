@@ -13,8 +13,8 @@ import type {
   YodoElement,
 } from '../../document/types.ts'
 import { smoothPath } from '../../geometry/freehand.ts'
-import { headFrom, isCurved } from '../../geometry/curve.ts'
-import { arrowhead } from '../../geometry/line.ts'
+import { arrowHeadOps } from '../../geometry/arrowhead.ts'
+import { isCurved } from '../../geometry/curve.ts'
 import {
   cornerRadius,
   diamondPoints,
@@ -28,6 +28,7 @@ import {
   IMAGE_PLACEHOLDER,
   NOTE_RADIUS,
   NOTE_SHADOW,
+  headPasses,
   roughOptions,
 } from '../../render/render.ts'
 import {
@@ -82,6 +83,8 @@ function drawablePaths(
   drawable: Drawable,
   deps: SvgDeps,
   element: YodoElement,
+  /** Leave out the element's opacity (a fill that hides what is under it). */
+  opaque = false,
 ): SvgNode[] {
   const paths = deps.generator.toPaths(drawable)
   return paths.map((path, i) =>
@@ -91,7 +94,7 @@ function drawablePaths(
       stroke: path.stroke,
       'stroke-width': path.strokeWidth,
       'stroke-dasharray': i === paths.length - 1 ? dashes(element) : undefined,
-      opacity: opacityOf(element),
+      opacity: opaque ? undefined : opacityOf(element),
     }),
   )
 }
@@ -327,18 +330,31 @@ function elementNodes(
         deps,
         element,
       )
-      if (points.length < 2) return nodes
-      const to = points.at(-1)!
-      const from = headFrom(points, curved)
-      const hasLength = from[0] !== to[0] || from[1] !== to[1]
-      if (element.type === 'arrow' && element.endArrowhead && hasLength) {
-        nodes.push(
-          ...drawablePaths(
-            generator.linearPath(arrowhead(from, to), options),
-            deps,
-            element,
-          ),
-        )
+      if (element.type !== 'arrow') return nodes
+      for (const op of arrowHeadOps(element, points, curved)) {
+        if (op.kind === 'path') {
+          nodes.push(
+            ...drawablePaths(
+              generator.linearPath(op.points, options),
+              deps,
+              element,
+            ),
+          )
+          continue
+        }
+        for (const pass of headPasses(options, op.filled, theme)) {
+          const drawable =
+            op.kind === 'polygon'
+              ? generator.polygon(op.points, pass.options)
+              : generator.ellipse(
+                  op.center[0],
+                  op.center[1],
+                  op.diameter,
+                  op.diameter,
+                  pass.options,
+                )
+          nodes.push(...drawablePaths(drawable, deps, element, pass.opaque))
+        }
       }
       return nodes
     }

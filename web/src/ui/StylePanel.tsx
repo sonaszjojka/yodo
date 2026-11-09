@@ -17,6 +17,7 @@ import {
   X,
 } from '@phosphor-icons/react'
 import {
+  Fragment,
   useEffect,
   useRef,
   useState,
@@ -25,12 +26,14 @@ import {
   type ReactNode,
 } from 'react'
 import type {
+  Arrowhead,
   FillStyle,
   Roundness,
   StrokeStyle,
   TextAlign,
 } from '../core/document/types.ts'
 import type { Editor, EditorState } from '../core/editor/editor.ts'
+import { commonArrowhead } from '../core/editor/arrowhead.ts'
 import { selectedOf } from '../core/editor/selection.ts'
 import {
   commonStyle,
@@ -50,8 +53,10 @@ import {
   type ResizeEdge,
 } from './panelGeometry.ts'
 import { Swatch, WidthLine } from './StyleBar.tsx'
+import { ArrowheadGlyph } from './ArrowheadGlyph.tsx'
 import {
   ALIGNMENTS,
+  ARROWHEAD_OPTIONS,
   CORNERS,
   FILL_STYLES,
   FILLS,
@@ -302,6 +307,43 @@ function ChoiceSection({
         ))}
       </div>
       {children}
+    </section>
+  )
+}
+
+/** The head choices of one end of the selected arrows (ADR 0055). */
+function HeadSection({
+  end,
+  value,
+  onPick,
+}: {
+  end: 'start' | 'end'
+  value: Arrowhead | null | 'mixed'
+  onPick(head: Arrowhead | null): void
+}) {
+  const id = `panel-${end}Arrowhead`
+  return (
+    <section className="panel-section" aria-labelledby={id}>
+      <SectionTitle
+        id={id}
+        name={end === 'start' ? 'Start arrowhead' : 'End arrowhead'}
+        value={labelOf(ARROWHEAD_OPTIONS, value)}
+      />
+      <div className="panel-options" role="group" aria-labelledby={id}>
+        {ARROWHEAD_OPTIONS.map((option) => (
+          <button
+            key={String(option.value)}
+            type="button"
+            className="tool-button"
+            aria-label={option.label}
+            title={option.label}
+            aria-pressed={option.value === value}
+            onClick={() => onPick(option.value)}
+          >
+            <ArrowheadGlyph head={option.value} end={end} />
+          </button>
+        ))}
+      </div>
     </section>
   )
 }
@@ -691,11 +733,23 @@ export function StylePanel({ editor, panel }: StylePanelProps) {
           const value = style[key]!
           if (key === 'opacity') {
             return (
-              <OpacitySection
-                key={key}
-                value={value as number | 'mixed'}
-                onSet={(opacity) => set({ opacity })}
-              />
+              <Fragment key={key}>
+                {(['start', 'end'] as const).map((end) => {
+                  const head = commonArrowhead(selected, end)
+                  return head === undefined ? null : (
+                    <HeadSection
+                      key={end}
+                      end={end}
+                      value={head}
+                      onPick={(picked) => editor.setArrowhead(end, picked)}
+                    />
+                  )
+                })}
+                <OpacitySection
+                  value={value as number | 'mixed'}
+                  onSet={(opacity) => set({ opacity })}
+                />
+              </Fragment>
             )
           }
           const choice = CHOICES[key]

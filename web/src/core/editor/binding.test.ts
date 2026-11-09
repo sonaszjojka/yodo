@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'vitest'
 import { createLinear, createShape } from '../document/create.ts'
-import type { ArrowElement } from '../document/types.ts'
+import type {
+  ArrowElement,
+  ShapeBinding,
+  YodoElement,
+} from '../document/types.ts'
 import { lineFromDrag } from '../geometry/line.ts'
 import { resizeTransform } from '../geometry/resize.ts'
 import {
@@ -11,9 +15,11 @@ import {
   bendLine,
   movePoint,
   followBindings,
+  pointAlong,
   pointOf,
   remapBindings,
   snapToOutline,
+  snapToPath,
   unbindDeleted,
 } from './binding.ts'
 import { moveElements, resizeElements } from './selection.ts'
@@ -80,9 +86,12 @@ describe('bindableAt', () => {
     expect(bindableAt([rect], [50, 50], 4)?.id).toBe(rect.id)
   })
 
-  test('ignores lines, text and anything out of reach', () => {
-    const line = createLinear('line', lineFromDrag([0, 0], [100, 100], false))
-    expect(bindableAt([line], [50, 50], 4)).toBeNull()
+  test('ignores pencil strokes and anything out of reach', () => {
+    const stroke = {
+      ...createLinear('line', lineFromDrag([0, 0], [100, 100], false)),
+      type: 'pencil' as const,
+    }
+    expect(bindableAt([stroke], [50, 50], 4)).toBeNull()
     expect(bindableAt([rect], [300, 300], 4)).toBeNull()
   })
 })
@@ -251,7 +260,7 @@ describe('followBindings, review fixes', () => {
     const [shape, result] = flipped as [typeof a, ArrowElement]
     expect(shape.x).toBe(-100)
     expect([result.x, result.y]).toEqual([-100, 50])
-    expect(result.startBinding?.ratio).toEqual([0, 0.5])
+    expect((result.startBinding as ShapeBinding).ratio).toEqual([0, 0.5])
   })
 
   test('an arrow with no points is detached instead of crashing', () => {
@@ -293,7 +302,10 @@ describe('remapBindings', () => {
       ArrowElement,
     ]
     expect(copy.startBinding?.elementId).toBe('a2')
-    expect(copy.startBinding?.ratio).toEqual(arrow.startBinding?.ratio)
+    expect(copy.startBinding).toEqual({
+      ...arrow.startBinding,
+      elementId: 'a2',
+    })
     expect(copy).not.toHaveProperty('endBinding')
   })
 })
@@ -436,5 +448,267 @@ describe('bending and moving points (ADR 0053)', () => {
       new Set(['far']),
     ) as ArrowElement[]
     expect(followed!.curved).toBe(true)
+  })
+})
+
+// Attaching to lines and arrows (roadmap 4.7, ADR 0054).
+describe('path targets', () => {
+  const target = createLinear('line', lineFromDrag([0, 0], [100, 0], false))
+  const bentTarget = {
+    ...createLinear('line', lineFromDrag([0, 0], [100, 0], false)),
+    id: 'bent',
+    points: [
+      [0, 0],
+      [50, 40],
+      [100, 0],
+    ] as [number, number][],
+    curved: true as const,
+  }
+  const corner = {
+    ...createLinear('line', lineFromDrag([0, 0], [100, 100], false)),
+    id: 'corner',
+    points: [
+      [0, 0],
+      [100, 0],
+      [100, 100],
+    ] as [number, number][],
+  }
+
+  function arrowTo(t: YodoElement, along: number): ArrowElement {
+    const a = createLinear('arrow', lineFromDrag([0, 200], [0, 100], false))
+    return { ...a, endBinding: { elementId: t.id, along } }
+  }
+
+  test('snapToPath lands on the nearest point and stores the arc-length fraction', () => {
+    const { point, binding } = snapToPath(target, [25, 30])
+    expect(point).toEqual([25, 0])
+    expect(binding).toEqual({ elementId: target.id, along: 0.25 })
+  })
+
+  test('snapToPath follows a curve, and pointAlong inverts it', () => {
+    const { point, binding } = snapToPath(bentTarget, [50, 60])
+    expect(point[0]).toBeCloseTo(50, 0)
+    expect(point[1]).toBeGreaterThan(20)
+    const again = pointAlong(bentTarget, (binding as { along: number }).along)!
+    expect(again[0]).toBeCloseTo(point[0], 3)
+    expect(again[1]).toBeCloseTo(point[1], 3)
+  })
+
+  test('a zero-length or empty target resolves to its first point or nothing', () => {
+    const dot = {
+      ...target,
+      points: [
+        [0, 0],
+        [0, 0],
+      ] as [number, number][],
+    }
+    expect(snapToPath(dot, [5, 5]).binding).toMatchObject({ along: 0 })
+    expect(pointAlong(dot, 0.7)).toEqual([0, 0])
+    expect(pointAlong({ ...target, points: [] }, 0.5)).toBeNull()
+  })
+
+  test('bindableAt finds a line or arrow near the point, not far from it', () => {
+    expect(bindableAt([target], [40, 3], 6)?.id).toBe(target.id)
+    expect(bindableAt([target], [40, 30], 6)).toBeNull()
+  })
+
+  test('the attached end follows when the target moves', () => {
+    const a = arrowTo(target, 0.5)
+    const moved = moveElements([target, a], new Set([target.id]), 10, 20)
+    const result = moved[1] as ArrowElement
+    expect([
+      result.x + result.points[1]![0],
+      result.y + result.points[1]![1],
+    ]).toEqual([60, 20])
+  })
+
+  test('the end follows a uniform resize of the target', () => {
+    const a = arrowTo(target, 0.5)
+    const t = resizeTransform(
+      { x: 0, y: 0, width: 100, height: 0 },
+      'e',
+      [100, 0],
+      [200, 0],
+      false,
+    )
+    const result = resizeElements(
+      [target, a],
+      new Set([target.id]),
+      t,
+    )[1] as ArrowElement
+    expect(result.x + result.points[1]![0]).toBeCloseTo(100, 5)
+  })
+
+  test('the end follows a mirrored resize on the same fraction of the path', () => {
+    const a = arrowTo(corner, 0.5)
+    const t = resizeTransform(
+      { x: 0, y: 0, width: 100, height: 100 },
+      'w',
+      [0, 50],
+      [200, 50],
+      false,
+    )
+    const result = resizeElements(
+      [corner, a],
+      new Set([corner.id]),
+      t,
+    )[1] as ArrowElement
+    // The corner (along 0.5) mirrors with the path: x 100 -> 100 (flipped about x = 100).
+    expect(result.endBinding).toEqual({ elementId: corner.id, along: 0.5 })
+  })
+
+  test('non-uniform scaling keeps the arc-length fraction, so the end can slide off a corner', () => {
+    const a = arrowTo(corner, 0.5)
+    const t = resizeTransform(
+      { x: 0, y: 0, width: 100, height: 100 },
+      'e',
+      [100, 50],
+      [200, 50],
+      false,
+    )
+    const resized = resizeElements([corner, a], new Set([corner.id]), t)
+    const line = resized[0] as typeof corner
+    const result = resized[1] as ArrowElement
+    const end = [
+      result.x + result.points[1]![0],
+      result.y + result.points[1]![1],
+    ]
+    // Width doubled, height kept: the corner is at (200, 0) but along 0.5 is (150, 0).
+    expect(line.points[1]![0]).toBe(200)
+    expect(end).toEqual([150, 0])
+  })
+
+  test('editing the target (bend, point drag) moves the end with `edited`', () => {
+    const a = arrowTo(target, 0.5)
+    const bent = bendLine(target, [50, 40])
+    const result = followBindings(
+      [bent, a],
+      new Set(),
+      { x: false, y: false },
+      new Set([bent.id]),
+    )[1] as ArrowElement
+    const end = [
+      result.x + result.points[1]![0],
+      result.y + result.points[1]![1],
+    ]
+    expect(end[1]).toBeGreaterThan(10)
+    expect(end[0]).toBeCloseTo(50, 0)
+  })
+
+  test('moving the arrow without its target detaches the end', () => {
+    const a = arrowTo(target, 0.5)
+    const moved = moveElements(
+      [target, a],
+      new Set([a.id]),
+      5,
+      5,
+    )[1] as ArrowElement
+    expect(moved.endBinding).toBeUndefined()
+  })
+
+  test('a chain follows in one pass: shape -> arrow B -> arrow A', () => {
+    const s = createShape('rectangle', box)
+    const b = createLinear('arrow', lineFromDrag([100, 50], [300, 50], false))
+    const bBound = { ...b, startBinding: snapToOutline(s, [100, 50]).binding }
+    const a = arrowTo(bBound, 0.5)
+    const result = moveElements([s, bBound, a], new Set([s.id]), 0, 100)
+    const follower = result[2] as ArrowElement
+    // B now runs (100, 150) to (300, 50); A hangs on its middle, (200, 100).
+    expect([
+      follower.x + follower.points[1]![0],
+      follower.y + follower.points[1]![1],
+    ]).toEqual([200, 100])
+  })
+
+  test('a binding of the wrong kind for its target is detached', () => {
+    const a = {
+      ...arrowTo(target, 0.5),
+      endBinding: { elementId: rect.id, along: 0.5 },
+    }
+    const result = followBindings(
+      [rect, a],
+      new Set([rect.id]),
+    )[1] as ArrowElement
+    expect(result.endBinding).toBeUndefined()
+  })
+
+  test('a target that is gone or a self-binding detaches without looping', () => {
+    const self = { ...arrowTo(target, 0.5) }
+    const looped = { ...self, endBinding: { elementId: self.id, along: 0.5 } }
+    expect(
+      (followBindings([looped], new Set([looped.id]))[0] as ArrowElement)
+        .endBinding,
+    ).toBeUndefined()
+    const a = { ...arrowTo(target, 0.5), id: 'a' }
+    const b = { ...arrowTo(a, 0.5), id: 'b' }
+    const cyc = { ...a, endBinding: { elementId: 'b', along: 0.5 } }
+    const out = followBindings(
+      [cyc, b],
+      new Set(['a']),
+      { x: false, y: false },
+      new Set(['a']),
+    )
+    expect(out).toHaveLength(2)
+  })
+
+  test('dropEnd offers lines but never the arrow itself or its dependants', () => {
+    const free = createLinear('arrow', lineFromDrag([0, 200], [0, 100], false))
+    expect(dropEnd([target, free], free, 'start', [40, 2], 6).target?.id).toBe(
+      target.id,
+    )
+    // b hangs on a, so a's start over b (or over a itself) would make a loop.
+    const a = { ...free, id: 'a' }
+    const b = {
+      ...createLinear('arrow', lineFromDrag([0, 50], [60, 0], false)),
+      id: 'b',
+      endBinding: { elementId: 'a', along: 0.5 },
+    }
+    expect(dropEnd([a, b], a, 'start', [30, 25], 6).target).toBeNull()
+    expect(dropEnd([a, b], a, 'start', [0, 150], 6).target).toBeNull()
+  })
+
+  test('a wrong-kind binding does not make a valid one look like a loop', () => {
+    const a = {
+      ...createLinear('arrow', lineFromDrag([0, 0], [10, 0], false)),
+      id: 'a',
+      startBinding: { elementId: 'b', ratio: [0.5, 0.5] as [number, number] },
+    }
+    const b = {
+      ...createLinear('arrow', lineFromDrag([0, 50], [10, 50], false)),
+      id: 'b',
+      endBinding: { elementId: 'a', along: 0.5 },
+    }
+    const [ra, rb] = followBindings([a, b], new Set(['a'])) as ArrowElement[]
+    expect(ra).not.toHaveProperty('startBinding')
+    expect(rb!.endBinding).toEqual({ elementId: 'a', along: 0.5 })
+  })
+
+  test('a very long chain of attached arrows does not overflow the stack', () => {
+    const count = 20000
+    const chain = Array.from({ length: count }, (_, i): ArrowElement => {
+      const a = createLinear('arrow', lineFromDrag([0, i], [10, i], false))
+      return i + 1 < count
+        ? {
+            ...a,
+            id: `c${i}`,
+            endBinding: { elementId: `c${i + 1}`, along: 1 },
+          }
+        : { ...a, id: `c${i}` }
+    })
+    const result = moveElements([rect, ...chain], new Set([rect.id]), 10, 10)
+    expect(result).toHaveLength(count + 1)
+  })
+
+  test('delete unbinds and duplicate remaps a path binding', () => {
+    const a = arrowTo(target, 0.5)
+    expect(
+      (unbindDeleted([target, a], new Set([target.id]))[1] as ArrowElement)
+        .endBinding,
+    ).toBeUndefined()
+    const copy = remapBindings(
+      [a],
+      new Map([[target.id, 'copy']]),
+    )[0] as ArrowElement
+    expect(copy.endBinding).toEqual({ elementId: 'copy', along: 0.5 })
   })
 })

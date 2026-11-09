@@ -325,3 +325,111 @@ test('bend a line by its mid-handle, move a point, and undo', async ({
     expect((await storedLine())!.curved).toBeUndefined()
   })
 })
+
+test('attach an arrow to a line, then move the line and the arrow end follows', async ({
+  page,
+  mode,
+}) => {
+  await page.goto('./')
+  await page.getByRole('button', { name: 'New drawing' }).click()
+  await page.waitForURL(/#\/d\/[^/]+$/)
+  const id = decodeURIComponent(new URL(page.url()).hash.slice('#/d/'.length))
+
+  async function stored(type: 'line' | 'arrow') {
+    return (await storedDocument(page, mode, id))?.find((e) => e.type === type)
+  }
+
+  await test.step('draw a line and an arrow that ends on it', async () => {
+    await tool(page, 'Line').click()
+    await drag(page, [200, 400], [600, 400])
+    await tool(page, 'Arrow').click()
+    await drag(page, [300, 550], [300, 405])
+    await expect.poll(() => stored('arrow')).toBeDefined()
+  })
+
+  const line =
+    await test.step('the end is attached a quarter along the line', async () => {
+      await expect
+        .poll(async () => (await stored('arrow'))?.endBinding?.along)
+        .toBeCloseTo(0.25, 2)
+      const line = (await stored('line'))!
+      expect((await stored('arrow'))!.endBinding!.elementId).toBe(line.id)
+      expect(arrowEnds((await stored('arrow'))!).end).toEqual([300, 400])
+      return line
+    })
+
+  await test.step('moving the line carries the arrow end with it', async () => {
+    await tool(page, 'Select').click()
+    await page.locator('canvas.canvas').click({ position: { x: 550, y: 400 } })
+    await drag(page, [550, 400], [550, 500])
+    await expect.poll(async () => (await stored('line'))?.y).toBe(line.y + 100)
+    await expect
+      .poll(async () => arrowEnds((await stored('arrow'))!).end)
+      .toEqual([300, 500])
+    expect((await stored('arrow'))!.endBinding!.along).toBeCloseTo(0.25, 2)
+  })
+})
+
+test('choose an arrowhead for each end of an arrow from the style bar', async ({
+  page,
+  mode,
+}) => {
+  await page.goto('./')
+  await page.getByRole('button', { name: 'New drawing' }).click()
+  await page.waitForURL(/#\/d\/[^/]+$/)
+  const id = decodeURIComponent(new URL(page.url()).hash.slice('#/d/'.length))
+
+  async function storedArrow() {
+    return (await storedDocument(page, mode, id))?.find(
+      (e) => e.type === 'arrow',
+    )
+  }
+
+  await test.step('draw an arrow and select it: the bar shows both heads', async () => {
+    await tool(page, 'Arrow').click()
+    await drag(page, [200, 400], [500, 400])
+    await expect.poll(storedArrow).toBeDefined()
+    await tool(page, 'Select').click()
+    await page.locator('canvas.canvas').click({ position: { x: 350, y: 400 } })
+    const bar = page.getByRole('toolbar', { name: 'Style' })
+    await expect(
+      bar.getByRole('button', { name: 'Start head: None' }),
+    ).toBeVisible()
+    await expect(
+      bar.getByRole('button', { name: 'End head: Arrow' }),
+    ).toBeVisible()
+  })
+
+  await test.step('pick a start head and a different end head', async () => {
+    const bar = page.getByRole('toolbar', { name: 'Style' })
+    await bar.getByRole('button', { name: 'Start head: None' }).click()
+    await page
+      .getByRole('group', { name: 'Start head' })
+      .getByRole('button', { name: 'Circle', exact: true })
+      .click()
+    await bar.getByRole('button', { name: 'End head: Arrow' }).click()
+    await page
+      .getByRole('group', { name: 'End head' })
+      .getByRole('button', { name: 'Zero or many' })
+      .click()
+    await expect
+      .poll(async () => (await storedArrow())?.startArrowhead)
+      .toBe('circle')
+    expect((await storedArrow())!.endArrowhead).toBe('cardinality_zero_or_many')
+  })
+
+  await test.step('the end head can be removed again, and undo brings it back', async () => {
+    // The End popover is still open after the last choice.
+    await page
+      .getByRole('group', { name: 'End head' })
+      .getByRole('button', { name: 'None' })
+      .click()
+    await expect
+      .poll(async () => (await storedArrow())?.endArrowhead)
+      .toBeNull()
+    await page.keyboard.press('ControlOrMeta+z')
+    await expect
+      .poll(async () => (await storedArrow())?.endArrowhead)
+      .toBe('cardinality_zero_or_many')
+  })
+})

@@ -1,6 +1,6 @@
 # 0048. Store attached arrows as bindings on the arrow
 
-- Status: Accepted (the sentence "existing arrows cannot be re-attached yet" is superseded by [0052](0052-arrow-endpoint-handles-and-reattaching.md))
+- Status: Accepted (the sentence "existing arrows cannot be re-attached yet" is superseded by [0052](0052-arrow-endpoint-handles-and-reattaching.md); "targets are shapes" and the box `ratio` as the only binding form are extended by [0054](0054-arrows-attach-to-lines-and-arrows.md))
 - Date: 2026-11-06
 
 ## Context

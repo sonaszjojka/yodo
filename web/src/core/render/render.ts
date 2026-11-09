@@ -12,10 +12,11 @@ import type {
   TextAlign,
   YodoElement,
 } from '../document/types.ts'
-import { adaptColor, type Theme } from './colors.ts'
+import { adaptColor, canvasColor, type Theme } from './colors.ts'
 import { smoothPath } from '../geometry/freehand.ts'
-import { drawnBounds, headFrom, isCurved } from '../geometry/curve.ts'
-import { ARROWHEAD_LENGTH, arrowhead } from '../geometry/line.ts'
+import { arrowHeadOps } from '../geometry/arrowhead.ts'
+import { drawnBounds, isCurved } from '../geometry/curve.ts'
+import { ARROWHEAD_LENGTH } from '../geometry/line.ts'
 import {
   drawsBoxFrame,
   handleLine,
@@ -25,7 +26,12 @@ import {
   HANDLE_SIZE,
   selectionFrame,
 } from '../geometry/frame.ts'
-import { bindOutline, isBindable } from '../editor/binding.ts'
+import {
+  bindOutline,
+  isBindable,
+  isPathTarget,
+  pathPoints,
+} from '../editor/binding.ts'
 import {
   cornerRadius,
   diamondPoints,
@@ -132,6 +138,46 @@ export function roughOptions(element: YodoElement, theme: Theme): Options {
     fillStyle: element.fillStyle,
     strokeLineDash: DASHES[element.strokeStyle],
   }
+}
+
+/** One drawing pass of a closed head. */
+export interface HeadPass {
+  options: Options
+  /** Drawn at full opacity, whatever the arrow's own (a hiding fill). */
+  opaque: boolean
+}
+
+/**
+ * How a closed head is drawn (ADR 0055). A filled head is one pass, solid in
+ * the stroke colour. A hollow one is an opaque fill in the canvas colour, so
+ * the arrow's shaft does not show through it even at reduced opacity, then
+ * its outline at the arrow's opacity, as Excalidraw does.
+ */
+export function headPasses(
+  options: Options,
+  filled: boolean,
+  theme: Theme,
+): HeadPass[] {
+  if (filled) {
+    return [
+      {
+        options: { ...options, fill: options.stroke, fillStyle: 'solid' },
+        opaque: false,
+      },
+    ]
+  }
+  return [
+    {
+      options: {
+        ...options,
+        stroke: 'none',
+        fill: canvasColor(theme),
+        fillStyle: 'solid',
+      },
+      opaque: true,
+    },
+    { options: { ...options, fill: undefined }, opaque: false },
+  ]
 }
 
 /**
@@ -338,13 +384,27 @@ function drawElement(
       if (curved) rough.curve(points, options)
       else rough.linearPath(points, options)
       // Stored documents aren't validated, so fewer than two points can occur.
-      if (points.length < 2) return
-      const to = points.at(-1)!
-      const from = headFrom(points, curved)
-      const hasLength = from[0] !== to[0] || from[1] !== to[1]
-      if (element.type === 'arrow' && element.endArrowhead && hasLength) {
-        // Same seed, so the head keeps its wobble from frame to frame too.
-        rough.linearPath(arrowhead(from, to), options)
+      if (element.type !== 'arrow') return
+      // Same seed, so a head keeps its wobble from frame to frame too.
+      for (const op of arrowHeadOps(element, points, curved)) {
+        if (op.kind === 'path') {
+          rough.linearPath(op.points, options)
+          continue
+        }
+        const alpha = ctx.globalAlpha
+        for (const pass of headPasses(options, op.filled, theme)) {
+          if (pass.opaque) ctx.globalAlpha = 1
+          if (op.kind === 'polygon') rough.polygon(op.points, pass.options)
+          else
+            rough.ellipse(
+              op.center[0],
+              op.center[1],
+              op.diameter,
+              op.diameter,
+              pass.options,
+            )
+          ctx.globalAlpha = alpha
+        }
       }
       return
     }
@@ -512,13 +572,15 @@ function drawOverlay(
     drawSizeBadge(ctx, frame.box, outline, viewport, dpr, colors)
   }
   const { bindTarget } = overlay
-  if (bindTarget && isBindable(bindTarget)) {
-    const outline = bindOutline(bindTarget)
+  if (bindTarget && (isBindable(bindTarget) || isPathTarget(bindTarget))) {
+    // A shape is outlined all round; a line or arrow along its path (ADR 0054).
+    const closed = isBindable(bindTarget)
+    const outline = closed ? bindOutline(bindTarget) : pathPoints(bindTarget)
     ctx.beginPath()
     outline.forEach(([x, y], i) =>
       i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y),
     )
-    ctx.lineTo(outline[0]![0], outline[0]![1])
+    if (closed) ctx.lineTo(outline[0]![0], outline[0]![1])
     ctx.lineWidth = BIND_OUTLINE_WIDTH * px
     ctx.stroke()
   }

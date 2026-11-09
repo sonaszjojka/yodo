@@ -57,7 +57,7 @@ export const ARROWHEAD_LENGTH = 20
 /** Angle between each wing and the line. */
 const WING_ANGLE = Math.PI / 6
 /** On short lines the head takes at most this share of the length. */
-const MAX_HEAD_SHARE = 0.4
+export const MAX_HEAD_SHARE = 0.4
 
 /**
  * The open arrowhead at `to` for a segment coming from `from`, as a path

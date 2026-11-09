@@ -2155,3 +2155,113 @@ describe('bending lines and arrows (ADR 0053)', () => {
     expect(editor.store.getState().hoverHandle).toBe('point')
   })
 })
+
+describe('arrows attached to lines and arrows (ADR 0054)', () => {
+  /** A line from (0, 0) to (200, 0) and a free arrow above it, ending at (50, 60). */
+  function setup() {
+    const line = createLinear('line', lineFromDrag([0, 0], [200, 0], false))
+    const arrow = createLinear(
+      'arrow',
+      lineFromDrag([50, 150], [50, 60], false),
+    )
+    const editor = createEditor({
+      ...createDocument(),
+      elements: [line, arrow],
+    })
+    const current = (i: number) =>
+      editor.store.getState().document.elements[i] as ArrowElement
+    return { editor, line, arrow, current }
+  }
+
+  test('an arrow drawn onto a line attaches its end at a point along it', () => {
+    const { editor, line } = setup()
+    editor.setTool('arrow')
+    editor.drawTool.pointerDown(1, [150, 100], false)
+    editor.drawTool.pointerMove(1, [150, 3], false)
+    expect(editor.store.getState().bindTarget).toBe(line.id)
+    editor.drawTool.pointerUp(1)
+    const drawn = editor.store.getState().document.elements[2] as ArrowElement
+    expect(drawn.endBinding).toEqual({ elementId: line.id, along: 0.75 })
+    expect(drawn.y + drawn.points[1]![1]).toBe(0)
+  })
+
+  test('dragging an arrow end onto a line attaches it, and away frees it', () => {
+    const { editor, line, current } = setup()
+    click(editor, [50, 100])
+    drag(editor, [50, 60], [50, 4])
+    expect(current(1).endBinding).toEqual({ elementId: line.id, along: 0.25 })
+    drag(editor, [50, 0], [50, 40])
+    expect(current(1)).not.toHaveProperty('endBinding')
+  })
+
+  test('bending the target moves the attached end, in the same undo step', () => {
+    const { editor, line, current } = setup()
+    click(editor, [50, 100])
+    drag(editor, [50, 60], [50, 4])
+    const attached = editor.store.getState().document
+    click(editor, [150, 0])
+    drag(editor, [100, 0], [100, 80])
+    const end = current(1)
+    expect(end.y + end.points[1]![1]).toBeGreaterThan(5)
+    expect(end.endBinding).toEqual({ elementId: line.id, along: 0.25 })
+    editor.undo()
+    expect(editor.store.getState().document).toBe(attached)
+  })
+
+  test('the preview shows the attached arrow following the dragged handle', () => {
+    const { editor } = setup()
+    click(editor, [50, 100])
+    drag(editor, [50, 60], [50, 4])
+    click(editor, [150, 0])
+    editor.pointerDown(1, [100, 0], { button: 0, shift: false })
+    editor.pointerMove(1, [100, 80], false)
+    const shown = sceneOf(editor.store.getState()).elements[1] as ArrowElement
+    expect(shown.y + shown.points[1]![1]).toBeGreaterThan(5)
+  })
+})
+
+describe('arrowheads (ADR 0055)', () => {
+  function setup() {
+    const arrow = createLinear('arrow', lineFromDrag([0, 0], [200, 0], false))
+    const rect = createShape('rectangle', {
+      x: 0,
+      y: 100,
+      width: 50,
+      height: 50,
+    })
+    const editor = createEditor({
+      ...createDocument(),
+      elements: [arrow, rect],
+    })
+    click(editor, [100, 0])
+    const current = () =>
+      editor.store.getState().document.elements[0] as ArrowElement
+    return { editor, arrow, current }
+  }
+
+  test('sets a head at each end of the selected arrow, one undo step each', () => {
+    const { editor, arrow, current } = setup()
+    editor.setArrowhead('start', 'diamond')
+    editor.setArrowhead('end', 'cardinality_many')
+    expect(current()).toMatchObject({
+      startArrowhead: 'diamond',
+      endArrowhead: 'cardinality_many',
+    })
+    editor.undo()
+    expect(current().endArrowhead).toBe('arrow')
+    expect(current().startArrowhead).toBe('diamond')
+    editor.undo()
+    expect(current()).toBe(arrow)
+  })
+
+  test('does nothing with no selection or a selection with no arrow', () => {
+    const { editor } = setup()
+    const before = editor.store.getState().document
+    click(editor, [25, 125])
+    editor.setArrowhead('end', 'bar')
+    expect(editor.store.getState().document).toBe(before)
+    editor.selectTool.cancel()
+    editor.setArrowhead('end', 'bar')
+    expect(editor.store.getState().document).toBe(before)
+  })
+})

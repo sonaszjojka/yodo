@@ -8,6 +8,7 @@ import {
   createShape,
   createText,
 } from '../document/create.ts'
+import { canvasColor } from './colors.ts'
 import { appendPoint, startStroke } from '../geometry/freehand.ts'
 import { arrowhead, lineFromDrag } from '../geometry/line.ts'
 import { fontOf } from '../text/layout.ts'
@@ -281,6 +282,55 @@ describe('renderScene', () => {
     )
   })
 
+  test('a start head is drawn at the first point, a filled one in the stroke colour', () => {
+    const rough = fakeRough()
+    const arrow = {
+      ...createLinear('arrow', lineFromDrag([0, 0], [100, 0], false), 6),
+      startArrowhead: 'triangle' as const,
+      endArrowhead: 'circle_outline' as const,
+    }
+
+    renderScene(fakeContext(), rough, [arrow], SURFACE, IDENTITY)
+
+    const [points, options] = rough.polygon.mock.calls[0]!
+    expect(points[0]).toEqual([0, 0])
+    expect(options).toMatchObject({ fill: options.stroke, fillStyle: 'solid' })
+    const [cx, , width, height, outline] = rough.ellipse.mock.calls[1]!
+    expect(cx).toBeLessThan(100)
+    expect(width).toBe(height)
+    // A hollow head is drawn as an opaque canvas-coloured fill, then its
+    // outline, so the shaft does not show through it (ADR 0055).
+    expect(outline.fill).toBeUndefined()
+    expect(rough.ellipse.mock.calls[0]![4]).toMatchObject({
+      fill: canvasColor('light'),
+      stroke: 'none',
+    })
+  })
+
+  test('a hollow head hides the shaft at reduced opacity too: an opaque fill pass, then the outline', () => {
+    const rough = fakeRough()
+    const ctx = fakeContext()
+    const alphas: number[] = []
+    rough.ellipse.mockImplementation(() => {
+      alphas.push(ctx.globalAlpha)
+    })
+    const arrow = {
+      ...createLinear('arrow', lineFromDrag([0, 0], [100, 0], false), 6),
+      endArrowhead: 'circle_outline' as const,
+      opacity: 50,
+    }
+
+    renderScene(ctx, rough, [arrow], SURFACE, IDENTITY)
+
+    expect(alphas).toEqual([1, 0.5])
+    const [fillPass, outlinePass] = rough.ellipse.mock.calls
+    expect(fillPass![4]).toMatchObject({
+      stroke: 'none',
+      fill: canvasColor('light'),
+    })
+    expect(outlinePass![4].fill).toBeUndefined()
+  })
+
   test('a zero-length arrow draws no head', () => {
     const rough = fakeRough()
     const arrow = createLinear('arrow', lineFromDrag([5, 5], [5, 5], false), 6)
@@ -447,6 +497,22 @@ describe('arrow overlay (ADR 0052)', () => {
     expect(ctx.moveTo).toHaveBeenCalledWith(200, 0)
     expect(ctx.lineWidth).toBe(2.5)
     expect(ctx.stroke).toHaveBeenCalled()
+  })
+})
+
+describe('path attach target', () => {
+  test('a line is outlined along its path, not closed', () => {
+    const line = createLinear('line', lineFromDrag([10, 20], [110, 20], false))
+    const ctx = fakeContext()
+    renderScene(ctx, fakeRough(), [line], SURFACE, IDENTITY, {
+      selected: [],
+      marquee: null,
+      bindTarget: line,
+    })
+    expect(ctx.moveTo).toHaveBeenCalledWith(10, 20)
+    expect(ctx.lineTo).toHaveBeenCalledWith(110, 20)
+    expect(ctx.lineTo).toHaveBeenCalledTimes(1)
+    expect(ctx.lineWidth).toBe(2.5)
   })
 })
 

@@ -13,8 +13,10 @@ export interface StoredElement {
   text?: string
   points?: [number, number][]
   curved?: boolean
+  startArrowhead?: string | null
+  endArrowhead?: string | null
   startBinding?: { elementId: string }
-  endBinding?: { elementId: string }
+  endBinding?: { elementId: string; along?: number }
 }
 
 /**

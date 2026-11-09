@@ -8,6 +8,7 @@ import {
   drawnBounds,
   flattenCurve,
   headFrom,
+  tailFrom,
   isCurved,
 } from './curve.ts'
 import { hitTest } from './hit.ts'
@@ -237,5 +238,30 @@ describe('Codex review round 1', () => {
       (i % 2) * 1000,
     ])
     expect(() => curveBounds(bent(points))).not.toThrow()
+  })
+})
+
+describe('tailFrom', () => {
+  test('is headFrom of the reversed points', () => {
+    const points: [number, number][] = [
+      [0, 0],
+      [50, 40],
+      [100, 0],
+    ]
+    expect(tailFrom(points, true)).toEqual(
+      headFrom([...points].reverse(), true),
+    )
+  })
+
+  test('a polyline looks back along its first segment', () => {
+    expect(
+      tailFrom(
+        [
+          [0, 0],
+          [10, 0],
+        ],
+        false,
+      ),
+    ).toEqual([10, 0])
   })
 })

@@ -2,6 +2,7 @@
 // light-theme values; dark mode adapts them when rendering (ADR 0015).
 import { stylesOf } from '../core/editor/style.ts'
 import type {
+  Arrowhead,
   FillStyle,
   FontFamily,
   Roundness,
@@ -103,6 +104,25 @@ export const SIZES: Option<number>[] = [
   { value: 20, label: 'M' },
   { value: 28, label: 'L' },
   { value: 36, label: 'XL' },
+]
+
+/** The heads an arrow end can have (ADR 0055); null is no head. */
+export const ARROWHEAD_OPTIONS: Option<Arrowhead | null>[] = [
+  { value: null, label: 'None' },
+  { value: 'arrow', label: 'Arrow' },
+  { value: 'bar', label: 'Bar' },
+  { value: 'circle', label: 'Circle' },
+  { value: 'circle_outline', label: 'Circle outline' },
+  { value: 'triangle', label: 'Triangle' },
+  { value: 'triangle_outline', label: 'Triangle outline' },
+  { value: 'diamond', label: 'Diamond' },
+  { value: 'diamond_outline', label: 'Diamond outline' },
+  { value: 'cardinality_one', label: 'One' },
+  { value: 'cardinality_many', label: 'Many' },
+  { value: 'cardinality_one_or_many', label: 'One or many' },
+  { value: 'cardinality_exactly_one', label: 'Exactly one' },
+  { value: 'cardinality_zero_or_one', label: 'Zero or one' },
+  { value: 'cardinality_zero_or_many', label: 'Zero or many' },
 ]
 
 /** The option's label, 'Mixed', or 'Custom' for a value not offered here. */
