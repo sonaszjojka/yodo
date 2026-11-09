@@ -1,5 +1,7 @@
 # Yodo
 
+[![CI](https://github.com/sonaszjojka/yodo/actions/workflows/ci.yml/badge.svg)](https://github.com/sonaszjojka/yodo/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/sonaszjojka/yodo)](https://github.com/sonaszjojka/yodo/releases) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A local-first, hand-drawn style drawing app, in the spirit of Excalidraw. Shapes, arrows that stay attached, pencil, text and images on an infinite canvas; folders, search and Trash for your drawings; PNG, SVG and `.yodo` export, and import of `.yodo` and Excalidraw files; light and dark themes. Roadmap and status: [`docs/roadmap.md`](docs/roadmap.md).
 
 ## Two ways to use Yodo
@@ -46,6 +48,10 @@ Image tags: `1.0.0` is that exact release, `1.0` follows the latest patch of tha
 The monorepo has `web/` (React + Vite + TypeScript) and `server/` (Go). Commands and architecture are in [`CLAUDE.md`](CLAUDE.md), decisions in [`docs/adr/`](docs/adr/README.md) and working conventions in [`docs/conventions.md`](docs/conventions.md).
 
 Build the image locally with `docker build -t yodo .`. A plain `go build` in `server/` serves "frontend not built" until `web/dist` is copied into `server/internal/webui/dist/` ([ADR 0019](docs/adr/0019-docker-image-build-and-publishing.md)).
+
+## Contributing
+
+Contributions are welcome. Start with [`CONTRIBUTING.md`](CONTRIBUTING.md) (setup, checks, pull requests, DCO sign-off). Questions go to [Discussions](https://github.com/sonaszjojka/yodo/discussions), security problems to [`SECURITY.md`](SECURITY.md). Everyone follows the [Code of Conduct](CODE_OF_CONDUCT.md); [`GOVERNANCE.md`](GOVERNANCE.md) says how decisions are made. Changes reach users with the next release, not on merge ([ADR 0057](docs/adr/0057-deploy-the-hosted-app-from-release-tags.md)).
 
 ## License
 
