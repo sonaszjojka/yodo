@@ -12,7 +12,7 @@ import type {
   TextAlign,
   YodoElement,
 } from '../document/types.ts'
-import { adaptColor, type Theme } from './colors.ts'
+import { adaptColor, canvasColor, type Theme } from './colors.ts'
 import { smoothPath } from '../geometry/freehand.ts'
 import { arrowHeadOps } from '../geometry/arrowhead.ts'
 import { drawnBounds, isCurved } from '../geometry/curve.ts'
@@ -142,12 +142,19 @@ export function roughOptions(element: YodoElement, theme: Theme): Options {
 
 /**
  * The rough.js options for a closed head: solid in the stroke colour when
- * `filled`, otherwise empty (ADR 0055).
+ * `filled`, otherwise filled with the canvas colour so the arrow's shaft does
+ * not show through the hollow shape, as in Excalidraw (ADR 0055).
  */
-export function headOptions(options: Options, filled: boolean): Options {
-  return filled
-    ? { ...options, fill: options.stroke, fillStyle: 'solid' }
-    : { ...options, fill: undefined }
+export function headOptions(
+  options: Options,
+  filled: boolean,
+  theme: Theme,
+): Options {
+  return {
+    ...options,
+    fill: filled ? options.stroke : canvasColor(theme),
+    fillStyle: 'solid',
+  }
 }
 
 /**
@@ -359,14 +366,14 @@ function drawElement(
       for (const op of arrowHeadOps(element, points, curved)) {
         if (op.kind === 'path') rough.linearPath(op.points, options)
         else if (op.kind === 'polygon')
-          rough.polygon(op.points, headOptions(options, op.filled))
+          rough.polygon(op.points, headOptions(options, op.filled, theme))
         else
           rough.ellipse(
             op.center[0],
             op.center[1],
             op.diameter,
             op.diameter,
-            headOptions(options, op.filled),
+            headOptions(options, op.filled, theme),
           )
       }
       return

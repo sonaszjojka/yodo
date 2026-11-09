@@ -8,6 +8,7 @@ import {
   createShape,
   createText,
 } from '../document/create.ts'
+import { canvasColor } from './colors.ts'
 import { appendPoint, startStroke } from '../geometry/freehand.ts'
 import { arrowhead, lineFromDrag } from '../geometry/line.ts'
 import { fontOf } from '../text/layout.ts'
@@ -297,7 +298,12 @@ describe('renderScene', () => {
     const [cx, , width, height, outline] = rough.ellipse.mock.calls[0]!
     expect(cx).toBeLessThan(100)
     expect(width).toBe(height)
-    expect(outline.fill).toBeUndefined()
+    // A hollow head is filled with the canvas, so the shaft does not show
+    // through it (ADR 0055).
+    expect(outline).toMatchObject({
+      fill: canvasColor('light'),
+      fillStyle: 'solid',
+    })
   })
 
   test('a zero-length arrow draws no head', () => {

@@ -220,6 +220,30 @@ describe('rough shapes', () => {
     expect(count({ ...arrow, endArrowhead: null })).toBe(count(line))
   })
 
+  test('a hollow head is filled with the canvas colour, so the shaft is hidden', () => {
+    const hollow = {
+      ...createLinear(
+        'arrow',
+        {
+          x: 0,
+          y: 0,
+          width: 80,
+          height: 0,
+          points: [
+            [0, 0],
+            [80, 0],
+          ],
+        },
+        4,
+      ),
+      endArrowhead: 'circle_outline' as const,
+    }
+    const fills = all(treeOf([hollow], { background: false }), 'path').map(
+      (node) => node.attrs.fill,
+    )
+    expect(fills).toContain(LIGHT_CANVAS)
+  })
+
   test('a start head and a closed head add drawings (ADR 0055)', () => {
     const geometry = {
       x: 0,

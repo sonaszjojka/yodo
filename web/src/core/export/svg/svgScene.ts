@@ -334,13 +334,16 @@ function elementNodes(
           op.kind === 'path'
             ? generator.linearPath(op.points, options)
             : op.kind === 'polygon'
-              ? generator.polygon(op.points, headOptions(options, op.filled))
+              ? generator.polygon(
+                  op.points,
+                  headOptions(options, op.filled, theme),
+                )
               : generator.ellipse(
                   op.center[0],
                   op.center[1],
                   op.diameter,
                   op.diameter,
-                  headOptions(options, op.filled),
+                  headOptions(options, op.filled, theme),
                 )
         nodes.push(...drawablePaths(drawable, deps, element))
       }
