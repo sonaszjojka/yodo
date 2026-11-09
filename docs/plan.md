@@ -1,7 +1,7 @@
 # Yodo: preparation before repositories and implementation
 
 ## Context
-When this plan was written (2026-10-29), Yodo had a name and working tooling (git identity `sonaszjojka <sssjonasz4@gmail.com>`, `gh` logged in, SSH working), but no files and no global CLAUDE.md. Before any code exists, we want to settle **what** we're building, **with what**, and **how we work**. Then implementation can move in small, verifiable steps, and Claude has context it can't read from the code.
+When this plan was written (2026-10-29), Yodo had a name and working tooling (git identity `sonaszjojka`, `gh` logged in, SSH working), but no files and no global CLAUDE.md. Before any code exists, we want to settle **what** we're building, **with what**, and **how we work**. Then implementation can move in small, verifiable steps, and Claude has context it can't read from the code.
 
 Rule: every stage ends with a **file of decisions**, not just a conversation. Conversations disappear after `/clear`; files stay and go into the repo.
 
