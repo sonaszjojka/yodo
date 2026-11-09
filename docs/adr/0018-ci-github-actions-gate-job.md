@@ -1,6 +1,6 @@
 # 0018. Run CI as one GitHub Actions workflow with path filters and a gate job
 
-- Status: Accepted
+- Status: Accepted (Pages deploy on merge superseded by [0057](0057-deploy-the-hosted-app-from-release-tags.md))
 - Date: 2026-11-01
 
 ## Context

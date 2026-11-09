@@ -18,7 +18,7 @@ Format ([conventionalcommits.org](https://www.conventionalcommits.org/)):
 - **No AI attribution trailer.** Commits carry no `Co-Authored-By` line; the owner is the sole author.
 
 ## Branches and flow: GitHub flow with squash merge
-- `main` is always deployable (it deploys to GitHub Pages) and is protected: changes land only through PRs with green CI.
+- `main` is the integration branch: always green, but not necessarily released. Users get code only from a release tag, which deploys the hosted app and publishes the image ([ADR 0057](adr/0057-deploy-the-hosted-app-from-release-tags.md)). It is protected: changes land only through PRs with green CI.
 - Enforced on GitHub: repo settings allow squash merge only (commit title = PR title) and delete merged branches; the ruleset "Protect main" requires a PR (0 approvals, since a solo owner cannot approve their own PR) with all review threads resolved, and blocks force-push and deletion, with no bypass, and requires the `ci` status check to pass ([ADR 0018](adr/0018-ci-github-actions-gate-job.md)).
 - One short-lived branch per roadmap task or bug: `<type>/<id>-<slug>`, e.g. `feat/1.2-rectangle-tool`, `fix/42-undo-after-delete`, `docs/roadmap-m2`.
 - The loop for every change:
@@ -42,14 +42,15 @@ A task is done only when all of these hold:
 - Docs that the change made stale are updated (ADR for any architectural decision, `docs/ui.md`, README).
 - No secrets in the diff.
 
-## Releases ([ADR 0049](adr/0049-releases-semver-tags-publish-the-image.md))
-Versions are semver, `vMAJOR.MINOR.PATCH`; the MVP is `v1.0.0`. Commits say what changed (`fix` patch, `feat` minor, breaking major). A release is cut by the owner from an up-to-date `main` whose CI is green:
-1. `git tag -a vX.Y.Z -m "vX.Y.Z"` and `git push origin vX.Y.Z`. The pushed tag runs the `docker` job, which refuses a tag that is not on `main` or not the highest, then publishes `ghcr.io/sonaszjojka/yodo` as `X.Y.Z`, `X.Y` and `latest` (`edge` is the head of `main`).
-2. Check the run, then `docker pull ghcr.io/sonaszjojka/yodo:X.Y.Z`.
-3. Create the GitHub Release from the tag, with notes from the Conventional Commits since the last one (`gh release create vX.Y.Z --generate-notes`).
-4. First release only: make the GHCR package public (package settings).
+## Releases ([ADR 0049](adr/0049-releases-semver-tags-publish-the-image.md), [0057](adr/0057-deploy-the-hosted-app-from-release-tags.md), [0058](adr/0058-release-please-for-versions-and-changelog.md))
+Versions are semver, `vMAJOR.MINOR.PATCH`. Commits say what changed (`fix` patch, `feat` minor, breaking major), so the PR title must be a Conventional Commit. release-please keeps a "release X.Y.Z" PR open with the version bump and `CHANGELOG.md`.
+1. The owner merges that PR when a release is wanted, from a `main` whose CI is green. release-please creates the tag `vX.Y.Z` and the GitHub Release.
+2. The tag runs the `docker` job (refuses a tag that is not on `main` or not the highest; publishes `ghcr.io/sonaszjojka/yodo` as `X.Y.Z`, `X.Y` and `latest`) and the Pages deploy. `edge` is the head of `main`.
+3. Check both: `docker pull ghcr.io/sonaszjojka/yodo:X.Y.Z` and the hosted app.
 
-A task whose done-when includes a release stays open until step 2 works: its PR says `Refs #<issue>` rather than `Closes`, and the roadmap tick and the issue close follow the pull.
+A task whose done-when includes a release stays open until step 3 works: its PR says `Refs #<issue>` rather than `Closes`, and the roadmap tick and the issue close follow the pull.
+
+**Hotfix for an older line** (not needed yet): branch `release/X.Y` from the tag, fix via a PR into it, tag from it, and forward-port the fix to `main`. The "highest tag" guard must be relaxed first, with a new ADR.
 
 ## Who does what
 | Step | Claude | Owner |
