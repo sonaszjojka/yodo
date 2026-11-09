@@ -44,7 +44,7 @@ Shipped in usable milestones; the split into milestones and tasks is in `docs/ro
 | Hand tool | Dragging with the hand tool (or holding Space) pans the canvas; elements don't move. |
 | Selection ("marking") | Click selects one element, Shift+click adds to the selection, drag on empty space selects everything inside the box; selected elements can be moved, resized and deleted. |
 | Rectangle, diamond, circle | Click-drag draws the shape at the dragged size; Shift keeps proportions (square / perfect circle). |
-| Arrow, line | Click-drag draws a straight line; the arrow has an arrowhead at the end. |
+| Arrow, line | Click-drag draws a straight line; the arrow has an arrowhead at the end, and either end can be given any of 14 heads or none from the style bar (ADR 0055). |
 | Pencil | Freehand strokes follow the cursor smoothly and can be selected and moved as one element. |
 | Text | Click places a text box and starts typing; double-click edits existing text; text can be placed over shapes, and a shape's own label is edited by double-click or Enter. |
 | Sticky notes | A coloured note with text that can be placed, moved, resized and edited like in Miro. |

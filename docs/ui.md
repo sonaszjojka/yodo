@@ -28,6 +28,7 @@
 - **Contextual bar** above the selection:
   - shape: stroke, fill, width, look (hand-drawn / clean), **All styles**, more;
   - text: font, size S/M/L/XL, **All styles**, more;
+  - arrow: the shape controls plus **Start head** and **End head**, each a popover of none and the 14 heads (arrow, bar, circle, triangle, diamond and the crow's-foot ones), drawn as a line ending in that head; the panel has the same two sections before Opacity (ADR 0055);
   - note (sticky note, tool `N`): text colour and note colour (the 7 fills, never "None"), **All styles**, more; opacity in the panel. A new note is Sand and opens for typing at once (ADR 0038);
   - more (any selection): duplicate, copy/paste style, bring to front, delete.
   - Each control opens one small popover at a time. No bar when nothing is selected.

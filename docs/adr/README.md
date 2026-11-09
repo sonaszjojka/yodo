@@ -65,3 +65,4 @@ Why Yodo is built the way it is. See [0001](0001-record-architecture-decisions.m
 | [0052](0052-arrow-endpoint-handles-and-reattaching.md) | Arrow endpoint handles: drag an end of a selected arrow to attach or detach it; the target shape is highlighted; amends 0048 | Accepted (selection clauses amended by [0053](0053-bendable-lines-and-arrows.md)) |
 | [0053](0053-bendable-lines-and-arrows.md) | Bendable lines and arrows: optional `curved` flag + extra points, a Catmull-Rom curve through every point; amends 0052 | Accepted |
 | [0054](0054-arrows-attach-to-lines-and-arrows.md) | Arrows attach to lines and arrows: a path binding `{ elementId, along }` (fraction of the drawn length); partly supersedes 0048 | Accepted |
+| [0055](0055-arrowheads-at-both-ends.md) | Arrowheads at both ends of an arrow: `startArrowhead`, 14 heads from Excalidraw's set, edited from the style bar | Accepted |
