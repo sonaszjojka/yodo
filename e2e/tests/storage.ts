@@ -14,7 +14,7 @@ export interface StoredElement {
   points?: [number, number][]
   curved?: boolean
   startBinding?: { elementId: string }
-  endBinding?: { elementId: string }
+  endBinding?: { elementId: string; along?: number }
 }
 
 /**

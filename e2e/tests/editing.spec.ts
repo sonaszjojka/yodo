@@ -325,3 +325,47 @@ test('bend a line by its mid-handle, move a point, and undo', async ({
     expect((await storedLine())!.curved).toBeUndefined()
   })
 })
+
+test('attach an arrow to a line, then move the line and the arrow end follows', async ({
+  page,
+  mode,
+}) => {
+  await page.goto('./')
+  await page.getByRole('button', { name: 'New drawing' }).click()
+  await page.waitForURL(/#\/d\/[^/]+$/)
+  const id = decodeURIComponent(new URL(page.url()).hash.slice('#/d/'.length))
+
+  async function stored(type: 'line' | 'arrow') {
+    return (await storedDocument(page, mode, id))?.find((e) => e.type === type)
+  }
+
+  await test.step('draw a line and an arrow that ends on it', async () => {
+    await tool(page, 'Line').click()
+    await drag(page, [200, 400], [600, 400])
+    await tool(page, 'Arrow').click()
+    await drag(page, [300, 550], [300, 405])
+    await expect.poll(() => stored('arrow')).toBeDefined()
+  })
+
+  const line =
+    await test.step('the end is attached a quarter along the line', async () => {
+      await expect
+        .poll(async () => (await stored('arrow'))?.endBinding?.along)
+        .toBeCloseTo(0.25, 2)
+      const line = (await stored('line'))!
+      expect((await stored('arrow'))!.endBinding!.elementId).toBe(line.id)
+      expect(arrowEnds((await stored('arrow'))!).end).toEqual([300, 400])
+      return line
+    })
+
+  await test.step('moving the line carries the arrow end with it', async () => {
+    await tool(page, 'Select').click()
+    await page.locator('canvas.canvas').click({ position: { x: 550, y: 400 } })
+    await drag(page, [550, 400], [550, 500])
+    await expect.poll(async () => (await stored('line'))?.y).toBe(line.y + 100)
+    await expect
+      .poll(async () => arrowEnds((await stored('arrow'))!).end)
+      .toEqual([300, 500])
+    expect((await stored('arrow'))!.endBinding!.along).toBeCloseTo(0.25, 2)
+  })
+})
