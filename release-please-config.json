@@ -7,10 +7,23 @@
       "include-component-in-tag": false,
       "changelog-path": "CHANGELOG.md",
       "extra-files": [
-        { "type": "json", "path": "web/package.json", "jsonpath": "$.version" },
-        { "type": "json", "path": "web/package-lock.json", "jsonpath": "$.version" },
-        { "type": "json", "path": "web/package-lock.json", "jsonpath": "$.packages[''].version" }
+        {
+          "type": "json",
+          "path": "web/package.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "web/package-lock.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "web/package-lock.json",
+          "jsonpath": "$.packages[''].version"
+        }
       ]
     }
-  }
+  },
+  "pull-request-title-pattern": "chore: release ${version}"
 }
