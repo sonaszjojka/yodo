@@ -41,7 +41,7 @@ export const SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
       { action: 'Paste elements or an image', keys: [[MOD, 'V']] },
       { action: 'Duplicate', keys: [[MOD, 'D']] },
       { action: 'Select all', keys: [[MOD, 'A']] },
-      { action: 'Export image', keys: [['Shift', MOD, 'E']] },
+      { action: 'Export', keys: [['Shift', MOD, 'E']] },
       { action: 'Delete', keys: [['Delete'], ['Backspace']] },
       { action: 'Cancel the gesture or selection', keys: [['Esc']] },
       {

@@ -15,7 +15,6 @@ import { Canvas } from './Canvas.tsx'
 import { isExportShortcut } from './editShortcuts.ts'
 import { ExportButton } from './ExportButton.tsx'
 import { ExportDialog } from './ExportDialog.tsx'
-import { ExportImageButton } from './ExportImageButton.tsx'
 import { HistoryControl } from './HistoryControl.tsx'
 import type { ImageCache } from './imageCache.ts'
 import { createImagePaster } from './imagePaster.ts'
@@ -104,11 +103,8 @@ export function App({
   const [exportRun, setExportRun] = useState<number | null>(null)
   const exportRuns = useRef(0)
   const openExport = useCallback(() => {
-    // Nothing to export from an empty drawing (the button is disabled too).
-    if (editor.store.getState().document.elements.length > 0) {
-      setExportRun((exportRuns.current += 1))
-    }
-  }, [editor])
+    setExportRun((exportRuns.current += 1))
+  }, [])
   // A dialog's `close` event arrives a moment after it hides, so a late one
   // from a previous opening must not close the next.
   const closeExport = (run: number) =>
@@ -181,8 +177,7 @@ export function App({
       />
       <StylePanel editor={editor} panel={panel} />
       <div className="top-right">
-        <ExportButton editor={editor} images={images} onError={setNotice} />
-        <ExportImageButton editor={editor} onOpen={openExport} />
+        <ExportButton onOpen={openExport} />
         <StylePanelToggle panel={panel} />
       </div>
       {exportRun !== null && (

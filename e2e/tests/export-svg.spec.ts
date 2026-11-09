@@ -27,8 +27,8 @@ async function newDrawing(page: Page) {
 }
 
 async function openSvgTab(page: Page) {
-  await page.getByRole('button', { name: 'Export image' }).click()
-  const dialog = page.getByRole('dialog', { name: 'Export image' })
+  await page.getByRole('button', { name: 'Export', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Export', exact: true })
   await dialog.getByRole('tab', { name: 'SVG' }).click()
   return dialog
 }

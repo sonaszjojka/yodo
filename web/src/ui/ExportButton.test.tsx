@@ -1,21 +1,12 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { expect, test } from 'vitest'
-import { createDocument } from '../core/document/create.ts'
-import { createEditor } from '../core/editor/editor.ts'
-import { InMemoryImageRepository } from '../storage/memoryImages.ts'
 import { ExportButton } from './ExportButton.tsx'
 
-test('renders a labelled Export button', () => {
-  const editor = createEditor(createDocument())
-
-  const html = renderToStaticMarkup(
-    <ExportButton
-      editor={editor}
-      images={new InMemoryImageRepository()}
-      onError={() => {}}
-    />,
-  )
+test('renders a labelled Export button that is never disabled', () => {
+  const html = renderToStaticMarkup(<ExportButton onOpen={() => {}} />)
 
   expect(html).toContain('type="button"')
   expect(html).toContain('Export</button>')
+  expect(html).toContain('title="Export (Shift+Ctrl/Cmd+E)"')
+  expect(html).not.toMatch(/<button[^>]*disabled/)
 })

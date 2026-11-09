@@ -5,7 +5,25 @@ import type { Bounds } from '../core/geometry/rect.ts'
 
 export const SCALES = [1, 2, 3] as const
 
-export type ExportFormat = 'png' | 'svg'
+export type ExportFormat = 'png' | 'svg' | 'yodo'
+
+/** The dialog's tabs, in order (ADR 0056). */
+export const EXPORT_TABS: { format: ExportFormat; label: string }[] = [
+  { format: 'png', label: 'PNG' },
+  { format: 'svg', label: 'SVG' },
+  { format: 'yodo', label: 'Yodo file' },
+]
+
+/** The tab an arrow key moves to from `from`, wrapping at both ends. */
+export function neighbourFormat(
+  from: ExportFormat,
+  key: 'ArrowLeft' | 'ArrowRight',
+): ExportFormat {
+  const index = EXPORT_TABS.findIndex((tab) => tab.format === from)
+  const step = key === 'ArrowRight' ? 1 : -1
+  return EXPORT_TABS[(index + step + EXPORT_TABS.length) % EXPORT_TABS.length]!
+    .format
+}
 
 export interface ExportChoices {
   /** Which tab of the dialog is open (ADR 0043). */
@@ -20,13 +38,17 @@ export interface ExportChoices {
   fileName: string
 }
 
-/** Defaults: the selection if there is one, a background, 2x for HiDPI screens. */
+/**
+ * Defaults: the selection if there is one, a background, 2x for HiDPI screens.
+ * An empty drawing has nothing to draw as an image, so it opens on the Yodo file tab.
+ */
 export function initialChoices(
   drawingName: string,
   selectedCount: number,
+  empty = false,
 ): ExportChoices {
   return {
-    format: 'png',
+    format: empty ? 'yodo' : 'png',
     scope: selectedCount > 0 ? 'selection' : 'all',
     background: true,
     dark: false,

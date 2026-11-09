@@ -69,7 +69,7 @@ test('lists the non-tool shortcuts the app implements', () => {
     'Paste elements or an image',
     'Duplicate',
     'Select all',
-    'Export image',
+    'Export',
     'Delete',
     'Cancel the gesture or selection',
     'Edit the label or text of the selected element',

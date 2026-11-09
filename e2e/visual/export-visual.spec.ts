@@ -47,8 +47,8 @@ for (const { name, document } of scenes) {
     page,
   }) => {
     await importScene(page, document)
-    await page.getByRole('button', { name: 'Export image' }).click()
-    const dialog = page.getByRole('dialog', { name: 'Export image' })
+    await page.getByRole('button', { name: 'Export', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: 'Export', exact: true })
     await expect(dialog).toBeVisible()
     const dark = dialog.getByLabel('Dark version')
 

@@ -28,6 +28,17 @@ describe('exportDrawing', () => {
     expect(parseYodoFile(text!).document).toEqual(doc)
   })
 
+  test('a file name only names the download, not the drawing', async () => {
+    const download = vi.fn()
+    const doc = { ...createDocument('Architecture') }
+
+    await exportDrawing(doc, new InMemoryImageRepository(), download, 'Backup')
+
+    const [filename, text] = download.mock.calls[0] as string[]
+    expect(filename).toBe('Backup.yodo')
+    expect(parseYodoFile(text!).document.name).toBe('Architecture')
+  })
+
   test('downloads nothing when an image is gone', async () => {
     const download = vi.fn()
     const doc = {

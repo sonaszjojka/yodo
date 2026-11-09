@@ -1489,6 +1489,11 @@ a.drawing-card-body:focus-visible,
   margin: 4px 0 0;
 }
 
+/* The Yodo file tab's one-line description (ADR 0056). */
+.export-note {
+  margin: 0;
+}
+
 /* Separates groups inside a menu (Settings: Theme / Keyboard shortcuts). */
 .menu-separator {
   height: 1px;

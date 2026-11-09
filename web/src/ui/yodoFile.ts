@@ -13,14 +13,19 @@ import type { DrawingRepository } from '../storage/repository.ts'
 import type { ImageCache } from './imageCache.ts'
 import { downloadText } from './download.ts'
 
-/** Downloads `doc`, with its images, as `<name>.yodo`. Throws if an image is gone. */
+/**
+ * Downloads `doc`, with its images, as `<name>.yodo`. Throws if an image is
+ * gone. `fileName` only names the download; the drawing keeps its own name
+ * inside the file.
+ */
 export async function exportDrawing(
   doc: YodoDocument,
   images: ImageRepository,
   download: typeof downloadText = downloadText,
+  fileName: string = doc.name,
 ): Promise<void> {
   download(
-    yodoFileName(doc.name),
+    yodoFileName(fileName),
     await exportYodo(doc, images),
     'application/json',
   )

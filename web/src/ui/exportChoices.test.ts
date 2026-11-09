@@ -1,7 +1,9 @@
 import { describe, expect, test } from 'vitest'
 import {
+  EXPORT_TABS,
   fittingScale,
   initialChoices,
+  neighbourFormat,
   pngFileName,
   svgFileName,
 } from './exportChoices.ts'
@@ -17,6 +19,11 @@ describe('initialChoices', () => {
 
   test('opens on the PNG tab', () => {
     expect(initialChoices('Sketch', 0).format).toBe('png')
+  })
+
+  test('opens on the Yodo file tab when the drawing is empty', () => {
+    expect(initialChoices('Sketch', 0, true).format).toBe('yodo')
+    expect(initialChoices('Sketch', 0, false).format).toBe('png')
   })
 
   test('starts with a light background at 2x', () => {
@@ -71,5 +78,23 @@ describe('svgFileName', () => {
     ['', 'drawing.svg'],
   ])('%j becomes %j', (input, expected) => {
     expect(svgFileName(input)).toBe(expected)
+  })
+})
+
+describe('tabs', () => {
+  test('are PNG, SVG and Yodo file, in that order', () => {
+    expect(EXPORT_TABS.map((tab) => tab.label)).toEqual([
+      'PNG',
+      'SVG',
+      'Yodo file',
+    ])
+  })
+
+  test('arrow keys move to the neighbour and wrap around', () => {
+    expect(neighbourFormat('png', 'ArrowRight')).toBe('svg')
+    expect(neighbourFormat('svg', 'ArrowRight')).toBe('yodo')
+    expect(neighbourFormat('yodo', 'ArrowRight')).toBe('png')
+    expect(neighbourFormat('png', 'ArrowLeft')).toBe('yodo')
+    expect(neighbourFormat('yodo', 'ArrowLeft')).toBe('svg')
   })
 })
