@@ -9,6 +9,11 @@ import {
   createText,
   DEFAULT_LABEL,
 } from '../../document/create.ts'
+import {
+  diamondCornerRadius,
+  diamondPoints,
+  roundedPolygonPath,
+} from '../../geometry/rect.ts'
 import type { YodoElement } from '../../document/types.ts'
 import { DARK_CANVAS, LIGHT_CANVAS } from '../../render/colors.ts'
 import { roughOptions } from '../../render/render.ts'
@@ -199,6 +204,24 @@ describe('rough shapes', () => {
     ],
   ])('draws a %s', (_name, element) => {
     expect(all(treeOf([element]), 'path').length).toBeGreaterThan(0)
+  })
+
+  test('a round diamond is drawn with the same outline as the canvas', () => {
+    const diamond = {
+      ...createShape('diamond', { x: 0, y: 0, width: 100, height: 60 }, 5),
+      roundness: 'round' as const,
+    }
+    const expected = generator.toPaths(
+      generator.path(
+        roundedPolygonPath(
+          diamondPoints(diamond),
+          diamondCornerRadius(diamond),
+        ),
+        roughOptions(diamond, 'light'),
+      ),
+    )
+    const [outline] = all(treeOf([diamond], { background: false }), 'path')
+    expect(outline!.attrs.d).toBe(expected[expected.length - 1]!.d)
   })
 
   test('an arrow adds a head to its line; a line or a headless arrow does not', () => {

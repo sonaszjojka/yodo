@@ -5,6 +5,7 @@ import type { Point, YodoElement } from '../document/types.ts'
 import {
   boxCorners,
   cornerRadius,
+  diamondCornerRadius,
   diamondPoints,
   roundedPolygonOutline,
 } from './rect.ts'
@@ -94,7 +95,11 @@ export function hitTest(
       element.type === 'rectangle'
         ? boxCorners(element)
         : diamondPoints(element)
-    const outline = roundedPolygonOutline(corners, cornerRadius(element))
+    const radius =
+      element.type === 'rectangle'
+        ? cornerRadius(element)
+        : diamondCornerRadius(element)
+    const outline = roundedPolygonOutline(corners, radius)
     return (
       nearPolyline(point, [...outline, outline[0]!], reach) ||
       (filled && pointInPolygon(point, outline))

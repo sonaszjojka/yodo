@@ -34,6 +34,7 @@ import {
 } from '../editor/binding.ts'
 import {
   cornerRadius,
+  diamondCornerRadius,
   diamondPoints,
   roundedPolygonPath,
   type Bounds,
@@ -359,7 +360,10 @@ function drawElement(
     case 'diamond':
       if (element.roundness === 'round') {
         rough.path(
-          roundedPolygonPath(diamondPoints(element), cornerRadius(element)),
+          roundedPolygonPath(
+            diamondPoints(element),
+            diamondCornerRadius(element),
+          ),
           options,
         )
       } else {

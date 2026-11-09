@@ -219,7 +219,7 @@ describe('round corners (roadmap 2.2b)', () => {
     ...createShape('rectangle', box),
     roundness: 'round' as const,
   }
-  // Tip at (100, 0); its curve passes through about (100, 11.3).
+  // Tip at (100, 0); radius 14.1, so its curve passes through about (100, 5).
   const diamond = {
     ...createShape('diamond', box),
     roundness: 'round' as const,
@@ -241,8 +241,9 @@ describe('round corners (roadmap 2.2b)', () => {
   })
 
   test('a round diamond hits on its rounded tip, not the sharp one', () => {
-    expect(hits(diamond, [100, 11])).toBe(true)
-    expect(hits(diamond, [100, 0])).toBe(false)
+    expect(hits(diamond, [100, 5])).toBe(true)
+    // Beyond the reach (6) of the curve: the sharp tip is empty.
+    expect(hits(diamond, [100, -2])).toBe(false)
   })
 })
 

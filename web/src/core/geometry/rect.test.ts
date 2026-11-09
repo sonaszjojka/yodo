@@ -4,6 +4,7 @@ import type { Point } from '../document/types.ts'
 import {
   containsBounds,
   cornerRadius,
+  diamondCornerRadius,
   elementBounds,
   rectFromDrag,
   roundedPolygonPath,
@@ -157,5 +158,31 @@ describe('roundedPolygonPath', () => {
       'M 0 0 L 100 0 Q 100 0 100 0 L 100 100 Q 100 100 100 100 ' +
         'L 0 100 Q 0 100 0 100 L 0 0 Q 0 0 0 0 Z',
     )
+  })
+})
+
+describe('diamondCornerRadius', () => {
+  // A tenth of the shortest edge (hypot(w/2, h/2)), so a tip loses at most 5%.
+  test.each([
+    [{ width: 200, height: 200 }, 14.142],
+    [{ width: 100, height: 100 }, 7.071],
+    [{ width: 400, height: 100 }, 20.616],
+    [{ width: 60, height: 260 }, 13.342],
+  ])('is a tenth of the edge length: %j', (size, radius) => {
+    expect(diamondCornerRadius({ x: 0, y: 0, ...size })).toBeCloseTo(radius, 3)
+  })
+
+  test('never exceeds the rectangle rule', () => {
+    // A thin box: a quarter of the shorter side (2.5) is smaller than a tenth of the edge.
+    expect(diamondCornerRadius({ x: 0, y: 0, width: 10, height: 200 })).toBe(
+      2.5,
+    )
+    expect(diamondCornerRadius({ x: 0, y: 0, width: 0, height: 50 })).toBe(0)
+  })
+
+  test('a negative size (a drag in progress) still gives a positive radius', () => {
+    expect(
+      diamondCornerRadius({ x: 0, y: 0, width: -200, height: -200 }),
+    ).toBeCloseTo(14.142, 3)
   })
 })

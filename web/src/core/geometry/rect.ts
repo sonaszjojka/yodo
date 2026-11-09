@@ -57,6 +57,19 @@ export function cornerRadius({ width, height }: Bounds): number {
   )
 }
 
+/**
+ * How round a round diamond's corners are: a tenth of its edge length
+ * (`hypot(width / 2, height / 2)`, the same for all four edges), and never
+ * more than `cornerRadius`. The curve then cuts at most 5% off the way to a
+ * tip, at any size or proportion; the rectangle rule alone cut 11% off a
+ * 200x200 diamond and 18% off a 100x100 one, which read as a rounded square
+ * (roadmap 4.8).
+ */
+export function diamondCornerRadius(bounds: Bounds): number {
+  const edge = Math.hypot(bounds.width / 2, bounds.height / 2)
+  return Math.min(cornerRadius(bounds), edge / 10)
+}
+
 /** The point `distance` along the segment from `from` towards `to`. */
 function toward(from: Point, to: Point, distance: number): Point {
   const length = Math.hypot(to[0] - from[0], to[1] - from[1])

@@ -15,6 +15,7 @@ import { hitTest } from '../geometry/hit.ts'
 import {
   boxCorners,
   cornerRadius,
+  diamondCornerRadius,
   diamondPoints,
   roundedPolygonOutline,
   type Bounds,
@@ -92,7 +93,12 @@ export function bindOutline(element: BindableElement): Point[] {
   const round =
     (element.type === 'rectangle' || element.type === 'diamond') &&
     element.roundness === 'round'
-  return round ? roundedPolygonOutline(corners, cornerRadius(element)) : corners
+  if (!round) return corners
+  const radius =
+    element.type === 'diamond'
+      ? diamondCornerRadius(element)
+      : cornerRadius(element)
+  return roundedPolygonOutline(corners, radius)
 }
 
 /** The point on segment `a`–`b` closest to `p`. */
