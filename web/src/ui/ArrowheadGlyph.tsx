@@ -1,5 +1,36 @@
-import { arrowheadOps } from '../core/geometry/arrowhead.ts'
+import { arrowheadOps, type HeadOp } from '../core/geometry/arrowhead.ts'
 import type { Arrowhead } from '../core/document/types.ts'
+
+/** The shaft's span in the glyph, tip at 0. */
+const SHAFT: [number, number] = [-31, 0]
+
+/**
+ * The shaft with the inside of every hollow head cut out, so it does not show
+ * through, whatever is behind the button (the canvas does the same with a fill,
+ * ADR 0055). Spans along x, in the glyph's own coordinates.
+ */
+function shaftSegments(ops: readonly HeadOp[]): [number, number][] {
+  const gaps = ops
+    .flatMap((op): [number, number][] => {
+      if (op.kind === 'path' || op.filled) return []
+      if (op.kind === 'circle') {
+        return [
+          [op.center[0] - op.diameter / 2, op.center[0] + op.diameter / 2],
+        ]
+      }
+      const xs = op.points.map((p) => p[0])
+      return [[Math.min(...xs), Math.max(...xs)]]
+    })
+    .sort((a, b) => a[0] - b[0])
+  const segments: [number, number][] = []
+  let from = SHAFT[0]
+  for (const [start, stop] of gaps) {
+    if (start > from) segments.push([from, Math.min(start, SHAFT[1])])
+    from = Math.max(from, stop)
+  }
+  if (from < SHAFT[1]) segments.push([from, SHAFT[1]])
+  return segments
+}
 
 /**
  * A line ending in `head`, drawn from the same shapes as the canvas and the
@@ -29,13 +60,16 @@ export function ArrowheadGlyph({
       // A mixed value shows a dashed line, like the width control.
       transform={end === 'start' ? 'scale(-1 1)' : undefined}
     >
-      <line
-        x1="-31"
-        y1="0"
-        x2="0"
-        y2="0"
-        strokeDasharray={head === 'mixed' ? '5 5' : undefined}
-      />
+      {shaftSegments(ops).map(([from, to]) => (
+        <line
+          key={from}
+          x1={from}
+          y1="0"
+          x2={to}
+          y2="0"
+          strokeDasharray={head === 'mixed' ? '5 5' : undefined}
+        />
+      ))}
       {ops.map((op, i) =>
         op.kind === 'path' ? (
           <polyline
