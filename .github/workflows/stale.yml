@@ -1,0 +1,22 @@
+# Closes question-type issues that went quiet. Bugs, features, roadmap items
+# and "good first issue" / "help wanted" are never touched.
+name: Stale
+on:
+  schedule:
+    - cron: "30 5 * * *"
+permissions:
+  issues: write
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@4391f3da665fdf50b6810c1a66712fb9ba21aa93 # v11.0.0
+        with:
+          only-labels: question,needs-info
+          days-before-issue-stale: 60
+          days-before-issue-close: 14
+          days-before-pr-stale: -1
+          days-before-pr-close: -1
+          stale-issue-label: stale
+          stale-issue-message: This issue has had no activity for 60 days. It will be closed in 14 days unless there is new information.
+          close-issue-message: Closed because of no activity. Feel free to reopen with more details.
