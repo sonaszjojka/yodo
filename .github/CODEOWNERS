@@ -1,0 +1,7 @@
+# Default owner for everything; sensitive areas listed explicitly so they stay
+# covered if the default ever changes.
+*                    @sonaszjojka
+/.github/            @sonaszjojka
+/docs/adr/           @sonaszjojka
+/Dockerfile          @sonaszjojka
+/server/             @sonaszjojka
