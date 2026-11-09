@@ -501,7 +501,8 @@ function arrowheadOf(name: unknown, simplified: Counter): Arrowhead | null {
     if ((ARROWHEADS as readonly string[]).includes(name)) {
       return name as Arrowhead
     }
-    if (name in HEAD_ALIASES) return HEAD_ALIASES[name]!
+    // Own properties only: "constructor" is not an Excalidraw head.
+    if (Object.hasOwn(HEAD_ALIASES, name)) return HEAD_ALIASES[name]!
   }
   simplified.add('arrowheads')
   return 'arrow'

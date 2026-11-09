@@ -105,6 +105,23 @@ describe('shapes, lines, arrows and pencil', () => {
     expect(document.elements[6]).toMatchObject({ endArrowhead: head })
   })
 
+  test.each(['constructor', '__proto__', 'toString'])(
+    'the arrowhead name %s is unknown, not an inherited property',
+    async (name) => {
+      const input = JSON.parse(shapes)
+      const arrows = input.elements.filter(
+        (e: { type: string }) => e.type === 'arrow',
+      )
+      arrows[1].endArrowhead = name
+      const { document, summary } = await convertExcalidraw(input, options())
+      expect(document.elements[6]).toMatchObject({ endArrowhead: 'arrow' })
+      expect(summary.simplified).toContainEqual({
+        reason: 'arrowheads',
+        count: 1,
+      })
+    },
+  )
+
   test('an arrowhead Yodo does not have is shown as the arrow and reported', async () => {
     const input = JSON.parse(shapes)
     const arrows = input.elements.filter(
