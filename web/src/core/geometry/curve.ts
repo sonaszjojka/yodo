@@ -169,6 +169,14 @@ export function headFrom(points: readonly Point[], curved: boolean): Point {
 }
 
 /**
+ * `headFrom` for the first point: where a head at the start should point from.
+ * `points` are absolute.
+ */
+export function tailFrom(points: readonly Point[], curved: boolean): Point {
+  return headFrom([...points].reverse(), curved)
+}
+
+/**
  * The box of what is drawn for `element`: its points' box, or the curve's own
  * box when it is curved. For culling and the export frame.
  */

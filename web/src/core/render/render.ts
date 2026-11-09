@@ -14,8 +14,9 @@ import type {
 } from '../document/types.ts'
 import { adaptColor, type Theme } from './colors.ts'
 import { smoothPath } from '../geometry/freehand.ts'
-import { drawnBounds, headFrom, isCurved } from '../geometry/curve.ts'
-import { ARROWHEAD_LENGTH, arrowhead } from '../geometry/line.ts'
+import { arrowHeadOps } from '../geometry/arrowhead.ts'
+import { drawnBounds, isCurved } from '../geometry/curve.ts'
+import { ARROWHEAD_LENGTH } from '../geometry/line.ts'
 import {
   drawsBoxFrame,
   handleLine,
@@ -137,6 +138,16 @@ export function roughOptions(element: YodoElement, theme: Theme): Options {
     fillStyle: element.fillStyle,
     strokeLineDash: DASHES[element.strokeStyle],
   }
+}
+
+/**
+ * The rough.js options for a closed head: solid in the stroke colour when
+ * `filled`, otherwise empty (ADR 0055).
+ */
+export function headOptions(options: Options, filled: boolean): Options {
+  return filled
+    ? { ...options, fill: options.stroke, fillStyle: 'solid' }
+    : { ...options, fill: undefined }
 }
 
 /**
@@ -343,13 +354,20 @@ function drawElement(
       if (curved) rough.curve(points, options)
       else rough.linearPath(points, options)
       // Stored documents aren't validated, so fewer than two points can occur.
-      if (points.length < 2) return
-      const to = points.at(-1)!
-      const from = headFrom(points, curved)
-      const hasLength = from[0] !== to[0] || from[1] !== to[1]
-      if (element.type === 'arrow' && element.endArrowhead && hasLength) {
-        // Same seed, so the head keeps its wobble from frame to frame too.
-        rough.linearPath(arrowhead(from, to), options)
+      if (element.type !== 'arrow') return
+      // Same seed, so a head keeps its wobble from frame to frame too.
+      for (const op of arrowHeadOps(element, points, curved)) {
+        if (op.kind === 'path') rough.linearPath(op.points, options)
+        else if (op.kind === 'polygon')
+          rough.polygon(op.points, headOptions(options, op.filled))
+        else
+          rough.ellipse(
+            op.center[0],
+            op.center[1],
+            op.diameter,
+            op.diameter,
+            headOptions(options, op.filled),
+          )
       }
       return
     }

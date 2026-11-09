@@ -4,6 +4,29 @@
 
 export const CURRENT_SCHEMA_VERSION = 1
 
+/**
+ * The shapes an arrow can end in (ADR 0055): Excalidraw's names, with its
+ * legacy `dot` as `circle`. Absent or null means no head.
+ */
+export const ARROWHEADS = [
+  'arrow',
+  'bar',
+  'circle',
+  'circle_outline',
+  'triangle',
+  'triangle_outline',
+  'diamond',
+  'diamond_outline',
+  'cardinality_one',
+  'cardinality_many',
+  'cardinality_one_or_many',
+  'cardinality_exactly_one',
+  'cardinality_zero_or_one',
+  'cardinality_zero_or_many',
+] as const
+
+export type Arrowhead = (typeof ARROWHEADS)[number]
+
 export type StrokeStyle = 'solid' | 'dashed' | 'dotted'
 export type FillStyle = 'hachure' | 'cross-hatch' | 'solid'
 export type FontFamily = 'hand' | 'sans' | 'mono'
@@ -133,7 +156,9 @@ export type ArrowBinding = ShapeBinding | PathBinding
 export interface ArrowElement extends BaseElement {
   type: 'arrow'
   points: Point[]
-  endArrowhead: 'arrow' | null
+  endArrowhead: Arrowhead | null
+  /** Absent means no head at the start (ADR 0055). */
+  startArrowhead?: Arrowhead | null
   curved?: true
   startBinding?: ArrowBinding
   endBinding?: ArrowBinding

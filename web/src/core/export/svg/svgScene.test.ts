@@ -219,6 +219,33 @@ describe('rough shapes', () => {
     expect(count(arrow)).toBeGreaterThan(count(line))
     expect(count({ ...arrow, endArrowhead: null })).toBe(count(line))
   })
+
+  test('a start head and a closed head add drawings (ADR 0055)', () => {
+    const geometry = {
+      x: 0,
+      y: 0,
+      width: 80,
+      height: 0,
+      points: [
+        [0, 0],
+        [80, 0],
+      ] as [number, number][],
+    }
+    const count = (e: YodoElement) =>
+      all(treeOf([e], { background: false }), 'path').length
+    const base = { ...createLinear('arrow', geometry, 4), endArrowhead: null }
+    const none = count(base)
+    expect(count({ ...base, startArrowhead: 'arrow' })).toBeGreaterThan(none)
+    expect(count({ ...base, endArrowhead: 'triangle' })).toBeGreaterThan(none)
+    expect(count({ ...base, endArrowhead: 'circle' })).toBeGreaterThan(none)
+    expect(
+      count({
+        ...base,
+        startArrowhead: 'bar',
+        endArrowhead: 'diamond_outline',
+      }),
+    ).toBeGreaterThan(count({ ...base, endArrowhead: 'diamond_outline' }))
+  })
 })
 
 describe('curved lines and arrows (ADR 0053)', () => {

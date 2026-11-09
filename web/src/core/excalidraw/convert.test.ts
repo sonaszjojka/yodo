@@ -76,17 +76,48 @@ describe('shapes, lines, arrows and pencil', () => {
     })
   })
 
-  test('reports dropped arrowheads as simplified, not attached arrows', async () => {
+  test('maps Excalidraw arrowheads at both ends, dot to circle (ADR 0055)', async () => {
     const { document, summary } = await convert(shapes)
     expect(document.elements[5]).toMatchObject({ endArrowhead: 'arrow' })
+    expect(document.elements[5]).not.toHaveProperty('startArrowhead')
+    expect(document.elements[6]).toMatchObject({
+      startArrowhead: 'circle',
+      endArrowhead: 'bar',
+    })
     expect(summary.simplified).toEqual([
       { reason: 'zigzag fills, shown as hachure', count: 1 },
-      { reason: 'arrowheads', count: 1 },
     ])
-    expect(describeSummary(summary)).toEqual([
-      'Simplified zigzag fills, shown as hachure (1)',
-      'Simplified arrowheads (1)',
-    ])
+  })
+
+  test.each([
+    ['crowfoot_many', 'cardinality_many'],
+    ['crowfoot_one', 'cardinality_one'],
+    ['crowfoot_one_or_many', 'cardinality_one_or_many'],
+    ['cardinality_zero_or_many', 'cardinality_zero_or_many'],
+    ['triangle_outline', 'triangle_outline'],
+  ])('arrowhead %s becomes %s', async (name, head) => {
+    const input = JSON.parse(shapes)
+    const arrows = input.elements.filter(
+      (e: { type: string }) => e.type === 'arrow',
+    )
+    arrows[1].endArrowhead = name
+    const { document } = await convertExcalidraw(input, options())
+    expect(document.elements[6]).toMatchObject({ endArrowhead: head })
+  })
+
+  test('an arrowhead Yodo does not have is shown as the arrow and reported', async () => {
+    const input = JSON.parse(shapes)
+    const arrows = input.elements.filter(
+      (e: { type: string }) => e.type === 'arrow',
+    )
+    arrows[1].endArrowhead = 'star'
+    const { document, summary } = await convertExcalidraw(input, options())
+    expect(document.elements[6]).toMatchObject({ endArrowhead: 'arrow' })
+    expect(summary.simplified).toContainEqual({
+      reason: 'arrowheads',
+      count: 1,
+    })
+    expect(describeSummary(summary)).toContain('Simplified arrowheads (1)')
   })
 
   test('attaches a bound arrow to the converted shapes, on their outlines', async () => {

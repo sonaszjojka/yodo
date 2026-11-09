@@ -13,8 +13,8 @@ import type {
   YodoElement,
 } from '../../document/types.ts'
 import { smoothPath } from '../../geometry/freehand.ts'
-import { headFrom, isCurved } from '../../geometry/curve.ts'
-import { arrowhead } from '../../geometry/line.ts'
+import { arrowHeadOps } from '../../geometry/arrowhead.ts'
+import { isCurved } from '../../geometry/curve.ts'
 import {
   cornerRadius,
   diamondPoints,
@@ -28,6 +28,7 @@ import {
   IMAGE_PLACEHOLDER,
   NOTE_RADIUS,
   NOTE_SHADOW,
+  headOptions,
   roughOptions,
 } from '../../render/render.ts'
 import {
@@ -327,18 +328,21 @@ function elementNodes(
         deps,
         element,
       )
-      if (points.length < 2) return nodes
-      const to = points.at(-1)!
-      const from = headFrom(points, curved)
-      const hasLength = from[0] !== to[0] || from[1] !== to[1]
-      if (element.type === 'arrow' && element.endArrowhead && hasLength) {
-        nodes.push(
-          ...drawablePaths(
-            generator.linearPath(arrowhead(from, to), options),
-            deps,
-            element,
-          ),
-        )
+      if (element.type !== 'arrow') return nodes
+      for (const op of arrowHeadOps(element, points, curved)) {
+        const drawable =
+          op.kind === 'path'
+            ? generator.linearPath(op.points, options)
+            : op.kind === 'polygon'
+              ? generator.polygon(op.points, headOptions(options, op.filled))
+              : generator.ellipse(
+                  op.center[0],
+                  op.center[1],
+                  op.diameter,
+                  op.diameter,
+                  headOptions(options, op.filled),
+                )
+        nodes.push(...drawablePaths(drawable, deps, element))
       }
       return nodes
     }

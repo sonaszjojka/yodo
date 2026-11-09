@@ -11,7 +11,12 @@ import {
   type LinearType,
   type ShapeType,
 } from '../document/create.ts'
-import type { Point, YodoDocument, YodoElement } from '../document/types.ts'
+import type {
+  Arrowhead,
+  Point,
+  YodoDocument,
+  YodoElement,
+} from '../document/types.ts'
 import { appendPoint, startStroke } from '../geometry/freehand.ts'
 import { lineFromDrag } from '../geometry/line.ts'
 import {
@@ -56,6 +61,7 @@ import {
   pasteElements,
   serializeClipboard,
 } from './clipboard.ts'
+import { applyArrowhead, type HeadEnd } from './arrowhead.ts'
 import {
   applyHandleDrag,
   followBindings,
@@ -246,6 +252,11 @@ export interface Editor {
    * on blur, must not land on what was selected in the meantime.
    */
   setStyle(patch: StylePatch, options?: { selection?: string[] }): void
+  /**
+   * Sets the head at one end of the selected arrows (null for none); one undo
+   * step, and nothing else in the selection changes (ADR 0055).
+   */
+  setArrowhead(end: HeadEnd, head: Arrowhead | null): void
   /** Moves the selection in the draw order (layers); one undo step. */
   arrange(order: LayerOrder): void
   /** Adds offset copies of the selection and selects them; one undo step. */
@@ -1311,6 +1322,17 @@ export function createEditor(
           prev.selectedIds,
           patch,
           measure,
+        )
+        return document === prev.document ? prev : { ...prev, document }
+      })
+    },
+    setArrowhead(end, head) {
+      store.setState((prev) => {
+        const document = applyArrowhead(
+          prev.document,
+          prev.selectedIds,
+          end,
+          head,
         )
         return document === prev.document ? prev : { ...prev, document }
       })

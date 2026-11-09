@@ -3,10 +3,12 @@ import { describe, expect, test } from 'vitest'
 import {
   BUILT_IN_STYLE,
   createDocument,
+  createLinear,
   createShape,
   createText,
 } from '../core/document/create.ts'
 import type { YodoElement } from '../core/document/types.ts'
+import { lineFromDrag } from '../core/geometry/line.ts'
 import { createEditor } from '../core/editor/editor.ts'
 import { createStore } from '../core/store/store.ts'
 import type { PanelLayout } from '../storage/preferences.ts'
@@ -224,5 +226,39 @@ describe('StylePanelToggle', () => {
     expect(
       renderToStaticMarkup(<StylePanelToggle panel={openPanel()} />),
     ).toContain('aria-pressed="true"')
+  })
+})
+
+describe('StylePanel arrowheads (ADR 0055)', () => {
+  const arrow = createLinear(
+    'arrow',
+    lineFromDrag([300, 300], [400, 350], false),
+  )
+
+  test('an arrow has a section per end, before opacity, showing its head', () => {
+    const html = render(editorWith([arrow]))
+    const titles = sections(html)
+    expect(titles).toContain('Start arrowhead')
+    expect(titles).toContain('End arrowhead')
+    expect(titles.indexOf('End arrowhead')).toBeLessThan(
+      titles.indexOf('Opacity'),
+    )
+    expect(html).toContain('Arrow</span>')
+  })
+
+  test('other elements and the defaults have no arrowhead section', () => {
+    expect(sections(render(editorWith([rect])))).not.toContain('End arrowhead')
+    expect(sections(render(editorWith([rect], [])))).not.toContain(
+      'End arrowhead',
+    )
+  })
+
+  test('bar and panel agree after a change', () => {
+    const editor = editorWith([arrow])
+    editor.setArrowhead('end', 'cardinality_zero_or_many')
+    expect(render(editor)).toContain('Zero or many')
+    expect(renderToStaticMarkup(<StyleBar editor={editor} />)).toContain(
+      'End head: Zero or many',
+    )
   })
 })

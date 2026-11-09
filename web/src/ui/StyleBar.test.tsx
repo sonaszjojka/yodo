@@ -121,6 +121,40 @@ describe('StyleBar', () => {
   })
 })
 
+describe('StyleBar arrowheads (ADR 0055)', () => {
+  const arrow = createLinear(
+    'arrow',
+    lineFromDrag([300, 300], [400, 350], false),
+  )
+
+  test('an arrow gets a Start and an End head control showing their values', () => {
+    const html = renderToStaticMarkup(<StyleBar editor={editorWith([arrow])} />)
+    expect(controls(html)).toContain('Start head: None')
+    expect(controls(html)).toContain('End head: Arrow')
+  })
+
+  test('a selection without an arrow has no head control', () => {
+    const html = renderToStaticMarkup(<StyleBar editor={editorWith([rect])} />)
+    expect(controls(html).join()).not.toContain('head')
+  })
+
+  test('arrows with different heads show as mixed; shapes beside them do not matter', () => {
+    const other = { ...arrow, id: 'other', endArrowhead: 'bar' as const }
+    const html = renderToStaticMarkup(
+      <StyleBar editor={editorWith([arrow, other, rect])} />,
+    )
+    expect(controls(html)).toContain('End head: Mixed')
+    expect(controls(html)).toContain('Start head: None')
+  })
+
+  test('the chosen head shows in the control', () => {
+    const editor = editorWith([arrow])
+    editor.setArrowhead('start', 'diamond_outline')
+    const html = renderToStaticMarkup(<StyleBar editor={editor} />)
+    expect(controls(html)).toContain('Start head: Diamond outline')
+  })
+})
+
 describe('MoreMenu', () => {
   const menu = (canPaste: boolean) =>
     renderToStaticMarkup(

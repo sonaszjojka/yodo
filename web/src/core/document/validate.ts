@@ -3,7 +3,13 @@
 // used for saved drawings; a pasted element is untrusted and a bad number or a
 // missing `points` array would break rendering, so anything malformed is
 // dropped rather than repaired.
-import type { Point, TextLabel, YodoElement } from './types.ts'
+import {
+  ARROWHEADS,
+  type Arrowhead,
+  type Point,
+  type TextLabel,
+  type YodoElement,
+} from './types.ts'
 
 /** An image id is the lowercase hex SHA-256 of its bytes (ADR 0040). */
 const FILE_ID = /^[0-9a-f]{64}$/
@@ -102,7 +108,9 @@ export function isElement(value: unknown): value is YodoElement {
     case 'arrow':
       return (
         isPoints(value.points) &&
-        (value.endArrowhead === null || value.endArrowhead === 'arrow')
+        // An unknown head is not a reason to drop the arrow: it is reset when
+        // sanitised (ADR 0055).
+        (value.endArrowhead === null || typeof value.endArrowhead === 'string')
       )
     case 'text':
       return (
@@ -138,23 +146,46 @@ function isBinding(value: unknown) {
 
 /**
  * A valid element with its optional fields checked: a malformed arrow binding
- * is removed (ADR 0048) and a `curved` that is not `true` is dropped (ADR
+ * is removed (ADR 0048), an unknown arrowhead is reset (ADR 0055) and a `curved` that is not `true` is dropped (ADR
  * 0053), keeping the element, since it still draws fine without them.
  * Anything else comes back as it is.
  */
 export function sanitizeElement(element: YodoElement): YodoElement {
   if (element.type === 'line') return sanitizeCurved(element)
   if (element.type !== 'arrow') return element
-  const { startBinding, endBinding, ...rest } = sanitizeCurved(element)
+  const { startBinding, endBinding, startArrowhead, ...rest } =
+    sanitizeCurved(element)
   const kept = {
     ...(isBinding(startBinding) ? { startBinding } : {}),
     ...(isBinding(endBinding) ? { endBinding } : {}),
   }
+  // An unknown head is reset: the end to the plain arrow, the start to none
+  // (ADR 0055).
+  const endArrowhead =
+    rest.endArrowhead === null || isHead(rest.endArrowhead)
+      ? rest.endArrowhead
+      : 'arrow'
+  const keepStart =
+    startArrowhead !== undefined &&
+    (startArrowhead === null || isHead(startArrowhead))
   const same =
     (startBinding === undefined) === !('startBinding' in kept) &&
     (endBinding === undefined) === !('endBinding' in kept) &&
-    rest.curved === element.curved
-  return same ? element : { ...rest, ...kept }
+    rest.curved === element.curved &&
+    endArrowhead === element.endArrowhead &&
+    (startArrowhead === undefined) === !keepStart
+  return same
+    ? element
+    : {
+        ...rest,
+        endArrowhead,
+        ...(keepStart ? { startArrowhead } : {}),
+        ...kept,
+      }
+}
+
+function isHead(value: unknown): value is Arrowhead {
+  return oneOf(value, ARROWHEADS)
 }
 
 function sanitizeCurved<T extends { curved?: true }>(element: T): T {

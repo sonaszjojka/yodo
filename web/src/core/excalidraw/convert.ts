@@ -4,14 +4,16 @@
 // Images are resolved through an injected function so this module stays free
 // of storage and the DOM (ADR 0002).
 import { createDocument, randomId, randomSeed } from '../document/create.ts'
-import type {
-  ArrowElement,
-  FillStyle,
-  FontFamily,
-  Point,
-  StrokeStyle,
-  YodoDocument,
-  YodoElement,
+import {
+  ARROWHEADS,
+  type Arrowhead,
+  type ArrowElement,
+  type FillStyle,
+  type FontFamily,
+  type Point,
+  type StrokeStyle,
+  type YodoDocument,
+  type YodoElement,
 } from '../document/types.ts'
 import { MAX_PASTE_ELEMENTS, parseElements } from '../document/validate.ts'
 import { attachEnd, isBindable } from '../editor/binding.ts'
@@ -331,10 +333,8 @@ export async function convertExcalidraw(
             element: { type: 'pencil', ...linear },
           }
         }
-        const end = raw.endArrowhead
-        if (raw.startArrowhead || (end && end !== 'arrow')) {
-          simplified.add('arrowheads')
-        }
+        const start = arrowheadOf(raw.startArrowhead, simplified)
+        const end = arrowheadOf(raw.endArrowhead, simplified)
         return {
           kind: 'element',
           rawId,
@@ -346,7 +346,8 @@ export async function convertExcalidraw(
             type: 'arrow',
             ...linear,
             ...bent,
-            endArrowhead: end ? 'arrow' : null,
+            endArrowhead: end,
+            ...(start ? { startArrowhead: start } : {}),
           },
         }
       }
@@ -482,6 +483,30 @@ export async function convertExcalidraw(
 }
 
 /** The source id an Excalidraw binding points at, if it has a usable one. */
+/** Excalidraw's names for the heads Yodo draws under another name (ADR 0055). */
+const HEAD_ALIASES: Record<string, Arrowhead> = {
+  dot: 'circle',
+  crowfoot_one: 'cardinality_one',
+  crowfoot_many: 'cardinality_many',
+  crowfoot_one_or_many: 'cardinality_one_or_many',
+}
+
+/**
+ * The head for an Excalidraw arrowhead name, or null for none. A name Yodo
+ * does not know is shown as the plain arrow and reported.
+ */
+function arrowheadOf(name: unknown, simplified: Counter): Arrowhead | null {
+  if (!name) return null
+  if (typeof name === 'string') {
+    if ((ARROWHEADS as readonly string[]).includes(name)) {
+      return name as Arrowhead
+    }
+    if (name in HEAD_ALIASES) return HEAD_ALIASES[name]!
+  }
+  simplified.add('arrowheads')
+  return 'arrow'
+}
+
 function boundId(binding: unknown): string | undefined {
   if (!binding) return undefined
   // An unusable binding gets an id nothing has, so it is reported as lost.

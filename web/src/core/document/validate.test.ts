@@ -7,6 +7,7 @@ import {
   createShape,
   createText,
 } from './create.ts'
+import { ARROWHEADS } from './types.ts'
 import { MAX_PASTE_ELEMENTS, parseElements } from './validate.ts'
 import { lineFromDrag } from '../geometry/line.ts'
 
@@ -79,6 +80,36 @@ describe('path bindings (ADR 0054)', () => {
   })
 })
 
+describe('arrowheads (ADR 0055)', () => {
+  const arrow = createLinear('arrow', lineFromDrag([0, 0], [10, 10], false))
+
+  test.each(ARROWHEADS)('%s is kept at both ends', (head) => {
+    const json = JSON.parse(
+      JSON.stringify({ ...arrow, startArrowhead: head, endArrowhead: head }),
+    )
+    expect(parseElements([json])).toEqual([json])
+  })
+
+  test('no head at either end is kept', () => {
+    const json = JSON.parse(
+      JSON.stringify({ ...arrow, startArrowhead: null, endArrowhead: null }),
+    )
+    expect(parseElements([json])).toEqual([json])
+  })
+
+  test('an unknown end head is reset to the arrow and the element kept', () => {
+    const json = JSON.parse(JSON.stringify({ ...arrow, endArrowhead: 'star' }))
+    expect(parseElements([json])).toEqual([{ ...arrow, endArrowhead: 'arrow' }])
+  })
+
+  test.each(['star', 5, true])('an unknown start head %j is removed', (bad) => {
+    const json = JSON.parse(JSON.stringify({ ...arrow, startArrowhead: bad }))
+    const [result] = parseElements([json])
+    expect(result).toEqual(arrow)
+    expect(result).not.toHaveProperty('startArrowhead')
+  })
+})
+
 describe('parseElements', () => {
   test('keeps a valid element of every type, unchanged', () => {
     const json = JSON.parse(JSON.stringify(valid))
@@ -108,7 +139,11 @@ describe('parseElements', () => {
     ['a line without points', { ...valid[4], points: undefined }],
     ['a point with NaN', { ...valid[4], points: [[0, null]] }],
     ['a point that is not a pair', { ...valid[6], points: [[0, 1, 2]] }],
-    ['an arrow with a bad arrowhead', { ...valid[5], endArrowhead: 'dot' }],
+    ['an arrow whose head is not a string', { ...valid[5], endArrowhead: 5 }],
+    [
+      'an arrow without an end head field',
+      { ...valid[5], endArrowhead: undefined },
+    ],
     ['a text without text', { ...valid[7], text: undefined }],
     ['an image without a fileId', { ...valid[8], fileId: undefined }],
     ['an image with a malformed fileId', { ...valid[8], fileId: '../../x' }],

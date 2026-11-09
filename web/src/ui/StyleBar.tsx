@@ -12,7 +12,9 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from 'react'
+import type { Arrowhead } from '../core/document/types.ts'
 import type { Editor, EditorState } from '../core/editor/editor.ts'
+import { commonArrowhead } from '../core/editor/arrowhead.ts'
 import { selectedOf } from '../core/editor/selection.ts'
 import {
   commonStyle,
@@ -34,7 +36,9 @@ import {
 import { nextMenuIndex } from './menuKeys.ts'
 import { MORE_ITEMS } from './moreItems.tsx'
 import { isOutside } from './outsidePress.ts'
+import { ArrowheadGlyph } from './ArrowheadGlyph.tsx'
 import {
+  ARROWHEAD_OPTIONS,
   FILLS,
   fillsFor,
   FONTS,
@@ -54,6 +58,16 @@ interface Control<K extends StyleKey> {
   name: string
   options: Option<NonNullable<StylePatch[K]>>[]
   show(value: NonNullable<StylePatch[K]> | 'mixed'): ReactNode
+}
+
+/** One control of the bar, whatever it edits: a style, or an arrow's head. */
+interface BarItem {
+  key: string
+  name: string
+  options: Option<unknown>[]
+  value: unknown
+  show(value: unknown): ReactNode
+  choose(value: unknown): void
 }
 
 /** A colour sample, shown as it looks on the canvas in the current theme. */
@@ -265,7 +279,7 @@ export function StyleBar({ editor, onAllStyles }: StyleBarProps) {
   // The open popover (or the "more" menu) belongs to one selection: a new
   // selection closes it.
   const [open, setOpen] = useState<{
-    key: StyleKey | 'more'
+    key: string
     ids: string[]
   } | null>(null)
   const openKey = open?.ids === ids ? open.key : null
@@ -294,11 +308,35 @@ export function StyleBar({ editor, onAllStyles }: StyleBarProps) {
   if (!frame) return null
   const style = commonStyle(selected)
   const fills = fillsFor(selected)
-  const controls = CONTROLS.filter(({ key }) => key in style).map((control) =>
-    control.key === 'backgroundColor'
-      ? { ...control, options: fills }
-      : control,
+  const items: BarItem[] = CONTROLS.filter(({ key }) => key in style).map(
+    (control): BarItem => {
+      const options =
+        control.key === 'backgroundColor' ? fills : control.options
+      return {
+        key: control.key,
+        name: control.name,
+        options,
+        value: style[control.key]!,
+        show: (value) => control.show(value as never),
+        choose: (value) => editor.setStyle({ [control.key]: value }),
+      }
+    },
   )
+  // An arrow in the selection adds a control per end (ADR 0055).
+  for (const end of ['start', 'end'] as const) {
+    const head = commonArrowhead(selected, end)
+    if (head === undefined) continue
+    items.push({
+      key: `${end}Arrowhead`,
+      name: end === 'start' ? 'Start head' : 'End head',
+      options: ARROWHEAD_OPTIONS,
+      value: head,
+      show: (value) => (
+        <ArrowheadGlyph head={value as Arrowhead | null | 'mixed'} end={end} />
+      ),
+      choose: (value) => editor.setArrowhead(end, value as Arrowhead | null),
+    })
+  }
 
   const { outline } = frame
   const [x, y] = worldToScreen(viewport, [outline.x, outline.y])
@@ -311,7 +349,7 @@ export function StyleBar({ editor, onAllStyles }: StyleBarProps) {
   const { left, top } = barPosition(
     screenOutline,
     // The controls, then All styles and More.
-    barWidth(controls.length + 2),
+    barWidth(items.length + 2),
     size,
   )
 
@@ -338,8 +376,8 @@ export function StyleBar({ editor, onAllStyles }: StyleBarProps) {
       style={{ left, top }}
       onKeyDown={onKeyDown}
     >
-      {controls.map((control, index) => {
-        const value = style[control.key]!
+      {items.map((control, index) => {
+        const value = control.value
         const label = `${control.name}: ${labelOf(control.options, value)}`
         const isOpen = openKey === control.key
         return (
@@ -378,9 +416,7 @@ export function StyleBar({ editor, onAllStyles }: StyleBarProps) {
                     aria-label={option.label}
                     title={option.label}
                     aria-pressed={option.value === value}
-                    onClick={() =>
-                      editor.setStyle({ [control.key]: option.value })
-                    }
+                    onClick={() => control.choose(option.value)}
                   >
                     {control.show(option.value)}
                   </button>
@@ -424,7 +460,7 @@ export function StyleBar({ editor, onAllStyles }: StyleBarProps) {
             onDone={closeMenu}
             style={menuOffset(
               { left, top },
-              controls.length + 1,
+              items.length + 1,
               MORE_ITEMS.length,
               size,
             )}

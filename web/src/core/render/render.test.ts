@@ -281,6 +281,25 @@ describe('renderScene', () => {
     )
   })
 
+  test('a start head is drawn at the first point, a filled one in the stroke colour', () => {
+    const rough = fakeRough()
+    const arrow = {
+      ...createLinear('arrow', lineFromDrag([0, 0], [100, 0], false), 6),
+      startArrowhead: 'triangle' as const,
+      endArrowhead: 'circle_outline' as const,
+    }
+
+    renderScene(fakeContext(), rough, [arrow], SURFACE, IDENTITY)
+
+    const [points, options] = rough.polygon.mock.calls[0]!
+    expect(points[0]).toEqual([0, 0])
+    expect(options).toMatchObject({ fill: options.stroke, fillStyle: 'solid' })
+    const [cx, , width, height, outline] = rough.ellipse.mock.calls[0]!
+    expect(cx).toBeLessThan(100)
+    expect(width).toBe(height)
+    expect(outline.fill).toBeUndefined()
+  })
+
   test('a zero-length arrow draws no head', () => {
     const rough = fakeRough()
     const arrow = createLinear('arrow', lineFromDrag([5, 5], [5, 5], false), 6)

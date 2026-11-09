@@ -2219,3 +2219,49 @@ describe('arrows attached to lines and arrows (ADR 0054)', () => {
     expect(shown.y + shown.points[1]![1]).toBeGreaterThan(5)
   })
 })
+
+describe('arrowheads (ADR 0055)', () => {
+  function setup() {
+    const arrow = createLinear('arrow', lineFromDrag([0, 0], [200, 0], false))
+    const rect = createShape('rectangle', {
+      x: 0,
+      y: 100,
+      width: 50,
+      height: 50,
+    })
+    const editor = createEditor({
+      ...createDocument(),
+      elements: [arrow, rect],
+    })
+    click(editor, [100, 0])
+    const current = () =>
+      editor.store.getState().document.elements[0] as ArrowElement
+    return { editor, arrow, current }
+  }
+
+  test('sets a head at each end of the selected arrow, one undo step each', () => {
+    const { editor, arrow, current } = setup()
+    editor.setArrowhead('start', 'diamond')
+    editor.setArrowhead('end', 'cardinality_many')
+    expect(current()).toMatchObject({
+      startArrowhead: 'diamond',
+      endArrowhead: 'cardinality_many',
+    })
+    editor.undo()
+    expect(current().endArrowhead).toBe('arrow')
+    expect(current().startArrowhead).toBe('diamond')
+    editor.undo()
+    expect(current()).toBe(arrow)
+  })
+
+  test('does nothing with no selection or a selection with no arrow', () => {
+    const { editor } = setup()
+    const before = editor.store.getState().document
+    click(editor, [25, 125])
+    editor.setArrowhead('end', 'bar')
+    expect(editor.store.getState().document).toBe(before)
+    editor.selectTool.cancel()
+    editor.setArrowhead('end', 'bar')
+    expect(editor.store.getState().document).toBe(before)
+  })
+})
