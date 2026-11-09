@@ -667,6 +667,22 @@ describe('path targets', () => {
     expect(dropEnd([a, b], a, 'start', [0, 150], 6).target).toBeNull()
   })
 
+  test('a wrong-kind binding does not make a valid one look like a loop', () => {
+    const a = {
+      ...createLinear('arrow', lineFromDrag([0, 0], [10, 0], false)),
+      id: 'a',
+      startBinding: { elementId: 'b', ratio: [0.5, 0.5] as [number, number] },
+    }
+    const b = {
+      ...createLinear('arrow', lineFromDrag([0, 50], [10, 50], false)),
+      id: 'b',
+      endBinding: { elementId: 'a', along: 0.5 },
+    }
+    const [ra, rb] = followBindings([a, b], new Set(['a'])) as ArrowElement[]
+    expect(ra).not.toHaveProperty('startBinding')
+    expect(rb!.endBinding).toEqual({ elementId: 'a', along: 0.5 })
+  })
+
   test('a very long chain of attached arrows does not overflow the stack', () => {
     const count = 20000
     const chain = Array.from({ length: count }, (_, i): ArrowElement => {

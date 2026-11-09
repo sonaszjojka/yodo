@@ -482,7 +482,15 @@ export function followBindings(
       }
       const binding = targets[frame.next++]
       const target = binding && byId.get(binding.elementId)
-      if (target?.type !== 'arrow' || !hasBinding(target)) continue
+      // An edge of the wrong kind is detached later and must not look like a
+      // loop.
+      if (
+        !binding ||
+        target?.type !== 'arrow' ||
+        !hasBinding(target) ||
+        !fitsKind(binding, target)
+      )
+        continue
       const seen = state.get(target.id)
       if (seen === 'visiting') loops.add(`${frame.arrow.id}:${frame.next - 1}`)
       else if (seen === undefined) {
@@ -502,10 +510,11 @@ export function followBindings(
       const binding = arrow[key]
       if (!binding) continue
       const original = byId.get(binding.elementId)
-      const fits =
-        original &&
-        ('along' in binding ? isPathTarget(original) : isBindable(original))
-      if (!fits || loops.has(`${element.id}:${end === 'start' ? 0 : 1}`)) {
+      if (
+        !original ||
+        !fitsKind(binding, original) ||
+        loops.has(`${element.id}:${end === 'start' ? 0 : 1}`)
+      ) {
         arrow = without(arrow, key)
         continue
       }
@@ -538,6 +547,11 @@ export function followBindings(
 
   for (const arrow of order) done.set(arrow.id, follow(arrow))
   return elements.map((e) => done.get(e.id) ?? e)
+}
+
+/** Whether `binding` is the right form for `target`: a path or a shape one. */
+function fitsKind(binding: ArrowBinding, target: YodoElement) {
+  return 'along' in binding ? isPathTarget(target) : isBindable(target)
 }
 
 function hasBinding(arrow: ArrowElement) {
