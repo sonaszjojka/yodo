@@ -12,6 +12,7 @@ export interface StoredElement {
   label?: { text: string }
   text?: string
   points?: [number, number][]
+  curved?: boolean
   startBinding?: { elementId: string }
   endBinding?: { elementId: string }
 }

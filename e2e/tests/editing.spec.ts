@@ -1,7 +1,7 @@
 // Roadmap 3.6: the MVP's key flows, each proved in both usage modes (ADR 0035).
 //
 //   1. Draw and keep       persistence.spec.ts
-//   2. Edit                this file: text, attached arrow, move, undo/redo
+//   2. Edit                this file: text, attached arrow, bent line, move, undo/redo
 //   3. Organise            folders.spec.ts, trash.spec.ts, search.spec.ts
 //   4. Export and import   export-png, export-svg, yodo-file, excalidraw-import
 //   5. Paste               copy-paste.spec.ts, images.spec.ts
@@ -265,5 +265,63 @@ test('re-attach an arrow by dragging its end, then move and resize the shape, an
       .poll(async () => (await storedArrow())?.endBinding)
       .toBeUndefined()
     expect(arrowEnds((await storedArrow())!).end).toEqual([450, 520])
+  })
+})
+
+test('bend a line by its mid-handle, move a point, and undo', async ({
+  page,
+  mode,
+}) => {
+  await page.goto('./')
+  await page.getByRole('button', { name: 'New drawing' }).click()
+  await page.waitForURL(/#\/d\/[^/]+$/)
+  const id = decodeURIComponent(new URL(page.url()).hash.slice('#/d/'.length))
+
+  async function storedLine() {
+    return (await storedDocument(page, mode, id))?.find(
+      (e) => e.type === 'line',
+    )
+  }
+
+  await test.step('draw a straight line and select it', async () => {
+    await tool(page, 'Line').click()
+    await drag(page, [200, 400], [500, 400])
+    await expect.poll(storedLine).toBeDefined()
+    expect((await storedLine())!.points).toHaveLength(2)
+    await tool(page, 'Select').click()
+    await page.locator('canvas.canvas').click({ position: { x: 300, y: 400 } })
+  })
+
+  await test.step('dragging the mid-handle bends it into a curve', async () => {
+    await drag(page, [350, 400], [350, 300])
+    await expect.poll(async () => (await storedLine())?.points?.length).toBe(3)
+    const line = (await storedLine())!
+    expect(line.curved).toBe(true)
+    const [, middle] = line.points!
+    expect(line.y + middle![1]).toBeCloseTo(300, 0)
+  })
+
+  await test.step('dragging the new point moves just that point', async () => {
+    await drag(page, [350, 300], [380, 250])
+    await expect
+      .poll(async () => {
+        const line = await storedLine()
+        return line && line.y + line.points![1]![1]
+      })
+      .toBeCloseTo(250, 0)
+    expect((await storedLine())!.points).toHaveLength(3)
+  })
+
+  await test.step('undo takes the point back, then the bend', async () => {
+    await page.keyboard.press('ControlOrMeta+z')
+    await expect
+      .poll(async () => {
+        const line = await storedLine()
+        return line && line.y + line.points![1]![1]
+      })
+      .toBeCloseTo(300, 0)
+    await page.keyboard.press('ControlOrMeta+z')
+    await expect.poll(async () => (await storedLine())?.points).toHaveLength(2)
+    expect((await storedLine())!.curved).toBeUndefined()
   })
 })

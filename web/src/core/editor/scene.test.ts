@@ -94,8 +94,9 @@ test('shows an arrow end being dragged, and resolves the highlight', () => {
   const scene = sceneOf({
     ...editor.store.getState(),
     endpoint: {
-      arrowId: arrow.id,
-      end: 'end',
+      elementId: arrow.id,
+      index: 1,
+      insert: false,
       point: [50, 5],
       binding: { elementId: b.id, ratio: [0, 0.5] },
     },

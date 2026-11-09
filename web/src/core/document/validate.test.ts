@@ -108,3 +108,44 @@ describe('parseElements', () => {
     expect(parseElements([one, { ...one, x: 99 }])).toHaveLength(1)
   })
 })
+
+describe('curved lines and arrows (ADR 0053)', () => {
+  const bent = [
+    [0, 0],
+    [5, 9],
+    [10, 0],
+  ]
+
+  test.each(['line', 'arrow'] as const)(
+    'a %s without the field loads unchanged',
+    (type) => {
+      const element = createLinear(type, lineFromDrag([0, 0], [10, 10], false))
+      expect(parseElements([element])).toEqual([element])
+    },
+  )
+
+  test.each(['line', 'arrow'] as const)('a curved %s is kept', (type) => {
+    const element = {
+      ...createLinear(type, lineFromDrag([0, 0], [10, 10], false)),
+      points: bent,
+      curved: true,
+    }
+    const json = JSON.parse(JSON.stringify(element))
+    expect(parseElements([json])).toEqual([json])
+  })
+
+  test.each([false, 'yes', 1, null])(
+    'a bad curved value (%j) is dropped, the element kept',
+    (bad) => {
+      for (const type of ['line', 'arrow'] as const) {
+        const element = {
+          ...createLinear(type, lineFromDrag([0, 0], [10, 10], false)),
+          curved: bad,
+        }
+        const [kept] = parseElements([JSON.parse(JSON.stringify(element))])
+        expect(kept).toBeDefined()
+        expect(kept).not.toHaveProperty('curved')
+      }
+    },
+  )
+})

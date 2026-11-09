@@ -5,11 +5,13 @@
 import { beforeEach, describe, expect, test } from 'vitest'
 import {
   createDocument,
+  createLinear,
   createShape,
   createText,
 } from '../core/document/create.ts'
 import v1Fixture from '../core/document/fixtures/v1-every-element.json?raw'
 import type { YodoDocument } from '../core/document/types.ts'
+import { lineFromDrag } from '../core/geometry/line.ts'
 import type { DrawingRepository } from './repository.ts'
 
 function byId(a: { id: string }, b: { id: string }): number {
@@ -130,6 +132,24 @@ export function describeRepositoryContract(
 
     test('loads every element type of a v1 document unchanged', async () => {
       const doc = JSON.parse(v1Fixture) as YodoDocument
+      await repo.save(doc)
+      expect(await repo.get(doc.id)).toEqual(doc)
+    })
+
+    test('keeps a curved line and arrow (ADR 0053) as they were saved', async () => {
+      const bent = (type: 'line' | 'arrow') => ({
+        ...createLinear(type, lineFromDrag([0, 0], [100, 0], false)),
+        points: [
+          [0, 0],
+          [50, 40],
+          [100, 0],
+        ] as [number, number][],
+        curved: true as const,
+      })
+      const doc = {
+        ...drawing('Curves'),
+        elements: [bent('line'), bent('arrow')],
+      }
       await repo.save(doc)
       expect(await repo.get(doc.id)).toEqual(doc)
     })

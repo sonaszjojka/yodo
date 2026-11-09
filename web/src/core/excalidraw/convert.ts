@@ -313,9 +313,16 @@ export async function convertExcalidraw(
       case 'freedraw': {
         const list = points(raw.points)
         if (!list || list.length < 2) return 'invalid'
+        // A round line or arrow with a bend is a curve (ADR 0053).
+        const bent =
+          raw.roundness && list.length >= 3 ? { curved: true as const } : {}
         const linear = { ...base, ...pointsBox(list), points: list }
         if (type === 'line') {
-          return { kind: 'element', rawId, element: { type, ...linear } }
+          return {
+            kind: 'element',
+            rawId,
+            element: { type, ...linear, ...bent },
+          }
         }
         if (type === 'freedraw') {
           return {
@@ -338,6 +345,7 @@ export async function convertExcalidraw(
           element: {
             type: 'arrow',
             ...linear,
+            ...bent,
             endArrowhead: end ? 'arrow' : null,
           },
         }

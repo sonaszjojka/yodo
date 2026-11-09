@@ -1,7 +1,12 @@
 // The selection frame: the outline drawn around the selection and where its
 // handles are. The renderer draws it and the select tool hit-tests it, so
 // both read these sizes from one place.
-import type { ArrowElement, Point, YodoElement } from '../document/types.ts'
+import type {
+  ArrowElement,
+  LineElement,
+  Point,
+  YodoElement,
+} from '../document/types.ts'
 import { elementBounds, unionBounds, type Bounds } from './rect.ts'
 import type { Handle } from './resize.ts'
 
@@ -101,16 +106,19 @@ export function handleAt(
   return null
 }
 
+/** A line or arrow: the elements with point handles (ADR 0052, 0053). */
+export type LinearElement = LineElement | ArrowElement
+
 /**
- * The arrow whose ends can be dragged: the selection is exactly that one
- * arrow (ADR 0052). Everything else is resized by the box frame.
+ * The line or arrow whose points can be dragged: the selection is exactly that
+ * one element. Everything else is resized by the box frame.
  */
-export function endpointArrow(
+export function handleLine(
   selected: readonly YodoElement[],
-): ArrowElement | null {
+): LinearElement | null {
   const [only] = selected
   return selected.length === 1 &&
-    only!.type === 'arrow' &&
+    (only!.type === 'arrow' || only!.type === 'line') &&
     only!.points.length >= 2
     ? only!
     : null
@@ -118,29 +126,51 @@ export function endpointArrow(
 
 /** Whether the selection draws the box outline, corner handles and badge. */
 export function drawsBoxFrame(selected: readonly YodoElement[]): boolean {
-  return endpointArrow(selected) === null
+  return handleLine(selected) === null
 }
 
-/** The ends of `arrow` in world coordinates. */
-export function endpointsOf(arrow: ArrowElement): { start: Point; end: Point } {
-  const [first, last] = [arrow.points[0]!, arrow.points.at(-1)!]
-  return {
-    start: [arrow.x + first[0], arrow.y + first[1]],
-    end: [arrow.x + last[0], arrow.y + last[1]],
+/** A handle of a selected line or arrow: one of its points, or the mid-handle that bends it. */
+export type LineHandle = { kind: 'point'; index: number } | { kind: 'bend' }
+
+export interface LineHandleSpot {
+  handle: LineHandle
+  /** In world coordinates. */
+  at: Point
+}
+
+/**
+ * Where the handles of `line` are: one on each point, and, on a two-point
+ * element, a mid-handle halfway between them that bends it (ADR 0053).
+ */
+export function lineHandles(line: LinearElement): LineHandleSpot[] {
+  const spots: LineHandleSpot[] = line.points.map(([dx, dy], index) => ({
+    handle: { kind: 'point', index },
+    at: [line.x + dx, line.y + dy],
+  }))
+  if (line.points.length === 2) {
+    const [a, b] = [spots[0]!.at, spots[1]!.at]
+    spots.push({
+      handle: { kind: 'bend' },
+      at: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2],
+    })
   }
+  return spots
 }
 
-/** The end of `arrow` whose handle is at `point`, or null. The end wins a tie. */
-export function endpointAt(
-  arrow: ArrowElement,
+/** The handle of `line` at `point`, or null. Points win over the mid-handle, the last point over the first. */
+export function lineHandleAt(
+  line: LinearElement,
   point: Point,
   px: number,
-): 'start' | 'end' | null {
+): LineHandle | null {
   const reach = (HANDLE_SIZE / 2 + HANDLE_SLOP) * px
-  const ends = endpointsOf(arrow)
-  for (const end of ['end', 'start'] as const) {
-    if (Math.hypot(point[0] - ends[end][0], point[1] - ends[end][1]) <= reach)
-      return end
+  const spots = lineHandles(line)
+  const order = [
+    ...spots.filter((s) => s.handle.kind === 'point').reverse(),
+    ...spots.filter((s) => s.handle.kind === 'bend'),
+  ]
+  for (const { handle, at } of order) {
+    if (Math.hypot(point[0] - at[0], point[1] - at[1]) <= reach) return handle
   }
   return null
 }
