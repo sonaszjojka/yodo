@@ -19,13 +19,14 @@ import {
   type DownloadHost,
 } from './exportActions.ts'
 import {
+  EXPORT_TABS,
   fittingScale,
   initialChoices,
+  neighbourFormat,
   pngFileName,
   SCALES,
   svgFileName,
   type ExportChoices,
-  type ExportFormat,
 } from './exportChoices.ts'
 import type { ImageCache } from './imageCache.ts'
 import { createCanvasMeasure } from './measure.ts'
@@ -33,6 +34,7 @@ import { imageDataUris } from './svgImages.ts'
 import { loadEmbeddedFonts, pageFontsReady } from './svgFonts.ts'
 import type { ImageRepository } from '../storage/images.ts'
 import { useStore } from './useStore.ts'
+import { exportDrawing, exportErrorMessage } from './yodoFile.ts'
 
 const selectDocument = (state: EditorState) => state.document
 const selectSelected = (state: EditorState) => state.selectedIds
@@ -65,13 +67,9 @@ interface SvgResult {
   url: string
 }
 
-const TABS: { format: ExportFormat; label: string }[] = [
-  { format: 'png', label: 'PNG' },
-  { format: 'svg', label: 'SVG' },
-]
-
 /**
- * The export dialog (docs/ui.md, Export dialog) with a PNG and an SVG tab.
+ * The export dialog (docs/ui.md, Export dialog) with a PNG, an SVG and a Yodo
+ * file tab (ADR 0056).
  * Mounted only while open, so its options start fresh each time. PNG draws one
  * canvas with `renderExport` (ADR 0041); SVG builds the file with `buildSvg`
  * (ADR 0043). Either way the preview is the thing Copy and Download give you.
@@ -92,7 +90,11 @@ export function ExportDialog({
   const dialog = useRef<HTMLDialogElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
   const [choices, setChoices] = useState<ExportChoices>(() =>
-    initialChoices(document_.name, selectedIds.length),
+    initialChoices(
+      document_.name,
+      selectedIds.length,
+      document_.elements.length === 0,
+    ),
   )
   const [status, setStatus] = useState('')
   const measure = useMemo(() => createCanvasMeasure(), [])
@@ -250,17 +252,34 @@ export function ExportDialog({
     setChoices((prev) => ({ ...prev, ...patch }))
   }
   const isSvg = choices.format === 'svg'
-  const size = isSvg
-    ? frame && {
-        width: Math.ceil(frame.width),
-        height: Math.ceil(frame.height),
-      }
-    : frame && scale
-      ? exportSize(frame, scale)
-      : undefined
-  const ready = isSvg ? svgReady : job !== null && drawn === job
+  const isYodo = choices.format === 'yodo'
+  const size = isYodo
+    ? undefined
+    : isSvg
+      ? frame && {
+          width: Math.ceil(frame.width),
+          height: Math.ceil(frame.height),
+        }
+      : frame && scale
+        ? exportSize(frame, scale)
+        : undefined
+  const ready = isYodo || (isSvg ? svgReady : job !== null && drawn === job)
 
   function download() {
+    if (isYodo) {
+      // Like auto-save: the document plus the view as it is now.
+      const { document, viewport } = editor.store.getState()
+      exportDrawing(
+        { ...document, appState: { ...document.appState, viewport } },
+        images,
+        undefined,
+        choices.fileName,
+      ).catch((error: unknown) => {
+        console.error('Could not export the drawing', error)
+        setStatus(exportErrorMessage(error))
+      })
+      return
+    }
     if (isSvg) {
       downloadBlob(
         new Blob([svg!.text], { type: 'image/svg+xml' }),
@@ -306,9 +325,9 @@ export function ExportDialog({
         if (event.target === event.currentTarget) onClose()
       }}
     >
-      <h2 id="export-title">Export image</h2>
+      <h2 id="export-title">Export</h2>
       <div className="export-tabs" role="tablist" aria-label="Format">
-        {TABS.map(({ format, label }) => (
+        {EXPORT_TABS.map(({ format, label }) => (
           <button
             key={format}
             type="button"
@@ -320,25 +339,35 @@ export function ExportDialog({
               if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')
                 return
               event.preventDefault()
-              update({ format: format === 'png' ? 'svg' : 'png' })
+              const next = neighbourFormat(format, event.key)
+              update({ format: next })
               // Focus follows the selected tab (WAI-ARIA tabs pattern).
-              const other =
-                event.currentTarget.parentElement!.querySelector<HTMLElement>(
-                  'button:not([aria-selected="true"])',
-                )
-              other?.focus()
+              event.currentTarget
+                .parentElement!.querySelectorAll<HTMLElement>('[role="tab"]')
+                [EXPORT_TABS.findIndex((tab) => tab.format === next)]?.focus()
             }}
           >
             {label}
           </button>
         ))}
       </div>
-      <div className="export-preview" data-transparent={!choices.background}>
-        {/* The canvas stays mounted while the SVG tab is open, so coming back is instant. */}
+      {isYodo && (
+        <p className="export-note">
+          The whole drawing with its images, as a .yodo file you can open in
+          Yodo.
+        </p>
+      )}
+      <div
+        className="export-preview"
+        data-transparent={!choices.background}
+        // Not `hidden`: the class sets `display`, which would win over it.
+        style={isYodo ? { display: 'none' } : undefined}
+      >
+        {/* The canvas stays mounted while another tab is open, so coming back is instant. */}
         {frame && scale ? (
           <canvas
             ref={canvas}
-            hidden={isSvg}
+            hidden={isSvg || isYodo}
             aria-label="Preview of the exported image"
           />
         ) : null}
@@ -348,7 +377,7 @@ export function ExportDialog({
         {isSvg && frame && !svgReady && !svg && (
           <p role="status">Preparing the SVG…</p>
         )}
-        {!frame && <p role="status">Nothing to export.</p>}
+        {!frame && !isYodo && <p role="status">Nothing to export.</p>}
         {!isSvg && frame && !scale && (
           <p role="status">This is too large to export as an image.</p>
         )}
@@ -359,47 +388,51 @@ export function ExportDialog({
         </p>
       )}
 
-      <fieldset>
-        <legend>What to export</legend>
-        <label>
-          <input
-            type="radio"
-            name="export-scope"
-            checked={choices.scope === 'all'}
-            onChange={() => update({ scope: 'all' })}
-          />
-          Whole drawing
-        </label>
-        <label>
-          <input
-            type="radio"
-            name="export-scope"
-            checked={choices.scope === 'selection'}
-            disabled={selectionCount === 0}
-            onChange={() => update({ scope: 'selection' })}
-          />
-          Selection{selectionCount > 0 ? ` (${selectionCount})` : ''}
-        </label>
-      </fieldset>
+      {!isYodo && (
+        <>
+          <fieldset>
+            <legend>What to export</legend>
+            <label>
+              <input
+                type="radio"
+                name="export-scope"
+                checked={choices.scope === 'all'}
+                onChange={() => update({ scope: 'all' })}
+              />
+              Whole drawing
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="export-scope"
+                checked={choices.scope === 'selection'}
+                disabled={selectionCount === 0}
+                onChange={() => update({ scope: 'selection' })}
+              />
+              Selection{selectionCount > 0 ? ` (${selectionCount})` : ''}
+            </label>
+          </fieldset>
 
-      <label>
-        <input
-          type="checkbox"
-          checked={choices.background}
-          onChange={(event) => update({ background: event.target.checked })}
-        />
-        Background
-      </label>
-      <label>
-        <input
-          type="checkbox"
-          checked={choices.dark}
-          onChange={(event) => update({ dark: event.target.checked })}
-        />
-        Dark version
-      </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={choices.background}
+              onChange={(event) => update({ background: event.target.checked })}
+            />
+            Background
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={choices.dark}
+              onChange={(event) => update({ dark: event.target.checked })}
+            />
+            Dark version
+          </label>
+        </>
+      )}
 
-      {!isSvg && (
+      {!isSvg && !isYodo && (
         <fieldset>
           <legend>Scale</legend>
           {SCALES.map((option) => (
@@ -433,14 +466,16 @@ export function ExportDialog({
         <button type="button" className="button" onClick={onClose}>
           Close
         </button>
-        <button
-          type="button"
-          className="button"
-          disabled={!ready}
-          onClick={() => void copy()}
-        >
-          Copy
-        </button>
+        {!isYodo && (
+          <button
+            type="button"
+            className="button"
+            disabled={!ready}
+            onClick={() => void copy()}
+          >
+            Copy
+          </button>
+        )}
         <button
           type="button"
           className="button-primary"
