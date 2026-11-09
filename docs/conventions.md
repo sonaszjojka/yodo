@@ -15,6 +15,7 @@ Format ([conventionalcommits.org](https://www.conventionalcommits.org/)):
 - **Scopes:** `web`, `server`, `e2e`, `docs`, `ci`, `deps`. Omit the scope if a change spans most of the repo.
 - **Subject:** imperative, lower case, no period, ≤ 72 characters (`add rectangle tool`, not `Added rectangle tool.`).
 - **Breaking change:** `!` after the type/scope (`feat(web)!: …`) plus a `BREAKING CHANGE:` footer. Document format changes follow ADR 0013 (bump `schemaVersion` + migration).
+- **Contributor sign-off:** outside contributors add a `Signed-off-by` line with `git commit -s` (DCO, [ADR 0059](adr/0059-developer-certificate-of-origin-instead-of-a-cla.md)).
 - **No AI attribution trailer.** Commits carry no `Co-Authored-By` line; the owner is the sole author.
 
 ## Branches and flow: GitHub flow with squash merge

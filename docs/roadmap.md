@@ -10,7 +10,7 @@ M0 builds a thin end-to-end path through every part of the system (web app, Go s
 |---|---|---|
 | 0.1 | Repo + scaffold ✓ (PR [#1](https://github.com/sonaszjojka/yodo/pull/1)) | `sonaszjojka/yodo` exists with `web/` (Vite + React + TS strict) and `server/` (Go module) laid out per ADR 0012; `npm run dev` shows a placeholder page with the logo. |
 | 0.2 | Tooling ✓ ([#6](https://github.com/sonaszjojka/yodo/issues/6)) | Format for TS and Go, lint for Go (TS lint: oxlint, ADR 0016), `npm test` and `go test ./...` each run one passing test, `sqlc generate` runs on an empty schema. Project CLAUDE.md via `/init`, extended with ADR rule + conventions. |
-| 0.3 | CI + Pages deploy ✓ ([#7](https://github.com/sonaszjojka/yodo/issues/7)) | GitHub Actions runs web and server jobs with path filters; merging to `main` deploys the placeholder to `sonaszjojka.github.io/yodo/` (ADR 0007). |
+| 0.3 | CI + Pages deploy ✓ ([#7](https://github.com/sonaszjojka/yodo/issues/7)) | GitHub Actions runs web and server jobs with path filters; merging to `main` deployed the placeholder to `sonaszjojka.github.io/yodo/` (ADR 0007); since ADR 0057 the deploy runs on a release tag instead. |
 | 0.4 | Go server + Docker image ✓ ([#8](https://github.com/sonaszjojka/yodo/issues/8)) | `server` embeds `dist/` and serves it with hash routing; `/api/health` returns 200; multi-stage `Dockerfile` builds an image pushed to GHCR; the documented `docker run` command shows the placeholder. |
 | 0.5 | Server security baseline ✓ ([#9](https://github.com/sonaszjojka/yodo/issues/9)) | Host/Origin middleware per ADR 0020 (`YODO_ALLOWED_ORIGINS`), table-driven tests for allowed/blocked/missing-Origin cases. |
 
