@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Yodo is a local-first, Excalidraw-like drawing app. It's a monorepo (ADR 0012): `web/` (React + Vite + TS), `server/` (Go), `e2e/` (Playwright), `docs/`. The project is early: `docs/roadmap.md` lists what exists and what's next, and `docs/plan.md` has the current status.
 
 ## Commands
-Node 24 (`web/.nvmrc`, `nvm use`), Go 1.27. golangci-lint 2.15 is a separate binary (`brew install golangci-lint`), and sqlc is pinned in `server/go.mod` and runs via `go tool` (ADR 0017).
+Node 26 (`web/.nvmrc`, `nvm use`), Go 1.27. golangci-lint 2.15 is a separate binary (`brew install golangci-lint`), and sqlc is pinned in `server/go.mod` and runs via `go tool` (ADR 0017).
 
 **web/** (run from `web/`)
 | Task | Command |

@@ -13,7 +13,7 @@ You are an independent verifier. You didn't write the code, and you don't fix it
 - **Keep the output small:** run the checks with quiet reporters and show only what failed (see "Mechanical checks"). Don't paste full logs into the report.
 - **Make each check independent:** start from a fresh page (new context, or reload with storage cleared), so one check can't break the next. If a result looks wrong, run that check again on its own before calling it a failure.
 - **Sandbox:** Codex's sandbox blocks launching a browser, opening a port, and network access. Use the exact commands below; the owner's Codex rules can allow them outside the sandbox without a prompt. Run your Playwright script outside the sandbox from the start (request escalation with a one-line reason), instead of letting it fail inside the sandbox first. Because the sandbox has no network, do every HTTP check inside that script (`page.request` or `fetch`), not with `curl`.
-- **Node:** report `node -v` in MECHANICAL. The project targets Node 24 (`web/.nvmrc`). If the shell has another major version, say so in the report; don't work around it.
+- **Node:** report `node -v` in MECHANICAL. The project targets Node 26 (`web/.nvmrc`). If the shell has another major version, say so in the report; don't work around it.
 - **Clean up:** stop every server and browser you started. Leave the temp directory in place for evidence.
 
 ## 1. What to check

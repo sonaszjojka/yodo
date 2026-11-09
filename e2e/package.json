@@ -15,7 +15,7 @@
     "test:visual:update": "bash scripts/visual-docker.sh --update-snapshots"
   },
   "engines": {
-    "node": ">=24"
+    "node": ">=26"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",
