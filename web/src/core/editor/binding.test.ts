@@ -74,10 +74,45 @@ describe('snapToOutline', () => {
     expect(y).toBeGreaterThan(1)
   })
 
+  test('a round diamond is snapped onto its rounded tip', () => {
+    const round = {
+      ...diamond,
+      id: 'round-diamond',
+      roundness: 'round' as const,
+    }
+    const [x, y] = snapToOutline(round, [50, -20]).point
+    // Radius 7.07: the curve's apex is about 2.5 below the sharp tip.
+    expect(x).toBeCloseTo(50, 1)
+    expect(y).toBeCloseTo(2.5, 1)
+  })
+
   test('pointOf maps a ratio back into the box', () => {
     expect(pointOf({ ...rect, x: 10, y: 20, width: 200 }, [0.5, 0.25])).toEqual(
       [110, 45],
     )
+  })
+})
+
+describe('a saved arrow bound to a round diamond (outline changed in 4.8)', () => {
+  test('re-snaps onto the new outline when the diamond moves', () => {
+    const round = {
+      ...diamond,
+      id: 'round-diamond',
+      roundness: 'round' as const,
+    }
+    const arrow = {
+      ...createLinear('arrow', lineFromDrag([50, -100], [50, 2], false)),
+      // Saved under the old radius (25): the tip's curve passed through y 8.84; this end sits near the tip.
+      endBinding: {
+        elementId: round.id,
+        ratio: [0.5, 0.02] as [number, number],
+      },
+    }
+    const moved = moveElements([round, arrow], new Set([round.id]), 0, 10)
+    const result = moved[1] as ArrowElement
+    const end = result.points[result.points.length - 1]!
+    // New tip curve: 10 + 2.5.
+    expect(result.y + end[1]).toBeCloseTo(12.5, 0)
   })
 })
 

@@ -216,6 +216,23 @@ describe('renderScene', () => {
     },
   )
 
+  test('a round diamond uses its own radius: a tenth of the edge, not a quarter of the shorter side', () => {
+    const rough = fakeRough()
+    const shape = {
+      ...createShape('diamond', { x: 0, y: 0, width: 100, height: 60 }, 5),
+      roundness: 'round' as const,
+    }
+
+    renderScene(fakeContext(), rough, [shape], SURFACE, IDENTITY)
+
+    // The top tip (50, 0) rounds 5.83 (= hypot(50, 30) / 10) along its edge
+    // towards (100, 30): the path starts at (55, 3).
+    const [d] = rough.path.mock.calls[0] as [string]
+    const [, x, y] = d.match(/^M ([\d.]+) ([\d.]+)/)!.map(Number)
+    expect(x).toBeCloseTo(55, 3)
+    expect(y).toBeCloseTo(3, 3)
+  })
+
   test('a shape without roundness (an older document) is drawn sharp', () => {
     const rough = fakeRough()
     const { roundness: _, ...old } = createShape(

@@ -17,6 +17,7 @@ import { arrowHeadOps } from '../../geometry/arrowhead.ts'
 import { isCurved } from '../../geometry/curve.ts'
 import {
   cornerRadius,
+  diamondCornerRadius,
   diamondPoints,
   roundedPolygonPath,
   type Bounds,
@@ -291,7 +292,10 @@ function elementNodes(
       const drawable =
         element.roundness === 'round'
           ? generator.path(
-              roundedPolygonPath(diamondPoints(element), cornerRadius(element)),
+              roundedPolygonPath(
+                diamondPoints(element),
+                diamondCornerRadius(element),
+              ),
               options,
             )
           : generator.polygon(diamondPoints(element), options)
