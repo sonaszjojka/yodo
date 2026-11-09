@@ -1,6 +1,6 @@
 # 0049. Releases: a semver tag on `main` publishes the versioned image, `latest` is the newest release and `edge` is `main`
 
-- Status: Accepted
+- Status: Accepted (manual tag and Release steps superseded by [0058](0058-release-please-for-versions-and-changelog.md))
 - Date: 2026-11-06
 
 ## Context

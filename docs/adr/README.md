@@ -28,7 +28,7 @@ Why Yodo is built the way it is. See [0001](0001-record-architecture-decisions.m
 | [0015](0015-store-light-colours-adapt-in-dark-mode.md) | Store light colours, adapt them when rendering dark | Accepted |
 | [0016](0016-typescript-lint-oxlint.md) | Lint TypeScript with oxlint | Accepted |
 | [0017](0017-formatting-go-lint-and-go-tools.md) | Prettier + gofmt, golangci-lint, Go tools via `go tool` | Accepted |
-| [0018](0018-ci-github-actions-gate-job.md) | CI: one workflow, path filters, `ci` gate job | Accepted |
+| [0018](0018-ci-github-actions-gate-job.md) | CI: one workflow, path filters, `ci` gate job | Accepted (Pages deploy on merge superseded by [0057](0057-deploy-the-hosted-app-from-release-tags.md)) |
 | [0019](0019-docker-image-build-and-publishing.md) | Docker image: dist copied into the Go package, distroless, multi-arch from `main` | Superseded by 0049 (publishing only) |
 | [0020](0020-auth-and-origin-checks.md) | Auth as 0008, plus check `Origin` whenever present and deny unlisted methods | Accepted |
 | [0021](0021-frontend-state-external-store.md) | Editor state in a framework-free store, read by React via `useSyncExternalStore` | Accepted |
@@ -59,7 +59,7 @@ Why Yodo is built the way it is. See [0001](0001-record-architecture-decisions.m
 | [0046](0046-trash-as-a-deleted-at-timestamp-on-the-summary.md) | Trash is a `deletedAt` timestamp on the drawing summary; folder delete trashes; 30-day client-side purge | Accepted |
 | [0047](0047-search-index-in-the-repository-matched-on-the-client.md) | Search: an index in the repository (`searchIndex()`, `X-Yodo-Search-Text` header), matched on the client | Accepted |
 | [0048](0048-attached-arrows-as-bindings-on-the-arrow.md) | Attached arrows: optional `startBinding`/`endBinding` (`elementId` + box `ratio`) on the arrow, geometry kept in sync | Accepted (re-attaching clause superseded by [0052](0052-arrow-endpoint-handles-and-reattaching.md)) |
-| [0049](0049-releases-semver-tags-publish-the-image.md) | Releases: a semver tag on `main` publishes the versioned image; `latest` is the newest release, `edge` is `main` | Accepted |
+| [0049](0049-releases-semver-tags-publish-the-image.md) | Releases: a semver tag on `main` publishes the versioned image; `latest` is the newest release, `edge` is `main` | Accepted (manual tag and Release steps superseded by [0058](0058-release-please-for-versions-and-changelog.md)) |
 | [0050](0050-drawing-tools-stay-active.md) | Drawing tools stay active after each element; `Esc` or `V` returns to Select; the new element is not selected | Accepted |
 | [0051](0051-text-tool-always-creates-free-text.md) | The text tool always creates free text; labels are edited with the Select tool (double-click or Enter); amends 0026 | Accepted |
 | [0052](0052-arrow-endpoint-handles-and-reattaching.md) | Arrow endpoint handles: drag an end of a selected arrow to attach or detach it; the target shape is highlighted; amends 0048 | Accepted (selection clauses amended by [0053](0053-bendable-lines-and-arrows.md)) |
@@ -67,3 +67,5 @@ Why Yodo is built the way it is. See [0001](0001-record-architecture-decisions.m
 | [0054](0054-arrows-attach-to-lines-and-arrows.md) | Arrows attach to lines and arrows: a path binding `{ elementId, along }` (fraction of the drawn length); partly supersedes 0048 | Accepted |
 | [0055](0055-arrowheads-at-both-ends.md) | Arrowheads at both ends of an arrow: `startArrowhead`, 14 heads from Excalidraw's set, edited from the style bar | Accepted |
 | [0056](0056-one-export-button-with-a-yodo-file-tab.md) | One Export button: the export dialog gets a Yodo file tab next to PNG and SVG | Accepted |
+| [0057](0057-deploy-the-hosted-app-from-release-tags.md) | Deploy the hosted app from release tags; `main` is an integration branch; `release/X.Y` for old-line hotfixes | Accepted |
+| [0058](0058-release-please-for-versions-and-changelog.md) | release-please picks versions, writes the changelog and tags releases | Accepted |
