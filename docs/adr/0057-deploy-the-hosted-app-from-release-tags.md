@@ -10,7 +10,7 @@ Yodo is open source and will take outside contributions. Today every merge to `m
 - **Branching stays GitHub flow:** short-lived branches (from forks for outside contributors), PRs squash-merged into protected `main`. `main` is the integration branch: always green, not necessarily released.
 - **Users get code only from a `vX.Y.Z` tag.** The Pages production deploy runs on a release tag, not on a push to `main`. The tag keeps the guards from 0049 (commit on `main`, highest release tag). On a tag the workflow builds `web/dist` itself, because the test jobs are skipped.
 - **Pre-release testing** uses the `edge` image (head of `main`), as before. Pages has one site per repository, so there is no hosted "next" preview.
-- The deploy job runs in a GitHub **Environment** `production`, so deployments are listed and can later require approval.
+- The deploy job keeps the `github-pages` Environment, whose deployment-branch policy must allow `v*` tags; deployments are listed there and can later require approval.
 - **Hotfixes for an older line:** cut `release/X.Y` from the tag, fix through a PR into that branch, tag from it, and forward-port the fix to `main`. This is documented only; the tag guard ("highest tag") is relaxed in a new ADR when the first such release is needed.
 - Supersedes the "deploys on merge to `main`" part of 0018; the rest of 0018 and 0049 stand except where [0058](0058-release-please-for-versions-and-changelog.md) replaces the manual tagging steps.
 
