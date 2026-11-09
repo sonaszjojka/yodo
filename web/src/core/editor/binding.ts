@@ -456,17 +456,40 @@ export function followBindings(
   }
   const byId = new Map(elements.map((e) => [e.id, e]))
   const done = new Map<string, YodoElement>()
-  const visiting = new Set<string>()
 
-  function resolve(element: YodoElement): YodoElement {
-    if (element.type !== 'arrow' || !hasBinding(element)) return element
-    const cached = done.get(element.id)
-    if (cached) return cached
-    visiting.add(element.id)
-    const result = follow(element)
-    visiting.delete(element.id)
-    done.set(element.id, result)
-    return result
+  // Arrows are followed after the arrows they hang on. The order is found with
+  // a loop, not recursion, so a long chain cannot overflow the stack. An end
+  // that points back at an arrow still being visited closes a loop: it is
+  // recorded in `loops` and detached.
+  const loops = new Set<string>()
+  const state = new Map<string, 'visiting' | 'done'>()
+  const order: ArrowElement[] = []
+  for (const root of elements) {
+    if (root.type !== 'arrow' || !hasBinding(root) || state.has(root.id))
+      continue
+    const stack: { arrow: ArrowElement; next: number }[] = [
+      { arrow: root, next: 0 },
+    ]
+    state.set(root.id, 'visiting')
+    while (stack.length > 0) {
+      const frame = stack[stack.length - 1]!
+      const targets = [frame.arrow.startBinding, frame.arrow.endBinding]
+      if (frame.next >= targets.length) {
+        state.set(frame.arrow.id, 'done')
+        order.push(frame.arrow)
+        stack.pop()
+        continue
+      }
+      const binding = targets[frame.next++]
+      const target = binding && byId.get(binding.elementId)
+      if (target?.type !== 'arrow' || !hasBinding(target)) continue
+      const seen = state.get(target.id)
+      if (seen === 'visiting') loops.add(`${frame.arrow.id}:${frame.next - 1}`)
+      else if (seen === undefined) {
+        state.set(target.id, 'visiting')
+        stack.push({ arrow: target, next: 0 })
+      }
+    }
   }
 
   function follow(element: ArrowElement): ArrowElement {
@@ -482,11 +505,11 @@ export function followBindings(
       const fits =
         original &&
         ('along' in binding ? isPathTarget(original) : isBindable(original))
-      if (!fits || visiting.has(original.id)) {
+      if (!fits || loops.has(`${element.id}:${end === 'start' ? 0 : 1}`)) {
         arrow = without(arrow, key)
         continue
       }
-      const target = resolve(original)
+      const target = done.get(original.id) ?? original
       if (moved.has(element.id) && !moved.has(target.id)) {
         arrow = without(arrow, key)
       } else if (
@@ -513,7 +536,8 @@ export function followBindings(
     return arrow
   }
 
-  return elements.map(resolve)
+  for (const arrow of order) done.set(arrow.id, follow(arrow))
+  return elements.map((e) => done.get(e.id) ?? e)
 }
 
 function hasBinding(arrow: ArrowElement) {

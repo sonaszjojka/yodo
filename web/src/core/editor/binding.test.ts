@@ -667,6 +667,22 @@ describe('path targets', () => {
     expect(dropEnd([a, b], a, 'start', [0, 150], 6).target).toBeNull()
   })
 
+  test('a very long chain of attached arrows does not overflow the stack', () => {
+    const count = 20000
+    const chain = Array.from({ length: count }, (_, i): ArrowElement => {
+      const a = createLinear('arrow', lineFromDrag([0, i], [10, i], false))
+      return i + 1 < count
+        ? {
+            ...a,
+            id: `c${i}`,
+            endBinding: { elementId: `c${i + 1}`, along: 1 },
+          }
+        : { ...a, id: `c${i}` }
+    })
+    const result = moveElements([rect, ...chain], new Set([rect.id]), 10, 10)
+    expect(result).toHaveLength(count + 1)
+  })
+
   test('delete unbinds and duplicate remaps a path binding', () => {
     const a = arrowTo(target, 0.5)
     expect(
