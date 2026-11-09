@@ -9,7 +9,7 @@ Thanks for your interest! Yodo is a local-first, hand-drawn style drawing app. B
 - **Report a security problem:** see [SECURITY.md](SECURITY.md). Do not open a public issue.
 
 ## Set up (about 10 minutes)
-You need Git, Node 24 (see `web/.nvmrc`; `nvm use`), Go 1.27 and, for linting the server, [golangci-lint](https://golangci-lint.run) 2.15.
+You need Git, Node 26 (see `web/.nvmrc`; `nvm use`), Go 1.27 and, for linting the server, [golangci-lint](https://golangci-lint.run) 2.15.
 
 ```sh
 git clone https://github.com/<you>/yodo.git   # your fork
