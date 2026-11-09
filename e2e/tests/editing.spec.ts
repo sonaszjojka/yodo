@@ -369,3 +369,67 @@ test('attach an arrow to a line, then move the line and the arrow end follows', 
     expect((await stored('arrow'))!.endBinding!.along).toBeCloseTo(0.25, 2)
   })
 })
+
+test('choose an arrowhead for each end of an arrow from the style bar', async ({
+  page,
+  mode,
+}) => {
+  await page.goto('./')
+  await page.getByRole('button', { name: 'New drawing' }).click()
+  await page.waitForURL(/#\/d\/[^/]+$/)
+  const id = decodeURIComponent(new URL(page.url()).hash.slice('#/d/'.length))
+
+  async function storedArrow() {
+    return (await storedDocument(page, mode, id))?.find(
+      (e) => e.type === 'arrow',
+    )
+  }
+
+  await test.step('draw an arrow and select it: the bar shows both heads', async () => {
+    await tool(page, 'Arrow').click()
+    await drag(page, [200, 400], [500, 400])
+    await expect.poll(storedArrow).toBeDefined()
+    await tool(page, 'Select').click()
+    await page.locator('canvas.canvas').click({ position: { x: 350, y: 400 } })
+    const bar = page.getByRole('toolbar', { name: 'Style' })
+    await expect(
+      bar.getByRole('button', { name: 'Start head: None' }),
+    ).toBeVisible()
+    await expect(
+      bar.getByRole('button', { name: 'End head: Arrow' }),
+    ).toBeVisible()
+  })
+
+  await test.step('pick a start head and a different end head', async () => {
+    const bar = page.getByRole('toolbar', { name: 'Style' })
+    await bar.getByRole('button', { name: 'Start head: None' }).click()
+    await page
+      .getByRole('group', { name: 'Start head' })
+      .getByRole('button', { name: 'Circle', exact: true })
+      .click()
+    await bar.getByRole('button', { name: 'End head: Arrow' }).click()
+    await page
+      .getByRole('group', { name: 'End head' })
+      .getByRole('button', { name: 'Zero or many' })
+      .click()
+    await expect
+      .poll(async () => (await storedArrow())?.startArrowhead)
+      .toBe('circle')
+    expect((await storedArrow())!.endArrowhead).toBe('cardinality_zero_or_many')
+  })
+
+  await test.step('the end head can be removed again, and undo brings it back', async () => {
+    // The End popover is still open after the last choice.
+    await page
+      .getByRole('group', { name: 'End head' })
+      .getByRole('button', { name: 'None' })
+      .click()
+    await expect
+      .poll(async () => (await storedArrow())?.endArrowhead)
+      .toBeNull()
+    await page.keyboard.press('ControlOrMeta+z')
+    await expect
+      .poll(async () => (await storedArrow())?.endArrowhead)
+      .toBe('cardinality_zero_or_many')
+  })
+})
