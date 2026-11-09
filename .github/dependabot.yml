@@ -7,6 +7,10 @@ updates:
     directory: /web
     schedule: { interval: weekly }
     commit-message: { prefix: "build(deps)" }
+    ignore:
+      # Follows the Node major in web/.nvmrc, bumped by hand.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
       web-minor-and-patch:
         update-types: [minor, patch]
@@ -14,6 +18,12 @@ updates:
     directory: /e2e
     schedule: { interval: weekly }
     commit-message: { prefix: "build(deps)" }
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # Must move together with the pinned Playwright image and the visual
+      # baselines in ci.yml (ADR 0044), so it is bumped by hand.
+      - dependency-name: "@playwright/test"
     groups:
       e2e-minor-and-patch:
         update-types: [minor, patch]
@@ -28,6 +38,10 @@ updates:
     directory: /
     schedule: { interval: weekly }
     commit-message: { prefix: "build(deps)" }
+    ignore:
+      # The Node major is pinned in web/.nvmrc and the Dockerfile together.
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }
