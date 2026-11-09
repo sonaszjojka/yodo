@@ -36,6 +36,18 @@ Then open <http://localhost:8080>. Publishing on `127.0.0.1` keeps the server re
 
 Image tags: `1.0.0` is that exact release, `1.0` follows the latest patch of that minor version, and `latest` is the newest release. `edge` is the current `main`, which may be unreleased ([ADR 0049](docs/adr/0049-releases-semver-tags-publish-the-image.md)).
 
+### Verify the image
+
+Release images are signed with [cosign](https://github.com/sigstore/cosign) (keyless, from this repository's CI) and carry build provenance and an SBOM:
+
+```sh
+cosign verify ghcr.io/sonaszjojka/yodo:X.Y.Z \
+  --certificate-identity-regexp '^https://github.com/sonaszjojka/yodo/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+Replace `X.Y.Z` with a release that came after this was added; `1.0.0` and `edge` images are not signed.
+
 | Variable | Default | Meaning |
 |---|---|---|
 | `YODO_ADDR` | `127.0.0.1:8080` (`0.0.0.0:8080` in the image) | Address the server listens on |
