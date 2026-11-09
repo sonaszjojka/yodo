@@ -5,7 +5,7 @@
 
 # Builder stages run on the build machine's platform and cross-compile, so a
 # multi-arch build needs no emulation.
-FROM --platform=$BUILDPLATFORM node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85 AS web
+FROM --platform=$BUILDPLATFORM node:26-alpine@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216 AS web
 WORKDIR /src/web
 # Dependencies first, so source edits reuse the cached npm ci layer.
 COPY web/package.json web/package-lock.json ./
