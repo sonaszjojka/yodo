@@ -75,6 +75,43 @@ describe('serializeYodoFile', () => {
 
     expect(errorCode(() => serializeYodoFile(doc, {}))).toBe('bad-files')
   })
+
+  test('writes no meta section unless one is given', () => {
+    const text = serializeYodoFile(everyElement, {})
+
+    expect(text).toBe(JSON.stringify({ ...everyElement, files: {} }))
+  })
+})
+
+// The MCP file backend keeps its metadata beside the document (ADR 0064).
+describe('the meta section', () => {
+  const meta = { createdAt: 1, updatedAt: 2, revision: 3 }
+
+  test('round-trips, and never reaches the document', () => {
+    const parsed = parseYodoFile(serializeYodoFile(everyElement, {}, meta))
+
+    expect(parsed.document).toEqual(everyElement)
+    expect(parsed.document).not.toHaveProperty('meta')
+    expect(parsed.meta).toEqual(meta)
+  })
+
+  test('is undefined in a file without one', () => {
+    expect(parseYodoFile(v1Export).meta).toBeUndefined()
+  })
+
+  test('is kept from migrations, like the images', () => {
+    const seen: string[][] = []
+    const steps: Migrations = {
+      1: (doc) => {
+        seen.push(Object.keys(doc))
+        return { ...doc, schemaVersion: 2 }
+      },
+    }
+
+    parseYodoFile(JSON.stringify({ ...exportObject(), meta }), steps, 2)
+
+    expect(seen[0]).not.toContain('meta')
+  })
 })
 
 describe('parseYodoFile', () => {
