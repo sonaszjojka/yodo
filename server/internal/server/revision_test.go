@@ -25,34 +25,50 @@ func ifMatch(tag string) map[string]string { return map[string]string{"If-Match"
 
 func TestParseIfMatch(t *testing.T) {
 	tests := []struct {
-		header  string
+		name    string
+		values  []string
 		want    int64
 		present bool
 		wantErr bool
 	}{
-		{header: "", present: false},
-		{header: `"1"`, want: 1, present: true},
-		{header: `"42"`, want: 42, present: true},
-		{header: ` "7" `, want: 7, present: true},
-		{header: `*`, present: true, wantErr: true},
-		{header: `W/"1"`, present: true, wantErr: true},
-		{header: `"1", "2"`, present: true, wantErr: true},
-		{header: `1`, present: true, wantErr: true},
-		{header: `"abc"`, present: true, wantErr: true},
-		{header: `"0"`, present: true, wantErr: true},
-		{header: `"-1"`, present: true, wantErr: true},
-		{header: `"+1"`, present: true, wantErr: true},
-		{header: `""`, present: true, wantErr: true},
-		{header: `"99999999999999999999"`, present: true, wantErr: true},
+		{name: "absent", values: nil, present: false},
+		{name: "one", values: []string{`"1"`}, want: 1, present: true},
+		{name: "many digits", values: []string{`"42"`}, want: 42, present: true},
+		{name: "spaces", values: []string{` "7" `}, want: 7, present: true},
+		// Present but empty is malformed, never "no precondition" (review round 1, finding 3).
+		{name: "empty", values: []string{""}, present: true, wantErr: true},
+		{name: "blank", values: []string{"   "}, present: true, wantErr: true},
+		{name: "two headers", values: []string{`"1"`, `"2"`}, present: true, wantErr: true},
+		{name: "star", values: []string{`*`}, present: true, wantErr: true},
+		{name: "weak", values: []string{`W/"1"`}, present: true, wantErr: true},
+		{name: "list", values: []string{`"1", "2"`}, present: true, wantErr: true},
+		{name: "unquoted", values: []string{`1`}, present: true, wantErr: true},
+		{name: "not a number", values: []string{`"abc"`}, present: true, wantErr: true},
+		{name: "zero", values: []string{`"0"`}, present: true, wantErr: true},
+		{name: "negative", values: []string{`"-1"`}, present: true, wantErr: true},
+		{name: "plus", values: []string{`"+1"`}, present: true, wantErr: true},
+		{name: "empty tag", values: []string{`""`}, present: true, wantErr: true},
+		{name: "overflow", values: []string{`"99999999999999999999"`}, present: true, wantErr: true},
 	}
 	for _, tt := range tests {
-		t.Run(tt.header, func(t *testing.T) {
-			got, present, err := parseIfMatch(tt.header)
+		t.Run(tt.name, func(t *testing.T) {
+			got, present, err := parseIfMatch(tt.values)
 			if present != tt.present || (err != nil) != tt.wantErr || (err == nil && got != tt.want) {
 				t.Errorf("parseIfMatch(%q) = %d, %v, %v; want %d, %v, err=%v",
-					tt.header, got, present, err, tt.want, tt.present, tt.wantErr)
+					tt.values, got, present, err, tt.want, tt.present, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestPutWithAnEmptyIfMatchIsABadRequestNotAnOverwrite(t *testing.T) {
+	api := newTestAPI(t)
+	wantStatus(t, api.do(http.MethodPut, "/api/drawings/"+docID, doc), http.StatusOK)
+	stale := strings.Replace(doc, `"Plan"`, `"Stale"`, 1)
+	rec := api.doWith(http.MethodPut, "/api/drawings/"+docID, stale, ifMatch(""))
+	wantStatus(t, rec, http.StatusBadRequest)
+	if got := api.do(http.MethodGet, "/api/drawings/"+docID, "").Body.String(); got != doc {
+		t.Errorf("document = %q, want the unchanged %q", got, doc)
 	}
 }
 

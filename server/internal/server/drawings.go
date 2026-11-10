@@ -231,16 +231,20 @@ func etag(revision int64) string {
 	return `"` + strconv.FormatInt(revision, 10) + `"`
 }
 
-// parseIfMatch reads an If-Match header (ADR 0062). Absent means an
-// unconditional save. Yodo's only client sends exactly one strong tag of a
-// positive revision, so anything else (*, a weak tag, a list) is reported as
-// malformed instead of being matched loosely; a deliberate narrowing of
-// RFC 9110 §13.1.1.
-func parseIfMatch(header string) (revision int64, present bool, err error) {
-	header = strings.TrimSpace(header)
-	if header == "" {
+// parseIfMatch reads the If-Match header values (ADR 0062). Only a header
+// that is absent means an unconditional save; an empty one is malformed, so a
+// client bug can never turn into an overwrite. Yodo's only client sends
+// exactly one strong tag of a positive revision, so anything else (*, a weak
+// tag, a list, several headers) is reported as malformed instead of being
+// matched loosely; a deliberate narrowing of RFC 9110 §13.1.1.
+func parseIfMatch(values []string) (revision int64, present bool, err error) {
+	if len(values) == 0 {
 		return 0, false, nil
 	}
+	if len(values) > 1 {
+		return 0, true, errors.New(`If-Match must be one revision tag like "3"`)
+	}
+	header := strings.TrimSpace(values[0])
 	inner, ok := strings.CutPrefix(header, `"`)
 	if ok {
 		inner, ok = strings.CutSuffix(inner, `"`)
@@ -319,7 +323,7 @@ func (a drawingsAPI) put(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	expected, conditional, err := parseIfMatch(r.Header.Get("If-Match"))
+	expected, conditional, err := parseIfMatch(r.Header.Values("If-Match"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
