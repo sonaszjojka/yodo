@@ -11,7 +11,7 @@ Format ([conventionalcommits.org](https://www.conventionalcommits.org/)):
 
 <footer: Refs #12 / Closes #12 / BREAKING CHANGE: …>
 ```
-- **Types:** `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `build`, `ci`, `chore`, `style`.
+- **Types:** `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `build`, `ci`, `chore`, `style`. Only `feat` (minor), `fix` (patch) and `!` (major) change the version and appear in `CHANGELOG.md` ([ADR 0058](adr/0058-release-please-for-versions-and-changelog.md)), so pick the type on purpose and write subjects a user can read in a changelog.
 - **Scopes:** `web`, `server`, `e2e`, `docs`, `ci`, `deps`. Omit the scope if a change spans most of the repo.
 - **Subject:** imperative, lower case, no period, ≤ 72 characters (`add rectangle tool`, not `Added rectangle tool.`).
 - **Breaking change:** `!` after the type/scope (`feat(web)!: …`) plus a `BREAKING CHANGE:` footer. Document format changes follow ADR 0013 (bump `schemaVersion` + migration).
@@ -20,7 +20,7 @@ Format ([conventionalcommits.org](https://www.conventionalcommits.org/)):
 
 ## Branches and flow: GitHub flow with squash merge
 - `main` is the integration branch: always green, but not necessarily released. Users get code only from a release tag, which deploys the hosted app and publishes the image ([ADR 0057](adr/0057-deploy-the-hosted-app-from-release-tags.md)). It is protected: changes land only through PRs with green CI.
-- Enforced on GitHub: repo settings allow squash merge only (commit title = PR title) and delete merged branches; the ruleset "Protect main" requires a PR (0 approvals, since a solo owner cannot approve their own PR) with all review threads resolved, and blocks force-push and deletion, with no bypass, and requires the `ci` status check to pass ([ADR 0018](adr/0018-ci-github-actions-gate-job.md)).
+- Enforced on GitHub: repo settings allow squash merge only (commit title = PR title) and delete merged branches; the ruleset "Protect main" requires a PR (0 approvals, since a solo owner cannot approve their own PR) with all review threads resolved, and blocks force-push and deletion, with no bypass, and requires the checks `ci` ([ADR 0018](adr/0018-ci-github-actions-gate-job.md)), `conventional-title` (the PR title is a Conventional Commit, see above), `analyze (go)` and `analyze (javascript-typescript)` (CodeQL) to pass. Outside contributors also sign off their commits (DCO, [ADR 0059](adr/0059-developer-certificate-of-origin-instead-of-a-cla.md)).
 - One short-lived branch per roadmap task or bug: `<type>/<id>-<slug>`, e.g. `feat/1.2-rectangle-tool`, `fix/42-undo-after-delete`, `docs/roadmap-m2`.
 - The loop for every change:
   1. `/clear`, then state one goal (a roadmap task or an issue).
@@ -48,6 +48,8 @@ Versions are semver, `vMAJOR.MINOR.PATCH`. Commits say what changed (`fix` patch
 1. The owner merges that PR when a release is wanted, from a `main` whose CI is green. release-please creates the tag `vX.Y.Z` and the GitHub Release.
 2. The tag runs the `docker` job (refuses a tag that is not on `main` or not the highest; publishes `ghcr.io/sonaszjojka/yodo` as `X.Y.Z`, `X.Y` and `latest`) and the Pages deploy. `edge` is the head of `main`.
 3. Check both: `docker pull ghcr.io/sonaszjojka/yodo:X.Y.Z` and the hosted app.
+
+Never edit `CHANGELOG.md`, `.release-please-manifest.json` or the `version` in `web/package.json` by hand; release-please owns them. Dependabot PRs follow the normal flow (they carry `build(deps)` / `ci(deps)` titles); Node majors and `@playwright/test` are bumped by hand (ignore rules in `.github/dependabot.yml`).
 
 A task whose done-when includes a release stays open until step 3 works: its PR says `Refs #<issue>` rather than `Closes`, and the roadmap tick and the issue close follow the pull.
 

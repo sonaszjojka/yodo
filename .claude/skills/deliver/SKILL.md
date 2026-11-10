@@ -136,4 +136,4 @@ When it reports:
 - Stop after giving the PR link (no CI watching). Handle step 4 (PR comments) and step 5 (merge commands) only when the owner comes back.
 
 ## 10. Recap
-Up to 5 bullets plus one "worth learning" line. Cover what was built, what each review found, and what was fixed. End with the merge command for the owner: `! gh pr merge <n> --squash`.
+Up to 5 bullets plus one "worth learning" line. Cover what was built, what each review found, and what was fixed. End with the merge command for the owner: `! gh pr merge <n> --squash`, and note that merging does not deploy: the change ships with the next release PR (ADR 0057/0058).
