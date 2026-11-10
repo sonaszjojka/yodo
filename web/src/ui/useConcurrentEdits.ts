@@ -54,78 +54,83 @@ export interface ConcurrentEditsOptions {
   showNotice(notice: EditorNotice): void
 }
 
+export interface ReloadController {
+  /** On focus: save local changes, then reload if the stored one is newer. */
+  check(): Promise<void>
+  dispose(): void
+}
+
 /**
- * Wires the saver and the window's focus to reloads. A conflicted copy is
+ * The reload logic, framework-free so it can be tested. A conflicted copy is
  * noticed from the saver itself: its status turns `saved` with `conflict()`
- * set. Everything lives in one effect, so a reload never acts on a closed
- * editor.
+ * set. `current` returns the latest options, so callbacks never go stale.
  */
-export function useConcurrentEdits(options: ConcurrentEditsOptions): void {
-  // The latest props, so the long-lived listeners below never go stale.
-  const latest = useRef(options)
-  useEffect(() => {
-    latest.current = options
+export function createReloadController(
+  saver: AutoSaver,
+  current: () => ConcurrentEditsOptions,
+): ReloadController {
+  let disposed = false
+  // A reload still waiting for the barrier, and the copy already announced.
+  let pending: EditorNotice | undefined
+  let announced: string | undefined
+  let reloading = false
+  let checking = false
+
+  /** Tries the barrier once; true if the editor was handed the new version. */
+  async function reload(notice: EditorNotice): Promise<boolean> {
+    const { repository, id, settled, busy, onReload } = current()
+    if (reloading || !onReload) return false
+    reloading = true
+    try {
+      const loaded = await prepareReload({
+        repository,
+        id,
+        saver,
+        settled,
+        busy,
+      })
+      if (loaded === 'blocked' || disposed) return false
+      // The barrier's flush may have just made a conflicted copy; its notice
+      // (with Open copy) wins over the one this reload started with.
+      const shown = pending ?? notice
+      pending = undefined
+      onReload(loaded, shown)
+      return true
+    } finally {
+      reloading = false
+    }
+  }
+
+  async function retryPending() {
+    if (pending && (await reload(pending))) pending = undefined
+  }
+
+  // A reload blocked by unsaved edits is tried again once they are saved;
+  // a copy that failed to save is reported.
+  let previous = saver.status.getState()
+  const unsubscribe = saver.status.subscribe(() => {
+    const status = saver.status.getState()
+    if (status === previous) return
+    previous = status
+    const copy = saver.conflict()
+    if (status === 'error' && copy && !copy.saved) {
+      current().showNotice(COPY_FAILED_NOTICE)
+    }
+    if (status !== 'saved') return
+    if (copy?.saved && announced !== copy.copyId) {
+      announced = copy.copyId
+      pending = conflictNotice(copy.copyId)
+      current().showNotice(pending)
+    }
+    void retryPending()
   })
 
-  useEffect(() => {
-    const { saver } = latest.current
-    let disposed = false
-    // A reload still waiting for the barrier, and the copy already announced.
-    let pending: EditorNotice | undefined
-    let announced: string | undefined
-    let reloading = false
-    let checking = false
-
-    /** Tries the barrier once; true if the editor was handed the new version. */
-    async function reload(notice: EditorNotice): Promise<boolean> {
-      const { repository, id, settled, busy, onReload } = latest.current
-      if (reloading || !onReload) return false
-      reloading = true
-      try {
-        const loaded = await prepareReload({
-          repository,
-          id,
-          saver,
-          settled,
-          busy,
-        })
-        if (loaded === 'blocked' || disposed) return false
-        onReload(loaded, notice)
-        return true
-      } finally {
-        reloading = false
-      }
-    }
-
-    async function retryPending() {
-      if (pending && (await reload(pending))) pending = undefined
-    }
-
-    // A reload blocked by unsaved edits is tried again once they are saved;
-    // a copy that failed to save is reported.
-    let previous = saver.status.getState()
-    const unsubscribe = saver.status.subscribe(() => {
-      const status = saver.status.getState()
-      if (status === previous) return
-      previous = status
-      const copy = saver.conflict()
-      if (status === 'error' && copy && !copy.saved) {
-        latest.current.showNotice(COPY_FAILED_NOTICE)
-      }
-      if (status !== 'saved') return
-      if (copy?.saved && announced !== copy.copyId) {
-        announced = copy.copyId
-        pending = conflictNotice(copy.copyId)
-        latest.current.showNotice(pending)
-      }
-      void retryPending()
-    })
-
-    async function check() {
+  return {
+    async check() {
       if (checking) return
       checking = true
       try {
-        const { repository, id } = latest.current
+        const { repository, id } = current()
         // Local changes first: a stale save then conflicts, and the copy
         // path takes over. After a conflict this only retries the copy.
         await saver.flush()
@@ -143,16 +148,38 @@ export function useConcurrentEdits(options: ConcurrentEditsOptions): void {
       } finally {
         checking = false
       }
-    }
-    const onFocus = () => void check()
+    },
+    dispose() {
+      disposed = true
+      unsubscribe()
+    },
+  }
+}
+
+/**
+ * Wires the saver and the window's focus to reloads, through one controller
+ * per editor, so a reload never acts on a closed editor.
+ */
+export function useConcurrentEdits(options: ConcurrentEditsOptions): void {
+  // The latest props, so the long-lived listeners below never go stale.
+  const latest = useRef(options)
+  useEffect(() => {
+    latest.current = options
+  })
+
+  useEffect(() => {
+    const controller = createReloadController(
+      latest.current.saver,
+      () => latest.current,
+    )
+    const onFocus = () => void controller.check()
     const onVisibility = () => {
-      if (window.document.visibilityState === 'visible') void check()
+      if (window.document.visibilityState === 'visible') onFocus()
     }
     window.addEventListener('focus', onFocus)
     window.document.addEventListener('visibilitychange', onVisibility)
     return () => {
-      disposed = true
-      unsubscribe()
+      controller.dispose()
       window.removeEventListener('focus', onFocus)
       window.document.removeEventListener('visibilitychange', onVisibility)
     }
