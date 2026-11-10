@@ -14,14 +14,15 @@ import (
 // New returns the root handler. static holds the built web app (index.html at
 // its root). allowedOrigins guard every route against CSRF and DNS rebinding
 // (ADR 0020). sqlDB is the drawings store (ADR 0030); folder deletes need its transactions (ADR 0046). imagesDir holds the image blobs (ADR 0040).
-// auth is the optional password (ADR 0020); nil means none. The app uses hash routing (ADR 0007), so every page is served
+// auth is the optional password (ADR 0020); nil means none. token is the optional
+// API token for non-browser clients (ADR 0063); the zero value means none. The app uses hash routing (ADR 0007), so every page is served
 // by index.html at / and no SPA fallback is needed: unknown paths are 404.
-func New(static fs.FS, allowedOrigins AllowedOrigins, sqlDB *sql.DB, imagesDir string, auth *Auth) http.Handler {
-	return newHandler(static, allowedOrigins, sqlDB, imagesDir, auth, time.Now)
+func New(static fs.FS, allowedOrigins AllowedOrigins, sqlDB *sql.DB, imagesDir string, auth *Auth, token APIToken) http.Handler {
+	return newHandler(static, allowedOrigins, sqlDB, imagesDir, auth, token, time.Now)
 }
 
 // newHandler is New with an injected clock, for tests.
-func newHandler(static fs.FS, allowedOrigins AllowedOrigins, sqlDB *sql.DB, imagesDir string, auth *Auth, now func() time.Time) http.Handler {
+func newHandler(static fs.FS, allowedOrigins AllowedOrigins, sqlDB *sql.DB, imagesDir string, auth *Auth, token APIToken, now func() time.Time) http.Handler {
 	queries := db.New(sqlDB)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", handleHealth)
@@ -45,7 +46,7 @@ func newHandler(static fs.FS, allowedOrigins AllowedOrigins, sqlDB *sql.DB, imag
 	if auth != nil {
 		inner = auth.requireSession(mux)
 	}
-	return requireAllowedOrigin(allowedOrigins, inner)
+	return requireAllowedOrigin(allowedOrigins, token, inner)
 }
 
 func handleHealth(w http.ResponseWriter, _ *http.Request) {

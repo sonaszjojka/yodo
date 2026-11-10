@@ -29,7 +29,7 @@ func newTestAPI(t *testing.T) *testAPI {
 	}
 	t.Cleanup(func() { _ = sqlDB.Close() })
 	api := &testAPI{t: t, now: time.UnixMilli(1_000)}
-	api.handler = newHandler(builtFS, mustParse(t, "http://example.com"), sqlDB, t.TempDir(), nil,
+	api.handler = newHandler(builtFS, mustParse(t, "http://example.com"), sqlDB, t.TempDir(), nil, APIToken{},
 		func() time.Time { return api.now })
 	return api
 }

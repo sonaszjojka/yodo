@@ -207,7 +207,8 @@ func (a *Auth) requireSession(next http.Handler) http.Handler {
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p := r.URL.Path
-		open := p == "/api/health" || p == "/api/session" || !strings.HasPrefix(p, "/api/")
+		open := p == "/api/health" || p == "/api/session" || !strings.HasPrefix(p, "/api/") ||
+			authenticatedByToken(r) // ADR 0063
 		if !open && !a.validSession(r) {
 			http.Error(w, "unauthorized: password required", http.StatusUnauthorized)
 			return

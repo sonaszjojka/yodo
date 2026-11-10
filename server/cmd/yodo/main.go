@@ -9,6 +9,9 @@
 //	           for, default http://localhost:8080,http://127.0.0.1:8080 (ADR 0020)
 //	YODO_PASSWORD  if set, every API call needs a login with it (ADR 0020);
 //	           sessions are kept in memory, so a restart asks again
+//	YODO_API_TOKEN  if set (at least 32 characters), `Authorization: Bearer
+//	           <token>` lets non-browser clients in without Origin or a
+//	           login (ADR 0063)
 //	YODO_DATA_DIR  directory for the SQLite database yodo.db, created if
 //	           missing, default ./data (the Docker image sets /data, ADR 0030)
 package main
@@ -65,6 +68,11 @@ func run(ctx context.Context, getenv func(string) string) error {
 			"addr", addr)
 	}
 
+	token, err := server.ParseAPIToken(getenv("YODO_API_TOKEN"))
+	if err != nil {
+		return err
+	}
+
 	dataDir := getenv("YODO_DATA_DIR")
 	if dataDir == "" {
 		dataDir = defaultDataDir
@@ -90,10 +98,13 @@ func run(ctx context.Context, getenv func(string) string) error {
 	if auth.Enabled() {
 		slog.Info("password protection enabled")
 	}
+	if token.Enabled() {
+		slog.Info("API token enabled")
+	}
 
 	srv := &http.Server{
 		Addr:    addr,
-		Handler: server.New(webui.FS(), origins, sqlDB, filepath.Join(dataDir, "images"), auth),
+		Handler: server.New(webui.FS(), origins, sqlDB, filepath.Join(dataDir, "images"), auth, token),
 		// Bounds slow clients that never finish their headers (Slowloris).
 		ReadHeaderTimeout: 10 * time.Second,
 	}

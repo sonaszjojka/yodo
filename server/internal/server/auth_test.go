@@ -28,7 +28,7 @@ func newAuthAPI(t *testing.T, password string) *authAPI {
 	api := &authAPI{t: t, now: time.UnixMilli(1_000_000)}
 	clock := func() time.Time { return api.now }
 	api.handler = newHandler(builtFS, mustParse(t, "http://example.com,https://secure.example"),
-		sqlDB, t.TempDir(), NewAuth(password, clock), clock)
+		sqlDB, t.TempDir(), NewAuth(password, clock), APIToken{}, clock)
 	return api
 }
 
@@ -185,7 +185,7 @@ func TestImagesAreNotSharedCacheableBehindAPassword(t *testing.T) {
 		name, password, wantCache, wantVary string
 	}{
 		{"open", "", "public, max-age=31536000, immutable", ""},
-		{"locked", "secret", "private, max-age=31536000, immutable", "Cookie"},
+		{"locked", "secret", "private, max-age=31536000, immutable", "Cookie, Authorization"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			a := newAuthAPI(t, tt.password)

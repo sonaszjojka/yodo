@@ -95,14 +95,31 @@ const maxLoggedLen = 100
 //     the method;
 //   - every method other than GET/HEAD must carry one. Browsers may omit Origin
 //     on same-origin GETs, so only those may go without.
-func requireAllowedOrigin(allowed AllowedOrigins, next http.Handler) http.Handler {
+//
+// A valid YODO_API_TOKEN bearer lifts only the last rule (ADR 0063). It is
+// checked after Host and a present Origin, so a foreign page gets 403 before
+// the token is looked at; a wrong bearer gets 401.
+func requireAllowedOrigin(allowed AllowedOrigins, token APIToken, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
 		safe := r.Method == http.MethodGet || r.Method == http.MethodHead
 		ok := allowed.hosts[strings.ToLower(r.Host)]
-		if ok && (origin != "" || !safe) {
+		if ok && origin != "" {
 			u, err := parseOrigin(origin)
 			ok = err == nil && allowed.origins[u.Scheme+"://"+u.Host]
+		}
+		if ok {
+			switch token.check(r) {
+			case tokenInvalid:
+				w.Header().Set("WWW-Authenticate", "Bearer")
+				http.Error(w, "unauthorized: invalid API token (see YODO_API_TOKEN)", http.StatusUnauthorized)
+				return
+			case tokenValid:
+				r = withToken(r)
+			case tokenNone:
+				// Without a token, a state-changing request needs an Origin.
+				ok = origin != "" || safe
+			}
 		}
 		if !ok {
 			slog.Warn("request blocked: host or origin not allowed",

@@ -119,7 +119,9 @@ func (a imagesAPI) get(w http.ResponseWriter, r *http.Request) {
 	// The URL is the content's hash, so the bytes behind it never change.
 	if a.private {
 		w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
-		w.Header().Set("Vary", "Cookie")
+		// Authorization too: an API-token response must not be reused for a
+		// request without the token (ADR 0063).
+		w.Header().Set("Vary", "Cookie, Authorization")
 	} else {
 		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	}
