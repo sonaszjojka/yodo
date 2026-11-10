@@ -71,3 +71,4 @@ Why Yodo is built the way it is. See [0001](0001-record-architecture-decisions.m
 | [0058](0058-release-please-for-versions-and-changelog.md) | release-please picks versions, writes the changelog and tags releases | Accepted |
 | [0059](0059-developer-certificate-of-origin-instead-of-a-cla.md) | Require a DCO sign-off instead of a CLA | Accepted |
 | [0060](0060-sign-release-images-and-attach-provenance.md) | Sign release images with cosign (keyless); attach provenance and an SBOM; run OpenSSF Scorecard | Accepted |
+| [0061](0061-mcp-server-as-a-typescript-package-in-mcp.md) | MCP server as a TypeScript package in `mcp/`: stdio, SDK v2, relative imports of core/storage, Vite bundle, npm `yodo-mcp` | Accepted |
