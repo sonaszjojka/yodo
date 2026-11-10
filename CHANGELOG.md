@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/sonaszjojka/yodo/compare/v1.2.0...v1.3.0) (2026-11-10)
+
+
+### Features
+
+* **server:** optional API token for non-browser clients ([#192](https://github.com/sonaszjojka/yodo/issues/192)) ([81c9961](https://github.com/sonaszjojka/yodo/commit/81c99614ad288917f94a763ded433423dae688c0))
+
 ## [1.2.0](https://github.com/sonaszjojka/yodo/compare/v1.1.0...v1.2.0) (2026-11-10)
 
 
