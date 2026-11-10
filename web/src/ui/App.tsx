@@ -119,6 +119,8 @@ export function App({
     id: document.id,
     saver,
     settled: () => paster.settled(),
+    // Text being typed is not in the document until it is committed.
+    busy: () => editor.store.getState().editing !== null,
     onReload,
     showNotice: setNotice,
   })

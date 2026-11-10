@@ -535,6 +535,27 @@ describe('prepareReload (ADR 0062)', () => {
     expect(result).toBe('blocked')
   })
 
+  // Text being typed is not in the document yet, so no save holds it; a
+  // remount would drop it (Codex review round 1, finding 1).
+  test('is blocked while the editor holds work outside the document', async () => {
+    const { repository, doc } = await storedTwice()
+    const { saver } = fakeSaver({})
+    let typing = false
+    const load = repository.getWithRevision.bind(repository)
+    repository.getWithRevision = async (id) => {
+      typing = true
+      return load(id)
+    }
+    const result = await prepareReload({
+      repository,
+      id: doc.id,
+      saver,
+      settled: async () => {},
+      busy: () => typing,
+    })
+    expect(result).toBe('blocked')
+  })
+
   test('is blocked when the drawing cannot be loaded', async () => {
     const repository = new InMemoryDrawingRepository()
     const { saver } = fakeSaver({})

@@ -75,6 +75,11 @@ export interface ReloadOptions {
   saver: AutoSaver
   /** Resolves once image uploads have landed in the drawing. */
   settled(): Promise<void>
+  /**
+   * Whether the editor holds work that is not in the document yet, such as
+   * text being typed; no save holds it, so a reload must wait.
+   */
+  busy?(): boolean
 }
 
 /**
@@ -89,6 +94,7 @@ export async function prepareReload({
   id,
   saver,
   settled,
+  busy = () => false,
 }: ReloadOptions): Promise<LoadedDrawing | 'blocked'> {
   await settled()
   await saver.flush()
@@ -97,6 +103,7 @@ export async function prepareReload({
   const copy = saver.conflict()
   if (
     loaded.status !== 'loaded' ||
+    busy() ||
     saver.isDirty() ||
     saver.status.getState() !== 'saved' ||
     (copy !== undefined && !copy.saved)

@@ -47,6 +47,8 @@ export interface ConcurrentEditsOptions {
   saver: AutoSaver
   /** Resolves once image uploads have landed in the drawing. */
   settled(): Promise<void>
+  /** Whether the editor holds work outside the document (text being typed). */
+  busy(): boolean
   /** Swaps the editor for the stored version; undo starts afresh. */
   onReload?(loaded: LoadedDrawing, notice: EditorNotice): void
   showNotice(notice: EditorNotice): void
@@ -76,11 +78,17 @@ export function useConcurrentEdits(options: ConcurrentEditsOptions): void {
 
     /** Tries the barrier once; true if the editor was handed the new version. */
     async function reload(notice: EditorNotice): Promise<boolean> {
-      const { repository, id, settled, onReload } = latest.current
+      const { repository, id, settled, busy, onReload } = latest.current
       if (reloading || !onReload) return false
       reloading = true
       try {
-        const loaded = await prepareReload({ repository, id, saver, settled })
+        const loaded = await prepareReload({
+          repository,
+          id,
+          saver,
+          settled,
+          busy,
+        })
         if (loaded === 'blocked' || disposed) return false
         onReload(loaded, notice)
         return true
