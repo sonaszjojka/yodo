@@ -18,6 +18,7 @@ type Drawing struct {
 	FolderID      sql.NullString
 	DeletedAt     sql.NullInt64
 	SearchText    sql.NullString
+	Revision      int64
 }
 
 type Folder struct {

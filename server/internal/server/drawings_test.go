@@ -82,7 +82,7 @@ func TestPutThenGetReturnsSameBytes(t *testing.T) {
 	api := newTestAPI(t)
 	rec := api.do(http.MethodPut, "/api/drawings/"+docID, doc)
 	wantStatus(t, rec, http.StatusOK)
-	want := summary{ID: docID, Name: "Plan", CreatedAt: 1_000, UpdatedAt: 1_000}
+	want := summary{ID: docID, Name: "Plan", CreatedAt: 1_000, UpdatedAt: 1_000, Revision: 1}
 	if got := decodeSummary(t, rec); got != want {
 		t.Errorf("summary = %+v, want %+v", got, want)
 	}
@@ -115,7 +115,7 @@ func TestPutAgainReplacesAndKeepsCreatedAt(t *testing.T) {
 	changed := strings.Replace(doc, `"Plan"`, `"Final"`, 1)
 	rec := api.do(http.MethodPut, "/api/drawings/"+docID, changed)
 	wantStatus(t, rec, http.StatusOK)
-	want := summary{ID: docID, Name: "Final", CreatedAt: 1_000, UpdatedAt: 5_000}
+	want := summary{ID: docID, Name: "Final", CreatedAt: 1_000, UpdatedAt: 5_000, Revision: 2}
 	if got := decodeSummary(t, rec); got != want {
 		t.Errorf("summary = %+v, want %+v", got, want)
 	}

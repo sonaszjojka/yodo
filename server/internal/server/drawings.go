@@ -32,10 +32,12 @@ type summary struct {
 	FolderID *string `json:"folderId,omitempty"`
 	// DeletedAt is left out of the JSON for a drawing that is not in Trash (ADR 0046).
 	DeletedAt *int64 `json:"deletedAt,omitempty"`
+	// Revision counts saves, starting at 1; it is also the ETag (ADR 0062).
+	Revision int64 `json:"revision"`
 }
 
-func newSummary(id, name string, createdAt, updatedAt int64, folderID sql.NullString, deletedAt sql.NullInt64) summary {
-	s := summary{ID: id, Name: name, CreatedAt: createdAt, UpdatedAt: updatedAt}
+func newSummary(id, name string, createdAt, updatedAt int64, folderID sql.NullString, deletedAt sql.NullInt64, revision int64) summary {
+	s := summary{ID: id, Name: name, CreatedAt: createdAt, UpdatedAt: updatedAt, Revision: revision}
 	if folderID.Valid {
 		s.FolderID = &folderID.String
 	}
@@ -56,6 +58,7 @@ type drawingsAPI struct {
 func (a drawingsAPI) register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/drawings", a.list)
 	mux.HandleFunc("GET /api/drawings/{id}", a.get)
+	mux.HandleFunc("HEAD /api/drawings/{id}", a.head)
 	mux.HandleFunc("PUT /api/drawings/{id}", a.put)
 	mux.HandleFunc("DELETE /api/drawings", a.emptyTrash)
 	mux.HandleFunc("DELETE /api/drawings/{id}", a.delete)
@@ -176,7 +179,7 @@ func (a drawingsAPI) list(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		for _, row := range rows {
-			out = append(out, newSummary(row.ID, row.Name, row.CreatedAt, row.UpdatedAt, row.FolderID, row.DeletedAt))
+			out = append(out, newSummary(row.ID, row.Name, row.CreatedAt, row.UpdatedAt, row.FolderID, row.DeletedAt, row.Revision))
 		}
 	} else {
 		rows, err := a.queries.ListDrawings(r.Context())
@@ -185,14 +188,14 @@ func (a drawingsAPI) list(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		for _, row := range rows {
-			out = append(out, newSummary(row.ID, row.Name, row.CreatedAt, row.UpdatedAt, row.FolderID, row.DeletedAt))
+			out = append(out, newSummary(row.ID, row.Name, row.CreatedAt, row.UpdatedAt, row.FolderID, row.DeletedAt, row.Revision))
 		}
 	}
 	writeJSON(w, r, http.StatusOK, out)
 }
 
 func (a drawingsAPI) get(w http.ResponseWriter, r *http.Request) {
-	doc, err := a.queries.GetDrawingDocument(r.Context(), r.PathValue("id"))
+	row, err := a.queries.GetDrawingDocument(r.Context(), r.PathValue("id"))
 	if errors.Is(err, sql.ErrNoRows) {
 		http.Error(w, "drawing not found", http.StatusNotFound)
 		return
@@ -202,7 +205,54 @@ func (a drawingsAPI) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	_, _ = io.WriteString(w, doc)
+	w.Header().Set("ETag", etag(row.Revision))
+	_, _ = io.WriteString(w, row.Document)
+}
+
+// head returns a drawing's ETag without reading its document, so the editor
+// can check for a newer version cheaply (ADR 0062). The explicit HEAD route is
+// more specific than GET's implicit one, so the mux picks it.
+func (a drawingsAPI) head(w http.ResponseWriter, r *http.Request) {
+	revision, err := a.queries.GetDrawingRevision(r.Context(), r.PathValue("id"))
+	if errors.Is(err, sql.ErrNoRows) {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		serverError(w, r, err)
+		return
+	}
+	w.Header().Set("ETag", etag(revision))
+	w.WriteHeader(http.StatusOK)
+}
+
+// etag is a revision as a strong entity tag: "<n>" (ADR 0062).
+func etag(revision int64) string {
+	return `"` + strconv.FormatInt(revision, 10) + `"`
+}
+
+// parseIfMatch reads an If-Match header (ADR 0062). Absent means an
+// unconditional save. Yodo's only client sends exactly one strong tag of a
+// positive revision, so anything else (*, a weak tag, a list) is reported as
+// malformed instead of being matched loosely; a deliberate narrowing of
+// RFC 9110 §13.1.1.
+func parseIfMatch(header string) (revision int64, present bool, err error) {
+	header = strings.TrimSpace(header)
+	if header == "" {
+		return 0, false, nil
+	}
+	inner, ok := strings.CutPrefix(header, `"`)
+	if ok {
+		inner, ok = strings.CutSuffix(inner, `"`)
+	}
+	if !ok || inner == "" || strings.ContainsFunc(inner, func(c rune) bool { return c < '0' || c > '9' }) {
+		return 0, true, errors.New(`If-Match must be one revision tag like "3"`)
+	}
+	revision, err = strconv.ParseInt(inner, 10, 64)
+	if err != nil || revision < 1 {
+		return 0, true, errors.New(`If-Match must be one revision tag like "3"`)
+	}
+	return revision, true, nil
 }
 
 // documentMeta is the part of a document the server reads. Pointers tell a
@@ -269,20 +319,64 @@ func (a drawingsAPI) put(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-
-	row, err := a.queries.UpsertDrawing(r.Context(), db.UpsertDrawingParams{
-		ID:            id,
-		Name:          *meta.Name,
-		SchemaVersion: *meta.SchemaVersion,
-		Document:      string(body),
-		Now:           a.now().UnixMilli(),
-		SearchText:    searchText,
-	})
+	expected, conditional, err := parseIfMatch(r.Header.Get("If-Match"))
 	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var saved summary
+	if conditional {
+		row, err := a.queries.UpdateDrawingIfRevision(r.Context(), db.UpdateDrawingIfRevisionParams{
+			ID:               id,
+			Name:             *meta.Name,
+			SchemaVersion:    *meta.SchemaVersion,
+			Document:         string(body),
+			Now:              a.now().UnixMilli(),
+			SearchText:       searchText,
+			ExpectedRevision: expected,
+		})
+		if errors.Is(err, sql.ErrNoRows) {
+			a.preconditionFailed(w, r, id)
+			return
+		}
+		if err != nil {
+			serverError(w, r, err)
+			return
+		}
+		saved = newSummary(row.ID, row.Name, row.CreatedAt, row.UpdatedAt, row.FolderID, row.DeletedAt, row.Revision)
+	} else {
+		row, err := a.queries.UpsertDrawing(r.Context(), db.UpsertDrawingParams{
+			ID:            id,
+			Name:          *meta.Name,
+			SchemaVersion: *meta.SchemaVersion,
+			Document:      string(body),
+			Now:           a.now().UnixMilli(),
+			SearchText:    searchText,
+		})
+		if err != nil {
+			serverError(w, r, err)
+			return
+		}
+		saved = newSummary(row.ID, row.Name, row.CreatedAt, row.UpdatedAt, row.FolderID, row.DeletedAt, row.Revision)
+	}
+	w.Header().Set("ETag", etag(saved.Revision))
+	writeJSON(w, r, http.StatusOK, saved)
+}
+
+// preconditionFailed answers a conditional save that lost (ADR 0062): 412,
+// with the current ETag so the client knows which revision won, or without
+// one when the drawing no longer exists.
+func (a drawingsAPI) preconditionFailed(w http.ResponseWriter, r *http.Request, id string) {
+	revision, err := a.queries.GetDrawingRevision(r.Context(), id)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		serverError(w, r, err)
 		return
 	}
-	writeJSON(w, r, http.StatusOK, newSummary(row.ID, row.Name, row.CreatedAt, row.UpdatedAt, row.FolderID, row.DeletedAt))
+	if err == nil {
+		w.Header().Set("ETag", etag(revision))
+	}
+	http.Error(w, "the drawing has a newer revision", http.StatusPreconditionFailed)
 }
 
 func (a drawingsAPI) delete(w http.ResponseWriter, r *http.Request) {
@@ -346,10 +440,10 @@ func (a drawingsAPI) trash(w http.ResponseWriter, r *http.Request) {
 	var row summary
 	if trashed {
 		res, e := a.queries.TrashDrawing(r.Context(), db.TrashDrawingParams{ID: id, Now: sql.NullInt64{Int64: a.now().UnixMilli(), Valid: true}})
-		row, err = newSummary(res.ID, res.Name, res.CreatedAt, res.UpdatedAt, res.FolderID, res.DeletedAt), e
+		row, err = newSummary(res.ID, res.Name, res.CreatedAt, res.UpdatedAt, res.FolderID, res.DeletedAt, res.Revision), e
 	} else {
 		res, e := a.queries.RestoreDrawing(r.Context(), id)
-		row, err = newSummary(res.ID, res.Name, res.CreatedAt, res.UpdatedAt, res.FolderID, res.DeletedAt), e
+		row, err = newSummary(res.ID, res.Name, res.CreatedAt, res.UpdatedAt, res.FolderID, res.DeletedAt, res.Revision), e
 	}
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
@@ -403,7 +497,7 @@ func (a drawingsAPI) move(w http.ResponseWriter, r *http.Request) {
 	case err != nil:
 		serverError(w, r, err)
 	default:
-		writeJSON(w, r, http.StatusOK, newSummary(row.ID, row.Name, row.CreatedAt, row.UpdatedAt, row.FolderID, row.DeletedAt))
+		writeJSON(w, r, http.StatusOK, newSummary(row.ID, row.Name, row.CreatedAt, row.UpdatedAt, row.FolderID, row.DeletedAt, row.Revision))
 	}
 }
 
