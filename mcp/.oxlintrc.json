@@ -1,0 +1,22 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "oxc"],
+  "rules": {
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": [
+              "**/web/src/**",
+              "!**/web/src/core/**",
+              "!**/web/src/storage/**",
+              "**/web/src/storage/indexeddb*"
+            ],
+            "message": "mcp/ may import only web/src/core and web/src/storage, and not the browser-only storage/indexeddb.ts (ADR 0061)."
+          }
+        ]
+      }
+    ]
+  }
+}

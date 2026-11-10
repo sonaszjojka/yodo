@@ -1,0 +1,158 @@
+// The MCP server: read-only tools over a DrawingRepository (ADR 0061). The
+// repository is injected, so tests use the in-memory one and `index.ts` the
+// HTTP one with the API token.
+
+import { McpServer } from '@modelcontextprotocol/server'
+import * as z from 'zod'
+import { searchDrawings } from '../../web/src/core/search/match.ts'
+import { HttpError } from '../../web/src/storage/http.ts'
+import type { DrawingRepository } from '../../web/src/storage/repository.ts'
+import { formatDrawing, formatSearch, formatSummaries } from './format.ts'
+import pkg from '../package.json' with { type: 'json' }
+
+export const INSTRUCTIONS = `Yodo is a whiteboard app. These tools read the user's drawings.
+Call list_drawings or search_drawings to find a drawing's id, then get_drawing for its outline.
+Coordinates are world units: x grows to the right and y grows downward.`
+
+/** Tells the agent that a tool only reads, so a client can skip confirmations. */
+const READ_ONLY = { readOnlyHint: true, openWorldHint: false } as const
+
+interface TextResult {
+  [key: string]: unknown
+  content: { type: 'text'; text: string }[]
+  isError?: boolean
+}
+
+function text(body: string): TextResult {
+  return { content: [{ type: 'text', text: body }] }
+}
+
+function failure(body: string): TextResult {
+  return { ...text(body), isError: true }
+}
+
+/**
+ * A failed call as a tool result the agent can act on, rather than a protocol
+ * error it can't (ADR 0061: limits and bad input say how to fix the call).
+ */
+export function toolError(error: unknown, baseUrl?: URL): TextResult {
+  const where = baseUrl ? ` at ${baseUrl.href}` : ''
+  if (error instanceof HttpError) {
+    if (error.status === 401) {
+      return failure(
+        `Yodo${where} refused the request (401): the API token is missing or wrong. ` +
+          "Set YODO_API_TOKEN to the server's YODO_API_TOKEN (ADR 0063).",
+      )
+    }
+    if (error.status === 403) {
+      // Keep the server's own reason: a Host/Origin rejection (ADR 0020) can't
+      // be fixed with a token.
+      return failure(
+        `Yodo${where} refused the request (403): ${error.message}. ` +
+          "Check that YODO_URL's host is in the server's YODO_ALLOWED_ORIGINS, " +
+          'and set YODO_API_TOKEN if the server requires an Origin header or a password.',
+      )
+    }
+    return failure(`Yodo${where} answered ${error.status}: ${error.message}`)
+  }
+  if (error instanceof TypeError) {
+    return failure(
+      `Can't reach Yodo${where}: ${error.message}. Is the server running, and is YODO_URL right?`,
+    )
+  }
+  return failure(
+    `The call failed: ${error instanceof Error ? error.message : String(error)}`,
+  )
+}
+
+export interface ServerOptions {
+  /** Named in connection errors so the user sees which URL failed. */
+  baseUrl?: URL
+}
+
+export function createServer(
+  repo: DrawingRepository,
+  { baseUrl }: ServerOptions = {},
+): McpServer {
+  const server = new McpServer(
+    { name: 'yodo', version: pkg.version },
+    { instructions: INSTRUCTIONS },
+  )
+
+  async function run(body: () => Promise<TextResult>): Promise<TextResult> {
+    try {
+      return await body()
+    } catch (error) {
+      return toolError(error, baseUrl)
+    }
+  }
+
+  server.registerTool(
+    'list_drawings',
+    {
+      title: 'List drawings',
+      description:
+        'Lists every drawing (not those in Trash), newest first: id, name, last saved time and revision.',
+      annotations: READ_ONLY,
+    },
+    () => run(async () => text(formatSummaries(await repo.list()))),
+  )
+
+  server.registerTool(
+    'search_drawings',
+    {
+      title: 'Search drawings',
+      description:
+        'Finds drawings whose name or canvas text (free text and shape labels) contains the query, ' +
+        "case-insensitively, as Yodo's own search does. Returns ids, names and the matching text.",
+      inputSchema: z.object({
+        query: z
+          .string()
+          .trim()
+          .min(1)
+          .describe('Text to look for, matched literally.'),
+      }),
+      annotations: READ_ONLY,
+    },
+    ({ query }) =>
+      run(async () => {
+        const [summaries, index] = await Promise.all([
+          repo.list(),
+          repo.searchIndex(),
+        ])
+        return text(
+          formatSearch(searchDrawings(summaries, index, query), query),
+        )
+      }),
+  )
+
+  server.registerTool(
+    'get_drawing',
+    {
+      title: 'Get a drawing',
+      description:
+        "A drawing's outline: its revision and bounds, then one line per element, bottom first, " +
+        'with id, type, box (x,y widthxheight), and text, labels, arrow bindings or points. ' +
+        'Styles and colours are left out.',
+      inputSchema: z.object({
+        id: z
+          .string()
+          .min(1)
+          .describe('A drawing id from list_drawings or search_drawings.'),
+      }),
+      annotations: READ_ONLY,
+    },
+    ({ id }) =>
+      run(async () => {
+        const found = await repo.getWithRevision(id)
+        if (!found) {
+          return failure(
+            `No drawing with id ${JSON.stringify(id)}. Call list_drawings or search_drawings for ids.`,
+          )
+        }
+        return text(formatDrawing(found.doc, found.revision))
+      }),
+  )
+
+  return server
+}

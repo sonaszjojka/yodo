@@ -1,0 +1,68 @@
+// Smoke test of the built bundle over real stdio (ADR 0061): spawns
+// `node dist/index.js` as an MCP client would, against a stub Yodo API that
+// checks the bearer token. Run after `npm run build`; exits non-zero on failure.
+
+import { Client } from '@modelcontextprotocol/client'
+import { StdioClientTransport } from '@modelcontextprotocol/client/stdio'
+import assert from 'node:assert/strict'
+import { createServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
+
+const TOKEN = 'smoke-test-token-0123456789abcdef'
+const SUMMARY = {
+  id: 'smoke-drawing',
+  name: 'Smoke test',
+  createdAt: 0,
+  updatedAt: 0,
+  revision: 1,
+}
+
+const api = createServer((req, res) => {
+  if (req.headers.authorization !== `Bearer ${TOKEN}`) {
+    res.writeHead(401).end('unauthorized')
+    return
+  }
+  if (req.method === 'GET' && req.url === '/api/drawings') {
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify([SUMMARY]))
+    return
+  }
+  res.writeHead(404).end('not found')
+})
+await new Promise<void>((resolve) => api.listen(0, '127.0.0.1', resolve))
+const { port } = api.address() as AddressInfo
+
+const transport = new StdioClientTransport({
+  command: process.execPath,
+  args: [new URL('../dist/index.js', import.meta.url).pathname],
+  env: {
+    PATH: process.env.PATH ?? '',
+    YODO_URL: `http://127.0.0.1:${port}`,
+    YODO_API_TOKEN: TOKEN,
+  },
+  stderr: 'inherit',
+})
+const client = new Client(
+  { name: 'yodo-mcp-smoke', version: '0.0.0' },
+  { versionNegotiation: { mode: { pin: '2026-07-28' } } },
+)
+
+try {
+  await client.connect(transport)
+  const { tools } = await client.listTools()
+  assert.deepEqual(tools.map((t) => t.name).sort(), [
+    'get_drawing',
+    'list_drawings',
+    'search_drawings',
+  ])
+  const result = await client.callTool({ name: 'list_drawings', arguments: {} })
+  assert.notEqual(result.isError, true, JSON.stringify(result.content))
+  const [block] = result.content as { type: string; text: string }[]
+  assert.match(block.text, /^smoke-drawing {2}"Smoke test"/m)
+  console.log(
+    'smoke: ok (3 tools; list_drawings reached the API with the token)',
+  )
+} finally {
+  await client.close()
+  api.close()
+}

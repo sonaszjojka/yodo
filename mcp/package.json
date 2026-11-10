@@ -1,0 +1,39 @@
+{
+  "name": "yodo-mcp",
+  "private": true,
+  "version": "1.2.0",
+  "description": "MCP server for Yodo drawings",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "yodo-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "test": "vitest run",
+    "lint": "oxlint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "smoke": "node scripts/smoke.ts"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "^2.4.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "^2.4.0",
+    "@types/node": "^26.6.6",
+    "oxlint": "^1.92.0",
+    "prettier": "^3.9.10",
+    "typescript": "~7.0.2",
+    "vite": "^8.3.6",
+    "vitest": "^5.1.0"
+  }
+}
