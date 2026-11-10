@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/sonaszjojka/yodo/compare/v1.1.0...v1.2.0) (2026-11-10)
+
+
+### Features
+
+* safe concurrent saves with If-Match and conflicted copies ([#188](https://github.com/sonaszjojka/yodo/issues/188)) ([1761ed0](https://github.com/sonaszjojka/yodo/commit/1761ed0c3b18e309bd3d62a7c047f2792d85b2c1))
+
 ## [1.1.0](https://github.com/sonaszjojka/yodo/compare/v1.0.0...v1.1.0) (2026-11-09)
 
 
