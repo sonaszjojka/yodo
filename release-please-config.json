@@ -25,5 +25,6 @@
       ]
     }
   },
-  "pull-request-title-pattern": "chore: release ${version}"
+  "pull-request-title-pattern": "chore: release ${version}",
+  "signoff": "Jonasz Sójka <161844067+sonaszjojka@users.noreply.github.com>"
 }
