@@ -50,6 +50,8 @@ interface Entry {
 }
 
 const KEEP = /^[a-z0-9-]$/
+const LONE_SURROGATE =
+  /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/
 
 /**
  * The file name for an id: every byte outside `[a-z0-9-]` as `%XX`. It is
@@ -58,6 +60,9 @@ const KEEP = /^[a-z0-9-]$/
  * file systems. Undefined for an id with no usable name.
  */
 export function fileNameFor(id: string): string | undefined {
+  // A lone surrogate has no UTF-8 form: the encoder would turn it into U+FFFD,
+  // and two different ids would share one file.
+  if (LONE_SURROGATE.test(id)) return undefined
   let name = ''
   for (const byte of new TextEncoder().encode(id)) {
     const char = String.fromCharCode(byte)
@@ -86,7 +91,10 @@ export function idFor(fileName: string): string | undefined {
   }
   let id: string
   try {
-    id = new TextDecoder('utf-8', { fatal: true }).decode(new Uint8Array(bytes))
+    // `ignoreBOM` keeps a leading U+FEFF, which is part of the id.
+    id = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(
+      new Uint8Array(bytes),
+    )
   } catch {
     return undefined
   }

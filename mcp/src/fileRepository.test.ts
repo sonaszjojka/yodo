@@ -104,6 +104,20 @@ describe('file names', () => {
     expect(fileNameFor('x'.repeat(201))).toBeUndefined()
   })
 
+  // UTF-8 can't hold a lone surrogate: encoding turns each into U+FFFD, so
+  // two such ids would share one file (Codex review round 1, finding 1).
+  test.each(['\uD800', '\uDC00', 'a\uD801b', '\uDC00\uD800'])(
+    'refuse the ill-formed id %j',
+    (id) => {
+      expect(fileNameFor(id)).toBeUndefined()
+    },
+  )
+
+  test('keep a leading byte order mark', () => {
+    const id = '﻿drawing'
+    expect(idFor(`${fileNameFor(id)}.yodo`)).toBe(id)
+  })
+
   test('only accept the canonical spelling', () => {
     expect(idFor('a%2fb.yodo')).toBeUndefined()
     expect(idFor('Ab.yodo')).toBeUndefined()
@@ -223,6 +237,26 @@ describe('FileDrawingRepository files', () => {
 
     await expect(repo.save(doc)).rejects.toThrow(/file name/)
     expect(await repo.get(doc.id)).toBeUndefined()
+  })
+
+  test('never lets two ill-formed ids overwrite each other', async () => {
+    const { repo } = await setup()
+    const first = { ...drawing('First'), id: '\uD800' }
+    const second = { ...drawing('Second'), id: '\uD801' }
+
+    await expect(repo.save(first)).rejects.toThrow(/file name/)
+    await expect(repo.save(second)).rejects.toThrow(/file name/)
+    expect(await repo.list()).toEqual([])
+  })
+
+  test('lists and finds a drawing whose id starts with a byte order mark', async () => {
+    const { repo } = await setup()
+    const doc = { ...drawing('Marked'), id: '﻿drawing' }
+
+    await repo.save(doc)
+
+    expect((await repo.list()).map((s) => s.id)).toEqual([doc.id])
+    expect((await repo.searchIndex()).map((e) => e.id)).toEqual([doc.id])
   })
 
   test('has no folders: moving into one rejects, out of one works', async () => {
