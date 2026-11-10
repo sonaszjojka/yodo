@@ -12,7 +12,7 @@ Format ([conventionalcommits.org](https://www.conventionalcommits.org/)):
 <footer: Refs #12 / Closes #12 / BREAKING CHANGE: …>
 ```
 - **Types:** `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `build`, `ci`, `chore`, `style`. Only `feat` (minor), `fix` (patch) and `!` (major) change the version and appear in `CHANGELOG.md` ([ADR 0058](adr/0058-release-please-for-versions-and-changelog.md)), so pick the type on purpose and write subjects a user can read in a changelog.
-- **Scopes:** `web`, `server`, `e2e`, `docs`, `ci`, `deps`. Omit the scope if a change spans most of the repo.
+- **Scopes:** `web`, `server`, `e2e`, `mcp`, `docs`, `ci`, `deps`. Omit the scope if a change spans most of the repo.
 - **Subject:** imperative, lower case, no period, ≤ 72 characters (`add rectangle tool`, not `Added rectangle tool.`).
 - **Breaking change:** `!` after the type/scope (`feat(web)!: …`) plus a `BREAKING CHANGE:` footer. Document format changes follow ADR 0013 (bump `schemaVersion` + migration).
 - **Sign-off:** every commit carries a `Signed-off-by` line (`git commit -s`), the owner's and Claude's included, as well as outside contributors' (DCO, [ADR 0059](adr/0059-developer-certificate-of-origin-instead-of-a-cla.md)). The DCO check fails a PR with an unsigned commit; fix it with `git rebase --signoff main` and a force-push of the branch.

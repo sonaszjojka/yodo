@@ -1,0 +1,3 @@
+# Build output; Prettier only reads mcp/.gitignore, not the root one.
+dist/
+coverage/

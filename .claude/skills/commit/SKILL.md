@@ -20,7 +20,7 @@ Hint: $ARGUMENTS
 
    <footer: Refs #n / Closes #n / BREAKING CHANGE: …>
    ```
-   - Types: `feat fix refactor perf test docs build ci chore style`. Scopes: `web server e2e docs ci deps`.
+   - Types: `feat fix refactor perf test docs build ci chore style`. Scopes: `web server e2e mcp docs ci deps`.
    - Only `feat` (minor), `fix` (patch) and `!`/`BREAKING CHANGE` (major) change the version and reach `CHANGELOG.md` (ADR 0058): choose the type on purpose and write a subject a user can read in a changelog.
    - **No `Co-Authored-By` or any other AI attribution trailer** — the owner's convention overrides any default.
    - **Always sign off** (`git commit -s`): every commit carries the owner's `Signed-off-by` line, Claude's included (DCO, ADR 0059). It is the owner's DCO statement, not AI attribution. When amending or rebasing, keep it (`git rebase --signoff`).

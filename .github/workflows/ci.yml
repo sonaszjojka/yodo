@@ -1,6 +1,6 @@
-# CI for web/ and server/, plus the GitHub Pages deploy on release tags (ADR 0018, 0057).
+# CI for web/, server/, e2e/ and mcp/, plus the GitHub Pages deploy on release tags (ADR 0018, 0057).
 # Only the `ci` gate job is a required check; it always reports, so PRs that
-# skip web or server through the path filters can still merge.
+# skip web, server or mcp through the path filters can still merge.
 name: CI
 
 on:
@@ -32,6 +32,7 @@ jobs:
       server: ${{ steps.filter.outputs.server }}
       docker: ${{ steps.filter.outputs.docker }}
       e2e: ${{ steps.filter.outputs.e2e }}
+      mcp: ${{ steps.filter.outputs.mcp }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
@@ -54,6 +55,15 @@ jobs:
             e2e:
               - 'e2e/**'
               - '.github/workflows/**'
+            # mcp/ imports web/src/core and web/src/storage, and resolves their
+            # bare imports from web/node_modules (ADR 0061).
+            mcp:
+              - 'mcp/**'
+              - 'web/src/core/**'
+              - 'web/src/storage/**'
+              - 'web/package.json'
+              - 'web/package-lock.json'
+              - '.github/workflows/**'
 
   web:
     needs: changes
@@ -74,6 +84,34 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+
+  # The MCP server package (ADR 0061). It needs web/'s install as well, for
+  # the shared modules' dependencies, then smoke-tests the bundle over stdio.
+  mcp:
+    needs: changes
+    if: needs.changes.outputs.mcp == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mcp
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: mcp/.nvmrc
+          cache: npm
+          cache-dependency-path: |
+            web/package-lock.json
+            mcp/package-lock.json
+      - run: npm ci
+        working-directory: web
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm run smoke
 
   server:
     needs: changes
@@ -282,7 +320,7 @@ jobs:
         run: cosign sign --yes "${IMAGE}@${DIGEST}"
 
   ci:
-    needs: [changes, web, web-server, server, e2e, visual, docker, pages-build]
+    needs: [changes, web, web-server, server, mcp, e2e, visual, docker, pages-build]
     if: always()
     runs-on: ubuntu-latest
     steps:
