@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/sonaszjojka/yodo/compare/v1.3.0...v1.4.0) (2026-11-10)
+
+
+### Features
+
+* **mcp:** add the yodo-mcp server with read-only drawing tools ([#194](https://github.com/sonaszjojka/yodo/issues/194)) ([1d13005](https://github.com/sonaszjojka/yodo/commit/1d13005e3abab261170d0fb062759e3224ee880e))
+
 ## [1.3.0](https://github.com/sonaszjojka/yodo/compare/v1.2.0...v1.3.0) (2026-11-10)
 
 
