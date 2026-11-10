@@ -21,6 +21,7 @@ Ask once for the docs sync, the push and the PR together (step 1b), to save a ro
   - `docs/plan.md`: update Status ("Last done" and "Next step" with the next task and its issue).
   - `docs/history.md`: add a dated "Done" line for the task (append at the end).
   - Also `docs/adr/README.md`, `docs/product.md`, `docs/ui.md`, `docs/conventions.md`, README, CLAUDE.md and project memory.
+- Never edit `CHANGELOG.md`, `.release-please-manifest.json` or the version in `web/package.json`: release-please owns them (ADR 0058).
 - Note issues the branch also resolves (beyond the task's own), to list as `Closes #n` in the PR body.
 - If this task finishes a split (an earlier part used `Refs #n`), the PR also says `Closes #n` for the original parent issue, next to the task's own issue.
 - In **one message**, list each stale item (file, what's outdated, proposed fix; or say nothing is stale) plus the proposed PR title and a one-line body outline, and ask one question: apply the sync, push and open the PR? Leave superseded ADRs as history.
@@ -29,13 +30,15 @@ Ask once for the docs sync, the push and the PR together (step 1b), to save a ro
 ## 2. Push and open the PR
 - Push with `git push -u origin <branch>`.
 - Open the PR with `gh pr create`:
-  - **Title** = the future squash commit, in Conventional Commit format (e.g. `feat(web): add rectangle tool`).
+  - **Title** = the future squash commit, in Conventional Commit format (e.g. `feat(web): add rectangle tool`). The required `conventional-title` check enforces it: types `feat fix refactor perf test docs build ci chore style`, scopes `web server e2e docs ci deps` (or none), lower-case subject. `feat`, `fix` and `!` decide the next version and appear in the changelog, so pick the type on purpose.
   - **Body:** Summary (what + why), "Done when…" checklist with evidence, How to test, Screenshots for UI changes, `Closes #n`.
   - No AI attribution line in the body (owner's convention).
 
 ## 3. CI
 - Do not watch or poll CI (it burns tokens while nothing happens). Give the PR link, then stop: the user reports when CI is green or which job failed.
 - On a failure, read only the failed log (`gh run view --log-failed`), fix on the branch via the commit workflow, push again.
+- Required checks: `ci`, `conventional-title`, `analyze (go)`, `analyze (javascript-typescript)`. If `conventional-title` fails, fix the PR title with `gh pr edit <n> --title "..."` (no new commit needed).
+- A Playwright failure in a test the branch didn't touch may be the known flaky shortcuts test: read the log, and if it is a timing failure rerun only the failed job (`gh run rerun <run id> --failed`) instead of changing code.
 
 ## 4. Review
 - The branch is normally reviewed before `/ship`: `/feature` and `/fix` end with the reviewer command, and the user fixes findings in that clean session. If the user says the branch was not reviewed, give that command now (same format as the `/feature` hand-off) and wait until they come back.
@@ -54,4 +57,5 @@ Ask once for the docs sync, the push and the PR together (step 1b), to save a ro
 - Claude Code's auto mode blocks Claude from merging, and the owner merges anyway: give the user `! gh pr merge <n> --squash` to run. The PR title becomes the commit subject, and GitHub deletes the remote branch.
 - Then `git fetch --prune && git switch main && git pull --ff-only`.
 - Delete the local branch only after checking nothing is lost: a squash merge makes `git branch -d` always refuse, so confirm `git diff <branch> main` is empty first, then `git branch -D <branch>`. If the diff is not empty, stop and show it to the user.
+- Merging does not deploy: the change reaches users with the next release PR (release-please; merging that PR tags and deploys, ADR 0057/0058). Say so in the recap, and follow the `Refs`/`Closes` rule in `docs/conventions.md` for tasks that include a release.
 - Recap and suggest `/clear` before the next task.
