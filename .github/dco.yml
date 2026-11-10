@@ -1,4 +1,5 @@
-# DCO app settings (ADR 0059). Maintainers with write access are not required
-# to sign off; outside contributors are.
+# DCO app settings (ADR 0059). Every commit is signed off, the owner's too.
+# `members: false` only exempts commits by members that are also verified
+# (GPG/SSH-signed); unsigned owner commits still need a Signed-off-by line.
 require:
   members: false
