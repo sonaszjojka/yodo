@@ -23,5 +23,6 @@ Hint: $ARGUMENTS
    - Types: `feat fix refactor perf test docs build ci chore style`. Scopes: `web server e2e docs ci deps`.
    - Only `feat` (minor), `fix` (patch) and `!`/`BREAKING CHANGE` (major) change the version and reach `CHANGELOG.md` (ADR 0058): choose the type on purpose and write a subject a user can read in a changelog.
    - **No `Co-Authored-By` or any other AI attribution trailer** — the owner's convention overrides any default.
+   - **Always sign off** (`git commit -s`): every commit carries the owner's `Signed-off-by` line, Claude's included (DCO, ADR 0059). It is the owner's DCO statement, not AI attribution. When amending or rebasing, keep it (`git rebase --signoff`).
 5. **Propose:** show the files to be staged, a short diff summary, and the full message. Wait for approval.
-6. **Commit** after approval: stage the listed files by name (not `git add -A`), commit, then show `git log -1 --stat`.
+6. **Commit** after approval: stage the listed files by name (not `git add -A`), commit with `git commit -s`, then show `git log -1 --stat` and check the `Signed-off-by` line is there.
