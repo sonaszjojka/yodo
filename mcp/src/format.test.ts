@@ -190,15 +190,34 @@ describe('formatDrawing', () => {
     expect(text).toContain(`"${'x'.repeat(MAX_TEXT)}…"`)
   })
 
-  it(`lists at most ${MAX_ELEMENTS} elements and counts the rest`, () => {
+  it(`lists at most ${MAX_ELEMENTS} elements and says how to get the rest`, () => {
     const many = Array.from({ length: MAX_ELEMENTS + 3 }, (_, i) =>
       el({ id: `r${i}` }),
     )
     const lines = formatDrawing(doc(many), 1).split('\n')
     expect(lines[1]).toBe(`${MAX_ELEMENTS + 3} elements; bounds 0,0 10x10`)
+    expect(lines[2]).toBe(
+      `Elements 0-${MAX_ELEMENTS - 1} of ${MAX_ELEMENTS + 3}, bottom first (id type x,y widthxheight details):`,
+    )
     expect(lines).toHaveLength(3 + MAX_ELEMENTS + 1)
     expect(lines.at(-2)).toBe(`r${MAX_ELEMENTS - 1} rectangle 0,0 10x10`)
-    expect(lines.at(-1)).toBe('… and 3 more elements (truncated)')
+    expect(lines.at(-1)).toBe(
+      `… 3 more elements: call get_drawing with offset ${MAX_ELEMENTS} for the next ones.`,
+    )
+  })
+
+  it('lists the elements from an offset, the rest of the header unchanged', () => {
+    const many = Array.from({ length: MAX_ELEMENTS + 3 }, (_, i) =>
+      el({ id: `r${i}` }),
+    )
+    const lines = formatDrawing(doc(many), 1, MAX_ELEMENTS).split('\n')
+    expect(lines[1]).toBe(`${MAX_ELEMENTS + 3} elements; bounds 0,0 10x10`)
+    expect(lines.slice(2)).toEqual([
+      `Elements ${MAX_ELEMENTS}-${MAX_ELEMENTS + 2} of ${MAX_ELEMENTS + 3}, bottom first (id type x,y widthxheight details):`,
+      `r${MAX_ELEMENTS} rectangle 0,0 10x10`,
+      `r${MAX_ELEMENTS + 1} rectangle 0,0 10x10`,
+      `r${MAX_ELEMENTS + 2} rectangle 0,0 10x10`,
+    ])
   })
 })
 

@@ -191,6 +191,46 @@ describe('get_drawing', () => {
     )
   })
 
+  it('reaches every element of a large drawing through offset', async () => {
+    const repo = await seeded()
+    const box = createShape(
+      'rectangle',
+      { x: 0, y: 0, width: 10, height: 10 },
+      1,
+    )
+    const elements = Array.from({ length: 501 }, (_, i) => ({
+      ...box,
+      id: `e${i}`,
+    }))
+    await repo.save({ ...createDocument('Big'), id: 'big', elements })
+    const client = await connect(repo)
+
+    const first = textOf(
+      await client.callTool({ name: 'get_drawing', arguments: { id: 'big' } }),
+    )
+    expect(first).not.toContain('e500 ')
+    expect(first).toContain('call get_drawing with offset 500')
+
+    const rest = await client.callTool({
+      name: 'get_drawing',
+      arguments: { id: 'big', offset: 500 },
+    })
+    expect(rest.isError).not.toBe(true)
+    expect(textOf(rest).split('\n').at(-1)).toBe('e500 rectangle 0,0 10x10')
+  })
+
+  it('rejects an offset past the last element, saying how many there are', async () => {
+    const client = await connect(await seeded())
+    const result = await client.callTool({
+      name: 'get_drawing',
+      arguments: { id: 'd-login', offset: 1 },
+    })
+    expect(result.isError).toBe(true)
+    expect(textOf(result)).toBe(
+      'offset 1 is past the last element: drawing "d-login" has 1 elements (offsets 0-0).',
+    )
+  })
+
   it('says how to find ids when the drawing is missing', async () => {
     const client = await connect(await seeded())
     const result = await client.callTool({

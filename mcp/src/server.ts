@@ -7,7 +7,12 @@ import * as z from 'zod'
 import { searchDrawings } from '../../web/src/core/search/match.ts'
 import { HttpError } from '../../web/src/storage/http.ts'
 import type { DrawingRepository } from '../../web/src/storage/repository.ts'
-import { formatDrawing, formatSearch, formatSummaries } from './format.ts'
+import {
+  formatDrawing,
+  formatSearch,
+  formatSummaries,
+  MAX_ELEMENTS,
+} from './format.ts'
 import pkg from '../package.json' with { type: 'json' }
 
 export const INSTRUCTIONS = `Yodo is a whiteboard app. These tools read the user's drawings.
@@ -133,16 +138,25 @@ export function createServer(
       description:
         "A drawing's outline: its revision and bounds, then one line per element, bottom first, " +
         'with id, type, box (x,y widthxheight), and text, labels, arrow bindings or points. ' +
-        'Styles and colours are left out.',
+        `Styles and colours are left out. Lists at most ${MAX_ELEMENTS} elements per call; ` +
+        'the result says which offset lists the next ones.',
       inputSchema: z.object({
         id: z
           .string()
           .min(1)
           .describe('A drawing id from list_drawings or search_drawings.'),
+        offset: z
+          .number()
+          .int()
+          .min(0)
+          .optional()
+          .describe(
+            `Index of the first element to list (default 0), for drawings over ${MAX_ELEMENTS} elements.`,
+          ),
       }),
       annotations: READ_ONLY,
     },
-    ({ id }) =>
+    ({ id, offset = 0 }) =>
       run(async () => {
         const found = await repo.getWithRevision(id)
         if (!found) {
@@ -150,7 +164,14 @@ export function createServer(
             `No drawing with id ${JSON.stringify(id)}. Call list_drawings or search_drawings for ids.`,
           )
         }
-        return text(formatDrawing(found.doc, found.revision))
+        const total = found.doc.elements.length
+        if (offset > 0 && offset >= total) {
+          return failure(
+            `offset ${offset} is past the last element: drawing ${JSON.stringify(id)} has ${total} elements` +
+              (total > 0 ? ` (offsets 0-${total - 1}).` : '.'),
+          )
+        }
+        return text(formatDrawing(found.doc, found.revision, offset))
       }),
   )
 

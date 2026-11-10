@@ -120,24 +120,39 @@ function details(element: YodoElement): string[] {
  * The drawing as an outline: a header with its id, revision and bounds, then
  * one line per element, bottom of the stack first. Boxes are what is drawn
  * (`drawnBounds`), so a curve's overshoot counts; rotation is reported, not
- * applied to the box.
+ * applied to the box. At most `MAX_ELEMENTS` are listed, from `offset`; the
+ * last line then says which offset lists the next ones.
  */
-export function formatDrawing(doc: YodoDocument, revision: number): string {
+export function formatDrawing(
+  doc: YodoDocument,
+  revision: number,
+  offset = 0,
+): string {
+  const total = doc.elements.length
   const boxes = doc.elements.map((element) => drawnBounds(element))
   const all = unionBounds(boxes)
   const lines = [
     `Drawing ${quote(doc.name)} (id ${doc.id}, rev ${revision})`,
-    `${doc.elements.length} elements; bounds ${all ? box(all) : 'empty'}`,
+    `${total} elements; bounds ${all ? box(all) : 'empty'}`,
   ]
-  if (doc.elements.length > 0) {
-    lines.push('Elements, bottom first (id type x,y widthxheight details):')
+  const end = Math.min(total, offset + MAX_ELEMENTS)
+  if (offset < end) {
+    const range =
+      offset === 0 && end === total
+        ? 'Elements,'
+        : `Elements ${offset}-${end - 1} of ${total},`
+    lines.push(`${range} bottom first (id type x,y widthxheight details):`)
   }
-  doc.elements.slice(0, MAX_ELEMENTS).forEach((element, i) => {
+  for (let i = offset; i < end; i++) {
+    const element = doc.elements[i]
     lines.push(
       [element.id, element.type, box(boxes[i]), ...details(element)].join(' '),
     )
-  })
-  const hidden = doc.elements.length - MAX_ELEMENTS
-  if (hidden > 0) lines.push(`… and ${hidden} more elements (truncated)`)
+  }
+  if (end < total) {
+    lines.push(
+      `… ${total - end} more elements: call get_drawing with offset ${end} for the next ones.`,
+    )
+  }
   return lines.join('\n')
 }
