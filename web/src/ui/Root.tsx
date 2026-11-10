@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Session } from '../storage/session.ts'
-import { loadDrawing, type LoadResult } from '../storage/drawings.ts'
+import {
+  loadDrawing,
+  type LoadedDrawing,
+  type LoadResult,
+} from '../storage/drawings.ts'
 import type { FolderRepository } from '../storage/folders.ts'
 import type { ImageRepository } from '../storage/images.ts'
 import type { DrawingRepository } from '../storage/repository.ts'
@@ -9,6 +13,7 @@ import { DrawingLoadError } from './DrawingLoadError.tsx'
 import { Home } from './Home.tsx'
 import { createImageCache, type ImageCache } from './imageCache.ts'
 import { useRoute } from './route.ts'
+import type { EditorNotice } from './useConcurrentEdits.ts'
 
 /** Picks the screen from the hash route (ADR 0033). */
 export function Root({
@@ -90,6 +95,18 @@ function DrawingScreen({
 }: DrawingScreenProps) {
   const [result, setResult] = useState<LoadResult>()
   const [attempt, setAttempt] = useState(0)
+  // A reload from elsewhere (ADR 0062) remounts the editor on the stored
+  // version: a fresh editor, undo history and saver, with a notice.
+  const [generation, setGeneration] = useState(0)
+  const [reloadNotice, setReloadNotice] = useState<EditorNotice>()
+  const onReload = useCallback(
+    (loaded: LoadedDrawing, notice: EditorNotice) => {
+      setResult(loaded)
+      setReloadNotice(notice)
+      setGeneration((n) => n + 1)
+    },
+    [],
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -125,10 +142,14 @@ function DrawingScreen({
   }
   return (
     <App
+      key={generation}
       repository={repository}
       images={images}
       imageCache={imageCache}
       document={result.document}
+      revision={result.revision}
+      initialNotice={reloadNotice}
+      onReload={onReload}
       onClose={onClose}
     />
   )

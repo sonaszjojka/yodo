@@ -1280,6 +1280,16 @@ a.drawing-card-body:focus-visible,
   font-size: 14px;
 }
 
+/* News from elsewhere, not a failure (ADR 0062). */
+.notice-info {
+  color: var(--text);
+}
+
+.notice-action {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 /* Password screen (docs/ui.md, ADR 0020). */
 .gate-app {
   /* Only there to carry `inert`; it must not change the layout. */

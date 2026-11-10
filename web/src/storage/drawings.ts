@@ -9,7 +9,7 @@ import {
 } from '../core/document/file.ts'
 import { DocumentError } from '../core/document/migrate.ts'
 import type { YodoDocument } from '../core/document/types.ts'
-import { withFileIds } from './autosave.ts'
+import { withFileIds, type AutoSaver } from './autosave.ts'
 import { base64ToBlob, blobToBase64 } from './base64.ts'
 import {
   decodeSize,
@@ -22,9 +22,12 @@ import {
 import type { DrawingRepository, DrawingSummary } from './repository.ts'
 
 export type LoadResult =
-  | { status: 'loaded'; document: YodoDocument }
+  | { status: 'loaded'; document: YodoDocument; revision: number }
   | { status: 'not-found' }
   | { status: 'error'; error: unknown }
+
+/** A drawing ready for the editor. */
+export type LoadedDrawing = Extract<LoadResult, { status: 'loaded' }>
 
 export interface LoadOptions {
   /**
@@ -45,11 +48,62 @@ export async function loadDrawing(
 ): Promise<LoadResult> {
   try {
     await after
-    const document = await repository.get(id)
-    return document ? { status: 'loaded', document } : { status: 'not-found' }
+    // With its revision, so the editor's first save can expect it (ADR 0062).
+    const loaded = await repository.getWithRevision(id)
+    return loaded
+      ? { status: 'loaded', document: loaded.doc, revision: loaded.revision }
+      : { status: 'not-found' }
   } catch (error) {
     return { status: 'error', error }
   }
+}
+
+/** Whether the stored drawing has a newer revision than `known` (ADR 0062). */
+export async function isNewerElsewhere(
+  repository: DrawingRepository,
+  id: string,
+  known: number,
+): Promise<boolean> {
+  const stored = await repository.getRevision(id)
+  return stored !== undefined && stored > known
+}
+
+export interface ReloadOptions {
+  repository: DrawingRepository
+  id: string
+  /** The open editor's saver. */
+  saver: AutoSaver
+  /** Resolves once image uploads have landed in the drawing. */
+  settled(): Promise<void>
+}
+
+/**
+ * The barrier before the editor swaps its drawing for the stored version
+ * (ADR 0062): uploads land, pending changes are saved (to the conflicted copy
+ * if there is one), and the stored version is loaded. It resolves the load
+ * only if, at that moment, nothing local is left unsaved; otherwise
+ * `'blocked'`, and the editor keeps its document and keeps saving it.
+ */
+export async function prepareReload({
+  repository,
+  id,
+  saver,
+  settled,
+}: ReloadOptions): Promise<LoadedDrawing | 'blocked'> {
+  await settled()
+  await saver.flush()
+  const loaded = await loadDrawing(repository, id)
+  // Checked after the load, synchronously, so an edit made during it counts.
+  const copy = saver.conflict()
+  if (
+    loaded.status !== 'loaded' ||
+    saver.isDirty() ||
+    saver.status.getState() !== 'saved' ||
+    (copy !== undefined && !copy.saved)
+  ) {
+    return 'blocked'
+  }
+  return loaded
 }
 
 /** Saves a new, empty drawing and returns its id, so a reload finds it. */

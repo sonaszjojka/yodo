@@ -3,6 +3,7 @@ import type { YodoDocument } from '../core/document/types.ts'
 import { createEditor } from '../core/editor/editor.ts'
 import { createStore } from '../core/store/store.ts'
 import { createAutoSaver, finalSave } from '../storage/autosave.ts'
+import type { LoadedDrawing } from '../storage/drawings.ts'
 import {
   loadPanelLayout,
   loadStyleDefaults,
@@ -28,6 +29,7 @@ import { StylePanel, StylePanelToggle } from './StylePanel.tsx'
 import { TextEditor } from './TextEditor.tsx'
 import { Toolbar } from './Toolbar.tsx'
 import { TopBar } from './TopBar.tsx'
+import { useConcurrentEdits, type EditorNotice } from './useConcurrentEdits.ts'
 import { useTheme } from './useTheme.ts'
 import { ZoomControl } from './ZoomControl.tsx'
 
@@ -40,6 +42,15 @@ export interface AppProps {
   imageCache: ImageCache
   /** The drawing to open, loaded before the first render. */
   document: YodoDocument
+  /** The stored revision of `document`; every save expects it (ADR 0062). */
+  revision: number
+  /** Shown when the editor opens, e.g. after a reload from elsewhere. */
+  initialNotice?: EditorNotice
+  /**
+   * Replaces this editor with one on the stored version, after a conflict or
+   * a newer version found on focus (ADR 0062).
+   */
+  onReload?(loaded: LoadedDrawing, notice: EditorNotice): void
   /** Gets the last save (true if it succeeded) when the editor closes. */
   onClose?(saved: Promise<boolean>): void
 }
@@ -51,6 +62,9 @@ export function App({
   images,
   imageCache,
   document,
+  revision,
+  initialNotice,
+  onReload,
   onClose,
 }: AppProps) {
   // Lazy initialisers create these once, not on every render. Creating the
@@ -61,11 +75,14 @@ export function App({
       defaults: loadStyleDefaults(),
     }),
   )
-  const [saver] = useState(() => createAutoSaver(editor.store, repository))
+  const [saver] = useState(() =>
+    createAutoSaver(editor.store, repository, { revision }),
+  )
   const [panel] = useState(() => createStore(loadPanelLayout()))
   const { theme } = useTheme()
-  const [notice, setNotice] = useState<string>()
+  const [notice, setNotice] = useState<EditorNotice | undefined>(initialNotice)
   const dismissNotice = useCallback(() => setNotice(undefined), [])
+  const showError = useCallback((message: string) => setNotice({ message }), [])
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const openShortcuts = useCallback(() => {
     // A key held down now would never see its keyup (the dialog takes focus).
@@ -95,8 +112,16 @@ export function App({
 
   // A pasted image: stored first, then added to the drawing (ADR 0040).
   const [paster] = useState(() =>
-    createImagePaster(editor, images, imageCache, setNotice),
+    createImagePaster(editor, images, imageCache, showError),
   )
+  useConcurrentEdits({
+    repository,
+    id: document.id,
+    saver,
+    settled: () => paster.settled(),
+    onReload,
+    showNotice: setNotice,
+  })
 
   // Each opening gets a new number, used as the dialog's key: a dialog that
   // closes and opens again in one render batch still starts fresh and open.
@@ -166,7 +191,12 @@ export function App({
   return (
     <>
       <Canvas editor={editor} imageCache={imageCache} onImage={paster.paste} />
-      <Notice message={notice} onDismiss={dismissNotice} />
+      <Notice
+        message={notice?.message}
+        tone={notice?.tone}
+        action={notice?.action}
+        onDismiss={dismissNotice}
+      />
       <TopBar editor={editor} />
       <TextEditor editor={editor} theme={theme} />
       <StyleBar

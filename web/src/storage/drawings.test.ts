@@ -11,7 +11,9 @@ import {
   duplicateDrawing,
   exportYodo,
   importDrawing,
+  isNewerElsewhere,
   loadDrawing,
+  prepareReload,
   renameDrawing,
   sortDrawings,
   yodoFileName,
@@ -24,6 +26,8 @@ import {
 } from './memory.ts'
 import { InMemoryImageRepository } from './memoryImages.ts'
 import type { DrawingSummary } from './repository.ts'
+import type { AutoSaver, ConflictedCopy, SaveStatus } from './autosave.ts'
+import { createStore } from '../core/store/store.ts'
 
 describe('loadDrawing', () => {
   test('loads a stored drawing', async () => {
@@ -31,9 +35,12 @@ describe('loadDrawing', () => {
     const doc = createDocument('stored')
     await repository.save(doc)
 
+    await repository.save(doc)
+
     expect(await loadDrawing(repository, doc.id)).toEqual({
       status: 'loaded',
       document: doc,
+      revision: 2,
     })
   })
 
@@ -49,7 +56,7 @@ describe('loadDrawing', () => {
   test('reports a failing load as an error instead of a new drawing', async () => {
     const repository = new InMemoryDrawingRepository()
     const failure = new Error('newer schemaVersion')
-    repository.get = () => Promise.reject(failure)
+    repository.getWithRevision = () => Promise.reject(failure)
 
     expect(await loadDrawing(repository, 'any')).toEqual({
       status: 'error',
@@ -63,7 +70,7 @@ test('loadDrawing waits for an earlier save before reading', async () => {
   const repository = new InMemoryDrawingRepository()
   const doc = createDocument('stored')
   await repository.save(doc)
-  const get = vi.spyOn(repository, 'get')
+  const get = vi.spyOn(repository, 'getWithRevision')
   let finishSave!: () => void
   const saving = new Promise<void>((resolve) => (finishSave = resolve))
 
@@ -419,5 +426,124 @@ describe('yodoFileName', () => {
     ['Plan.', 'Plan.yodo'],
   ])('%j becomes %j', (name, expected) => {
     expect(yodoFileName(name)).toBe(expected)
+  })
+})
+
+describe('isNewerElsewhere (ADR 0062)', () => {
+  test('compares the stored revision with the one the editor knows', async () => {
+    const repository = new InMemoryDrawingRepository()
+    const doc = createDocument()
+    await repository.save(doc)
+    await repository.save(doc)
+
+    expect(await isNewerElsewhere(repository, doc.id, 1)).toBe(true)
+    expect(await isNewerElsewhere(repository, doc.id, 2)).toBe(false)
+    expect(await isNewerElsewhere(repository, 'missing', 1)).toBe(false)
+  })
+})
+
+describe('prepareReload (ADR 0062)', () => {
+  /** A saver whose state the test sets by hand. */
+  function fakeSaver(state: {
+    dirty?: boolean
+    status?: SaveStatus
+    conflict?: ConflictedCopy
+  }) {
+    const calls: string[] = []
+    const saver: AutoSaver = {
+      status: createStore<SaveStatus>(state.status ?? 'saved'),
+      start: () => () => {},
+      flush: async () => {
+        calls.push('flush')
+      },
+      revision: () => 1,
+      isDirty: () => state.dirty ?? false,
+      conflict: () => state.conflict,
+    }
+    return { saver, calls, state }
+  }
+
+  async function storedTwice() {
+    const repository = new InMemoryDrawingRepository()
+    const doc = createDocument('Theirs')
+    await repository.save(doc)
+    await repository.save(doc)
+    return { repository, doc }
+  }
+
+  test('waits for uploads, then flushes, then loads the newer version', async () => {
+    const { repository, doc } = await storedTwice()
+    const { saver, calls } = fakeSaver({})
+    const settled = async () => {
+      calls.push('settled')
+    }
+
+    const result = await prepareReload({
+      repository,
+      id: doc.id,
+      saver,
+      settled,
+    })
+
+    expect(calls).toEqual(['settled', 'flush'])
+    expect(result).toEqual({ status: 'loaded', document: doc, revision: 2 })
+  })
+
+  test('loads after a stored conflicted copy', async () => {
+    const { repository, doc } = await storedTwice()
+    const { saver } = fakeSaver({ conflict: { copyId: 'c', saved: true } })
+    const result = await prepareReload({
+      repository,
+      id: doc.id,
+      saver,
+      settled: async () => {},
+    })
+    expect(result).toMatchObject({ status: 'loaded' })
+  })
+
+  test.each([
+    ['an unsaved change', { dirty: true }],
+    ['a failed save', { status: 'error' as const }],
+    ['a save still running', { status: 'saving' as const }],
+    ['a copy not stored yet', { conflict: { copyId: 'c', saved: false } }],
+  ])('is blocked by %s', async (_, state) => {
+    const { repository, doc } = await storedTwice()
+    const { saver } = fakeSaver(state)
+    const result = await prepareReload({
+      repository,
+      id: doc.id,
+      saver,
+      settled: async () => {},
+    })
+    expect(result).toBe('blocked')
+  })
+
+  test('is blocked by an edit made while the newer version loads', async () => {
+    const { repository, doc } = await storedTwice()
+    const { saver, state } = fakeSaver({})
+    const load = repository.getWithRevision.bind(repository)
+    repository.getWithRevision = async (id) => {
+      state.dirty = true
+      return load(id)
+    }
+    const result = await prepareReload({
+      repository,
+      id: doc.id,
+      saver,
+      settled: async () => {},
+    })
+    expect(result).toBe('blocked')
+  })
+
+  test('is blocked when the drawing cannot be loaded', async () => {
+    const repository = new InMemoryDrawingRepository()
+    const { saver } = fakeSaver({})
+    const result = await prepareReload({
+      repository,
+      id: 'gone',
+      saver,
+      settled: async () => {},
+    })
+    expect(result).toBe('blocked')
   })
 })
