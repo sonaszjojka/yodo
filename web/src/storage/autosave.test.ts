@@ -40,6 +40,8 @@ function deferredRepository() {
     listTrash: async () => [],
     searchIndex: async () => [],
     get: async () => undefined,
+    getWithRevision: async () => undefined,
+    getRevision: async () => undefined,
     delete: async () => {},
     move: async () => undefined,
     trash: async () => undefined,
@@ -50,7 +52,13 @@ function deferredRepository() {
         saves.push({
           doc,
           resolve: () =>
-            resolve({ id: doc.id, name: doc.name, createdAt: 0, updatedAt: 0 }),
+            resolve({
+              id: doc.id,
+              name: doc.name,
+              createdAt: 0,
+              updatedAt: 0,
+              revision: 1,
+            }),
           reject,
         })
       }),

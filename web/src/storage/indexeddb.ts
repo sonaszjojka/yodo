@@ -8,10 +8,12 @@ import { safeSearchText } from '../core/search/extract.ts'
 import type { RepositoryOptions } from './memory.ts'
 import type { Folder, FolderInput, FolderRepository } from './folders.ts'
 import { sha256Hex, type ImageRepository } from './images.ts'
-import type {
-  DrawingRepository,
-  DrawingSummary,
-  SearchIndexEntry,
+import {
+  RevisionConflictError,
+  type DrawingRepository,
+  type DrawingSummary,
+  type SaveOptions,
+  type SearchIndexEntry,
 } from './repository.ts'
 
 /** Database names start with `yodo-` (ADR 0005). */
@@ -20,10 +22,20 @@ export const DEFAULT_DB_NAME = 'yodo-data'
 // Bump together with a new step in `upgrade`; never edit a released step.
 const DB_VERSION = 4
 
+/**
+ * A summary as stored. Those saved before revisions (ADR 0062) have none and
+ * read as revision 1, so no database upgrade is needed.
+ */
+type StoredSummary = Omit<DrawingSummary, 'revision'> & { revision?: number }
+
+function fromStored(stored: StoredSummary): DrawingSummary {
+  return { ...stored, revision: stored.revision ?? 1 }
+}
+
 // Summaries and documents live in separate stores so `list()` reads only the
 // small summaries, never every drawing's elements.
 interface YodoDb extends DBSchema {
-  drawings: { key: string; value: DrawingSummary }
+  drawings: { key: string; value: StoredSummary }
   documents: { key: string; value: YodoDocument }
   /** Image blobs by content hash (ADR 0040). Bytes, not a Blob, so every browser clones them the same way. */
   blobs: { key: string; value: StoredBlob }
@@ -137,16 +149,16 @@ export class IndexedDbDrawingRepository implements DrawingRepository {
     const db = await this.#open()
     // Summaries are small and a trashed drawing is rare, so filtering here
     // beats an index (and needs no schema change, ADR 0046).
-    return (await db.getAll('drawings')).filter(
-      (s) => s.deletedAt === undefined,
-    )
+    return (await db.getAll('drawings'))
+      .filter((s) => s.deletedAt === undefined)
+      .map(fromStored)
   }
 
   async listTrash(): Promise<DrawingSummary[]> {
     const db = await this.#open()
-    return (await db.getAll('drawings')).filter(
-      (s) => s.deletedAt !== undefined,
-    )
+    return (await db.getAll('drawings'))
+      .filter((s) => s.deletedAt !== undefined)
+      .map(fromStored)
   }
 
   async searchIndex(): Promise<SearchIndexEntry[]> {
@@ -169,19 +181,55 @@ export class IndexedDbDrawingRepository implements DrawingRepository {
     return doc && migrate(doc)
   }
 
-  async save(doc: YodoDocument): Promise<DrawingSummary> {
+  async getWithRevision(
+    id: string,
+  ): Promise<{ doc: YodoDocument; revision: number } | undefined> {
+    const db = await this.#open()
+    // One transaction, so the document and the revision are the same moment.
+    const tx = db.transaction(['drawings', 'documents'], 'readonly')
+    const [summary, doc] = await Promise.all([
+      tx.objectStore('drawings').get(id),
+      tx.objectStore('documents').get(id),
+      tx.done,
+    ])
+    if (!summary || !doc) return undefined
+    return { doc: migrate(doc), revision: fromStored(summary).revision }
+  }
+
+  async getRevision(id: string): Promise<number | undefined> {
+    const db = await this.#open()
+    const summary = await db.get('drawings', id)
+    return summary && fromStored(summary).revision
+  }
+
+  async save(
+    doc: YodoDocument,
+    { expectedRevision }: SaveOptions = {},
+  ): Promise<DrawingSummary> {
     const db = await this.#open()
     // One transaction, so the summary and document never disagree and two
-    // saves of the same drawing can't interleave between read and write.
+    // saves of the same drawing can't interleave between read and write. It
+    // also makes the revision check and the write one step (ADR 0062).
     const tx = db.transaction(['drawings', 'documents', 'search'], 'readwrite')
     const drawings = tx.objectStore('drawings')
-    const existing = await drawings.get(doc.id)
+    const stored = await drawings.get(doc.id)
+    const existing = stored && fromStored(stored)
+    if (
+      expectedRevision !== undefined &&
+      existing?.revision !== expectedRevision
+    ) {
+      // Nothing was written; aborting rejects tx.done, which isn't the cause.
+      tx.abort()
+      tx.done.catch(() => {})
+      throw new RevisionConflictError(doc.id, existing?.revision)
+    }
     const time = this.#now()
     const summary: DrawingSummary = {
       id: doc.id,
       name: doc.name,
       createdAt: existing?.createdAt ?? time,
       updatedAt: time,
+      revision: (existing?.revision ?? 0) + 1,
     }
     // Auto-save must not undo a move (ADR 0045).
     if (existing?.folderId !== undefined) summary.folderId = existing.folderId
@@ -224,7 +272,7 @@ export class IndexedDbDrawingRepository implements DrawingRepository {
       tx.done.catch(() => {})
       throw new Error(`Folder ${folderId} does not exist`)
     }
-    const { folderId: _old, ...rest } = existing
+    const { folderId: _old, ...rest } = fromStored(existing)
     const summary: DrawingSummary =
       folderId === null ? rest : { ...rest, folderId }
     await Promise.all([tx.objectStore('drawings').put(summary), tx.done])
@@ -240,7 +288,7 @@ export class IndexedDbDrawingRepository implements DrawingRepository {
       return undefined
     }
     const summary = {
-      ...existing,
+      ...fromStored(existing),
       deletedAt: existing.deletedAt ?? this.#now(),
     }
     await Promise.all([tx.store.put(summary), tx.done])
@@ -255,7 +303,7 @@ export class IndexedDbDrawingRepository implements DrawingRepository {
       await tx.done
       return undefined
     }
-    const { deletedAt: _deleted, ...summary } = existing
+    const { deletedAt: _deleted, ...summary } = fromStored(existing)
     await Promise.all([tx.store.put(summary), tx.done])
     return summary
   }

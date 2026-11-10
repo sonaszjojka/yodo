@@ -183,6 +183,7 @@ describe('duplicateDrawing', () => {
       name: 'Gone',
       createdAt: 1,
       updatedAt: 1,
+      revision: 1,
     }
 
     expect(await duplicateDrawing(repository, gone)).toBeUndefined()
@@ -215,7 +216,7 @@ describe('sortDrawings', () => {
     name: string,
     createdAt: number,
     updatedAt: number,
-  ): DrawingSummary => ({ id, name, createdAt, updatedAt })
+  ): DrawingSummary => ({ id, name, createdAt, updatedAt, revision: 1 })
   const list = [
     summary('a', 'beta', 1, 5),
     summary('b', 'Alpha', 3, 4),

@@ -22,6 +22,36 @@ export interface DrawingSummary {
    * live drawing.
    */
   deletedAt?: number
+  /**
+   * Counts saves (ADR 0062): 1 after the first, +1 after each one. A move,
+   * trash or restore is not an edit and leaves it as it is.
+   */
+  revision: number
+}
+
+export interface SaveOptions {
+  /**
+   * Save only if the stored drawing exists and is at this revision; otherwise
+   * reject with `RevisionConflictError` and store nothing (ADR 0062). Without
+   * it the save is unconditional, as before.
+   */
+  expectedRevision?: number
+}
+
+/** A conditional save lost: someone else saved first, or the drawing is gone. */
+export class RevisionConflictError extends Error {
+  /** The stored revision, or undefined when the drawing no longer exists. */
+  readonly currentRevision: number | undefined
+
+  constructor(id: string, currentRevision: number | undefined) {
+    super(
+      currentRevision === undefined
+        ? `Drawing ${id} no longer exists`
+        : `Drawing ${id} is at revision ${currentRevision}`,
+    )
+    this.name = 'RevisionConflictError'
+    this.currentRevision = currentRevision
+  }
 }
 
 export interface DrawingRepository {
@@ -42,11 +72,21 @@ export interface DrawingRepository {
   /** The document migrated to the current version (ADR 0013), or undefined. */
   get(id: string): Promise<YodoDocument | undefined>
   /**
+   * The document as `get` returns it, with the revision it was stored at, read
+   * together so the two always belong to each other (ADR 0062).
+   */
+  getWithRevision(
+    id: string,
+  ): Promise<{ doc: YodoDocument; revision: number } | undefined>
+  /** Only the stored revision, without loading the document; undefined if missing. */
+  getRevision(id: string): Promise<number | undefined>
+  /**
    * Inserts or replaces the drawing `doc.id`; keeps its `createdAt` and its
    * folder. A drawing saved after its folder was deleted is simply re-created
-   * outside any folder (ADR 0045). A drawing in Trash stays there.
+   * outside any folder (ADR 0045). A drawing in Trash stays there. With
+   * `expectedRevision`, the check and the write are one atomic step (ADR 0062).
    */
-  save(doc: YodoDocument): Promise<DrawingSummary>
+  save(doc: YodoDocument, options?: SaveOptions): Promise<DrawingSummary>
   /**
    * Puts the drawing into a folder, or out of any folder with null (ADR 0045).
    * Moving is not an edit: `updatedAt` and the document stay as they were.

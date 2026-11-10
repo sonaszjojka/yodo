@@ -12,7 +12,7 @@ import {
 import v1Fixture from '../core/document/fixtures/v1-every-element.json?raw'
 import type { YodoDocument } from '../core/document/types.ts'
 import { lineFromDrag } from '../core/geometry/line.ts'
-import type { DrawingRepository } from './repository.ts'
+import { RevisionConflictError, type DrawingRepository } from './repository.ts'
 
 function byId(a: { id: string }, b: { id: string }): number {
   return a.id.localeCompare(b.id)
@@ -386,6 +386,103 @@ export function describeRepositoryContract(
         await repo.save(doc)
         const trashed = await repo.trash(doc.id)
         expect(await repo.move(doc.id, null)).toEqual(trashed)
+      })
+    })
+
+    describe('Revisions (ADR 0062)', () => {
+      async function conflict(
+        promise: Promise<unknown>,
+      ): Promise<RevisionConflictError> {
+        const error = await promise.then(
+          () => undefined,
+          (e: unknown) => e,
+        )
+        expect(error).toBeInstanceOf(RevisionConflictError)
+        return error as RevisionConflictError
+      }
+
+      test('the first save is revision 1 and each save adds one', async () => {
+        const doc = drawing('Plan')
+        expect((await repo.save(doc)).revision).toBe(1)
+        expect((await repo.save(doc)).revision).toBe(2)
+        expect((await repo.save(doc)).revision).toBe(3)
+        expect((await repo.list())[0]?.revision).toBe(3)
+      })
+
+      test('a save without an expected revision is unconditional', async () => {
+        const doc = drawing('Plan')
+        await repo.save(doc)
+        await repo.save(doc)
+        const summary = await repo.save({ ...doc, name: 'Again' })
+        expect(summary).toMatchObject({ name: 'Again', revision: 3 })
+      })
+
+      test('a matching expected revision saves', async () => {
+        const doc = drawing('Plan')
+        await repo.save(doc)
+        const changed = { ...doc, name: 'Final' }
+        const summary = await repo.save(changed, { expectedRevision: 1 })
+        expect(summary).toMatchObject({ name: 'Final', revision: 2 })
+        expect(await repo.get(doc.id)).toEqual(changed)
+      })
+
+      test('a stale expected revision rejects and stores nothing', async () => {
+        const doc = drawing('Plan')
+        await repo.save(doc)
+        await repo.save(doc)
+        const error = await conflict(
+          repo.save({ ...doc, name: 'Stale' }, { expectedRevision: 1 }),
+        )
+        expect(error.currentRevision).toBe(2)
+        expect(await repo.get(doc.id)).toEqual(doc)
+        expect(await repo.getRevision(doc.id)).toBe(2)
+        expect((await repo.list())[0]).toMatchObject({
+          name: 'Plan',
+          revision: 2,
+        })
+      })
+
+      test('an expected revision on a missing drawing creates nothing', async () => {
+        const doc = drawing('Plan')
+        const error = await conflict(repo.save(doc, { expectedRevision: 1 }))
+        expect(error.currentRevision).toBeUndefined()
+        expect(await repo.get(doc.id)).toBeUndefined()
+        expect(await repo.list()).toEqual([])
+      })
+
+      test('a conditional save keeps a drawing in Trash', async () => {
+        const doc = drawing('Plan')
+        await repo.save(doc)
+        await repo.trash(doc.id)
+        const summary = await repo.save(doc, { expectedRevision: 1 })
+        expect(summary.revision).toBe(2)
+        expect(summary.deletedAt).toBeDefined()
+      })
+
+      test('move, trash and restore keep the revision', async () => {
+        const doc = drawing('Plan')
+        await repo.save(doc)
+        await repo.save(doc)
+        expect((await repo.move(doc.id, null))?.revision).toBe(2)
+        expect((await repo.trash(doc.id))?.revision).toBe(2)
+        expect((await repo.restore(doc.id))?.revision).toBe(2)
+        expect(await repo.getRevision(doc.id)).toBe(2)
+      })
+
+      test('getWithRevision returns the document with its revision', async () => {
+        const doc = drawing('Plan')
+        await repo.save(doc)
+        await repo.save(doc)
+        expect(await repo.getWithRevision(doc.id)).toEqual({
+          doc: await repo.get(doc.id),
+          revision: 2,
+        })
+      })
+
+      test('a missing drawing has no revision', async () => {
+        const id = crypto.randomUUID()
+        expect(await repo.getRevision(id)).toBeUndefined()
+        expect(await repo.getWithRevision(id)).toBeUndefined()
       })
     })
 

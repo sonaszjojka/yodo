@@ -87,7 +87,7 @@ test('upgrading a version-1 database keeps its drawings and adds image storage',
   v1.close()
 
   const drawings = new IndexedDbDrawingRepository()
-  expect(await drawings.list()).toEqual([summary])
+  expect(await drawings.list()).toEqual([{ ...summary, revision: 1 }])
   expect(await drawings.get(doc.id)).toEqual(doc)
 
   const images = new IndexedDbImageRepository()
@@ -118,7 +118,7 @@ test('upgrading a populated version-2 database keeps drawings and images and add
   v2.close()
 
   const drawings = new IndexedDbDrawingRepository()
-  expect(await drawings.list()).toEqual([summary])
+  expect(await drawings.list()).toEqual([{ ...summary, revision: 1 }])
   expect(await drawings.get(doc.id)).toEqual(doc)
   expect(await images.has(hash)).toBe(true)
   expect(await (await images.get(hash))!.arrayBuffer()).toEqual(bytes)
@@ -134,6 +134,7 @@ test('upgrading a populated version-2 database keeps drawings and images and add
   })
   expect(await drawings.move(doc.id, folder.id)).toEqual({
     ...summary,
+    revision: 1,
     folderId: folder.id,
   })
   await folders.delete(folder.id)

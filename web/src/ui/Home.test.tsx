@@ -9,9 +9,21 @@ import { HomeView, type HomeViewProps } from './Home.tsx'
 
 const now = Date.now()
 const drawings: DrawingSummary[] = [
-  { id: 'a', name: 'Beta', createdAt: 1, updatedAt: now - 120_000 },
-  { id: 'b', name: 'alpha', createdAt: 3, updatedAt: now - 5_000 },
-  { id: 'c', name: 'Gamma', createdAt: 2, updatedAt: now - 600_000 },
+  {
+    id: 'a',
+    name: 'Beta',
+    createdAt: 1,
+    updatedAt: now - 120_000,
+    revision: 1,
+  },
+  { id: 'b', name: 'alpha', createdAt: 3, updatedAt: now - 5_000, revision: 1 },
+  {
+    id: 'c',
+    name: 'Gamma',
+    createdAt: 2,
+    updatedAt: now - 600_000,
+    revision: 1,
+  },
 ]
 
 function render(props: Partial<HomeViewProps> = {}) {
@@ -234,6 +246,7 @@ describe('HomeView', () => {
         name: 'Old plan',
         createdAt: 1,
         updatedAt: 2,
+        revision: 1,
         deletedAt: now - 120_000,
       },
       {
@@ -241,6 +254,7 @@ describe('HomeView', () => {
         name: 'Newer plan',
         createdAt: 1,
         updatedAt: 2,
+        revision: 1,
         deletedAt: now - 5_000,
       },
     ]
@@ -344,8 +358,20 @@ describe('HomeView search (ADR 0047)', () => {
 
   test('lists name matches in the chosen sort order', () => {
     const named = [
-      { id: 'x', name: 'Zed note', createdAt: 1, updatedAt: now - 1_000 },
-      { id: 'y', name: 'Alpha note', createdAt: 2, updatedAt: now - 9_000 },
+      {
+        id: 'x',
+        name: 'Zed note',
+        createdAt: 1,
+        updatedAt: now - 1_000,
+        revision: 1,
+      },
+      {
+        id: 'y',
+        name: 'Alpha note',
+        createdAt: 2,
+        updatedAt: now - 9_000,
+        revision: 1,
+      },
     ]
     const list = {
       status: 'loaded' as const,

@@ -5,10 +5,12 @@ import { migrate } from '../core/document/migrate.ts'
 import type { YodoDocument } from '../core/document/types.ts'
 import { safeSearchText } from '../core/search/extract.ts'
 import type { Folder, FolderInput, FolderRepository } from './folders.ts'
-import type {
-  DrawingRepository,
-  DrawingSummary,
-  SearchIndexEntry,
+import {
+  RevisionConflictError,
+  type DrawingRepository,
+  type DrawingSummary,
+  type SaveOptions,
+  type SearchIndexEntry,
 } from './repository.ts'
 
 export interface RepositoryOptions {
@@ -71,14 +73,39 @@ export class InMemoryDrawingRepository implements DrawingRepository {
     return doc && migrate(structuredClone(doc))
   }
 
-  async save(doc: YodoDocument): Promise<DrawingSummary> {
+  async getWithRevision(
+    id: string,
+  ): Promise<{ doc: YodoDocument; revision: number } | undefined> {
+    // Both read in one synchronous step, so no save can land between them.
+    const doc = this.#documents.get(id)
+    const summary = this.#summaries.get(id)
+    if (!doc || !summary) return undefined
+    return { doc: migrate(structuredClone(doc)), revision: summary.revision }
+  }
+
+  async getRevision(id: string): Promise<number | undefined> {
+    return this.#summaries.get(id)?.revision
+  }
+
+  async save(
+    doc: YodoDocument,
+    { expectedRevision }: SaveOptions = {},
+  ): Promise<DrawingSummary> {
     const time = this.#now()
     const existing = this.#summaries.get(doc.id)
+    // Checked before anything is written (ADR 0062).
+    if (
+      expectedRevision !== undefined &&
+      existing?.revision !== expectedRevision
+    ) {
+      throw new RevisionConflictError(doc.id, existing?.revision)
+    }
     const summary: DrawingSummary = {
       id: doc.id,
       name: doc.name,
       createdAt: existing?.createdAt ?? time,
       updatedAt: time,
+      revision: (existing?.revision ?? 0) + 1,
     }
     if (existing?.folderId !== undefined) summary.folderId = existing.folderId
     // Auto-save must not bring a trashed drawing back (ADR 0046).

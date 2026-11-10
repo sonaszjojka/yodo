@@ -5,10 +5,12 @@
 import { migrate } from '../core/document/migrate.ts'
 import type { YodoDocument } from '../core/document/types.ts'
 import { safeSearchText } from '../core/search/extract.ts'
-import type {
-  DrawingRepository,
-  DrawingSummary,
-  SearchIndexEntry,
+import {
+  RevisionConflictError,
+  type DrawingRepository,
+  type DrawingSummary,
+  type SaveOptions,
+  type SearchIndexEntry,
 } from './repository.ts'
 
 /** The header that carries a drawing's canvas text on save (ADR 0047). */
@@ -91,6 +93,12 @@ export function pathSegment(kind: string, id: string): string {
   return encodeURIComponent(id)
 }
 
+/** The revision in a strong `"<n>"` ETag (ADR 0062), or undefined. */
+function revisionFromETag(etag: string | null): number | undefined {
+  const match = etag?.match(/^"([1-9][0-9]*)"$/)
+  return match ? Number(match[1]) : undefined
+}
+
 export interface HttpRepositoryOptions {
   /** The app root the API lives under, e.g. `new URL('./', document.baseURI)`. */
   baseUrl: URL
@@ -146,7 +154,41 @@ export class HttpDrawingRepository implements DrawingRepository {
     return migrate(await response.json())
   }
 
-  async save(doc: YodoDocument): Promise<DrawingSummary> {
+  async getWithRevision(
+    id: string,
+  ): Promise<{ doc: YodoDocument; revision: number } | undefined> {
+    const response = await this.#request(
+      'GET',
+      this.#drawingPath(id),
+      [200, 404],
+    )
+    if (response.status === 404) return undefined
+    // The ETag comes with the body, so the two always belong together.
+    const revision = revisionFromETag(response.headers.get('ETag'))
+    if (revision === undefined) {
+      throw new Error(`GET ${id} returned no usable ETag`)
+    }
+    return { doc: migrate(await response.json()), revision }
+  }
+
+  async getRevision(id: string): Promise<number | undefined> {
+    const response = await this.#request(
+      'HEAD',
+      this.#drawingPath(id),
+      [200, 404],
+    )
+    if (response.status === 404) return undefined
+    const revision = revisionFromETag(response.headers.get('ETag'))
+    if (revision === undefined) {
+      throw new Error(`HEAD ${id} returned no usable ETag`)
+    }
+    return revision
+  }
+
+  async save(
+    doc: YodoDocument,
+    { expectedRevision }: SaveOptions = {},
+  ): Promise<DrawingSummary> {
     // Serialized before the request, so a bad document never reaches the server.
     const body = toStrictJson(doc)
     const text = safeSearchText(doc)
@@ -158,12 +200,22 @@ export class HttpDrawingRepository implements DrawingRepository {
       'Content-Type': 'application/json',
     }
     if (fits) headers[SEARCH_TEXT_HEADER] = encoded
+    if (expectedRevision !== undefined) {
+      headers['If-Match'] = `"${expectedRevision}"`
+    }
     const response = await this.#request(
       'PUT',
       this.#drawingPath(doc.id),
-      [200],
+      [200, 412],
       { headers, body },
     )
+    if (response.status === 412) {
+      // No ETag: the drawing no longer exists (ADR 0062).
+      throw new RevisionConflictError(
+        doc.id,
+        revisionFromETag(response.headers.get('ETag')),
+      )
+    }
     const summary = (await response.json()) as DrawingSummary
     if (!fits) {
       // The document is saved; a failure here leaves the drawing unindexed
