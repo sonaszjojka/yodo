@@ -85,6 +85,9 @@ Shipped in usable milestones; the split into milestones and tasks is in `docs/ro
 - Version history: automatic snapshots + manually named versions; preview and restore (design already agreed)
 - Tablet / touch / stylus support
 - Installable PWA / offline, desktop app wrapper
+- Agents (MCP; planned as M5 in `docs/roadmap.md`): a local stdio MCP server (`npx -y yodo-mcp`) lets agents list, search, read, render, create and edit drawings, including auto-laid-out diagrams, against a self-hosted server or a folder of `.yodo` files, plus an open link for the hosted app ([ADR 0061](adr/0061-mcp-server-as-a-typescript-package-in-mcp.md))
+- MCP Apps view: an interactive Yodo canvas inside the agent's chat
+- MCP over Streamable HTTP for remote agents
 
 ## Never
 - Required account to draw
