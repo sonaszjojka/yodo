@@ -30,7 +30,7 @@ Ask once for the docs sync, the push and the PR together (step 1b), to save a ro
 ## 2. Push and open the PR
 - Push with `git push -u origin <branch>`.
 - Open the PR with `gh pr create`:
-  - **Title** = the future squash commit, in Conventional Commit format (e.g. `feat(web): add rectangle tool`). The required `conventional-title` check enforces it: types `feat fix refactor perf test docs build ci chore style`, scopes `web server e2e docs ci deps` (or none), lower-case subject. `feat`, `fix` and `!` decide the next version and appear in the changelog, so pick the type on purpose.
+  - **Title** = the future squash commit, in Conventional Commit format (e.g. `feat(web): add rectangle tool`). The required `conventional-title` check enforces it: types `feat fix refactor perf test docs build ci chore style`, scopes `web server e2e mcp docs ci deps` (or none), lower-case subject. `feat`, `fix` and `!` decide the next version and appear in the changelog, so pick the type on purpose.
   - **Body:** Summary (what + why), "Done when…" checklist with evidence, How to test, Screenshots for UI changes, `Closes #n`.
   - No AI attribution line in the body (owner's convention).
 
