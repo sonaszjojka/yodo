@@ -47,21 +47,42 @@ func (q *Queries) DeleteTrashedDrawingsBefore(ctx context.Context, cutoff sql.Nu
 }
 
 const getDrawingDocument = `-- name: GetDrawingDocument :one
-SELECT document
+SELECT document, revision
 FROM drawings
 WHERE id = ?
 `
 
-// GetDrawingDocument returns the stored document JSON.
-func (q *Queries) GetDrawingDocument(ctx context.Context, id string) (string, error) {
+type GetDrawingDocumentRow struct {
+	Document string
+	Revision int64
+}
+
+// GetDrawingDocument returns the stored document JSON and its revision, read
+// together so the ETag always describes the body (ADR 0062).
+func (q *Queries) GetDrawingDocument(ctx context.Context, id string) (GetDrawingDocumentRow, error) {
 	row := q.db.QueryRowContext(ctx, getDrawingDocument, id)
-	var document string
-	err := row.Scan(&document)
-	return document, err
+	var i GetDrawingDocumentRow
+	err := row.Scan(&i.Document, &i.Revision)
+	return i, err
+}
+
+const getDrawingRevision = `-- name: GetDrawingRevision :one
+SELECT revision
+FROM drawings
+WHERE id = ?
+`
+
+// GetDrawingRevision returns a drawing's revision without its document, for
+// HEAD and for the ETag of a 412 (ADR 0062).
+func (q *Queries) GetDrawingRevision(ctx context.Context, id string) (int64, error) {
+	row := q.db.QueryRowContext(ctx, getDrawingRevision, id)
+	var revision int64
+	err := row.Scan(&revision)
+	return revision, err
 }
 
 const listDrawings = `-- name: ListDrawings :many
-SELECT id, name, created_at, updated_at, folder_id, deleted_at
+SELECT id, name, created_at, updated_at, folder_id, deleted_at, revision
 FROM drawings
 WHERE deleted_at IS NULL
 `
@@ -73,6 +94,7 @@ type ListDrawingsRow struct {
 	UpdatedAt int64
 	FolderID  sql.NullString
 	DeletedAt sql.NullInt64
+	Revision  int64
 }
 
 // ListDrawings returns every live drawing's summary, without documents (ADR 0046).
@@ -92,6 +114,7 @@ func (q *Queries) ListDrawings(ctx context.Context) ([]ListDrawingsRow, error) {
 			&i.UpdatedAt,
 			&i.FolderID,
 			&i.DeletedAt,
+			&i.Revision,
 		); err != nil {
 			return nil, err
 		}
@@ -143,7 +166,7 @@ func (q *Queries) ListSearchIndex(ctx context.Context) ([]ListSearchIndexRow, er
 }
 
 const listTrashedDrawings = `-- name: ListTrashedDrawings :many
-SELECT id, name, created_at, updated_at, folder_id, deleted_at
+SELECT id, name, created_at, updated_at, folder_id, deleted_at, revision
 FROM drawings
 WHERE deleted_at IS NOT NULL
 `
@@ -155,6 +178,7 @@ type ListTrashedDrawingsRow struct {
 	UpdatedAt int64
 	FolderID  sql.NullString
 	DeletedAt sql.NullInt64
+	Revision  int64
 }
 
 // ListTrashedDrawings returns the summaries of the drawings in Trash.
@@ -174,6 +198,7 @@ func (q *Queries) ListTrashedDrawings(ctx context.Context) ([]ListTrashedDrawing
 			&i.UpdatedAt,
 			&i.FolderID,
 			&i.DeletedAt,
+			&i.Revision,
 		); err != nil {
 			return nil, err
 		}
@@ -192,7 +217,7 @@ const restoreDrawing = `-- name: RestoreDrawing :one
 UPDATE drawings
 SET deleted_at = NULL
 WHERE id = ?1
-RETURNING id, name, created_at, updated_at, folder_id, deleted_at
+RETURNING id, name, created_at, updated_at, folder_id, deleted_at, revision
 `
 
 type RestoreDrawingRow struct {
@@ -202,6 +227,7 @@ type RestoreDrawingRow struct {
 	UpdatedAt int64
 	FolderID  sql.NullString
 	DeletedAt sql.NullInt64
+	Revision  int64
 }
 
 // RestoreDrawing takes a drawing out of Trash; a live drawing is unchanged.
@@ -215,6 +241,7 @@ func (q *Queries) RestoreDrawing(ctx context.Context, id string) (RestoreDrawing
 		&i.UpdatedAt,
 		&i.FolderID,
 		&i.DeletedAt,
+		&i.Revision,
 	)
 	return i, err
 }
@@ -223,7 +250,7 @@ const setDrawingFolder = `-- name: SetDrawingFolder :one
 UPDATE drawings
 SET folder_id = ?1
 WHERE id = ?2
-RETURNING id, name, created_at, updated_at, folder_id, deleted_at
+RETURNING id, name, created_at, updated_at, folder_id, deleted_at, revision
 `
 
 type SetDrawingFolderParams struct {
@@ -238,6 +265,7 @@ type SetDrawingFolderRow struct {
 	UpdatedAt int64
 	FolderID  sql.NullString
 	DeletedAt sql.NullInt64
+	Revision  int64
 }
 
 // SetDrawingFolder moves a drawing into a folder, or out of any folder when
@@ -252,6 +280,7 @@ func (q *Queries) SetDrawingFolder(ctx context.Context, arg SetDrawingFolderPara
 		&i.UpdatedAt,
 		&i.FolderID,
 		&i.DeletedAt,
+		&i.Revision,
 	)
 	return i, err
 }
@@ -299,7 +328,7 @@ const trashDrawing = `-- name: TrashDrawing :one
 UPDATE drawings
 SET deleted_at = COALESCE(deleted_at, ?1)
 WHERE id = ?2
-RETURNING id, name, created_at, updated_at, folder_id, deleted_at
+RETURNING id, name, created_at, updated_at, folder_id, deleted_at, revision
 `
 
 type TrashDrawingParams struct {
@@ -314,6 +343,7 @@ type TrashDrawingRow struct {
 	UpdatedAt int64
 	FolderID  sql.NullString
 	DeletedAt sql.NullInt64
+	Revision  int64
 }
 
 // TrashDrawing moves a drawing to Trash. Like a move, it leaves updated_at
@@ -328,20 +358,82 @@ func (q *Queries) TrashDrawing(ctx context.Context, arg TrashDrawingParams) (Tra
 		&i.UpdatedAt,
 		&i.FolderID,
 		&i.DeletedAt,
+		&i.Revision,
+	)
+	return i, err
+}
+
+const updateDrawingIfRevision = `-- name: UpdateDrawingIfRevision :one
+UPDATE drawings
+SET name           = ?1,
+    schema_version = ?2,
+    document       = ?3,
+    updated_at     = ?4,
+    search_text    = ?5,
+    revision       = revision + 1
+WHERE id = ?6 AND revision = ?7
+RETURNING id, name, created_at, updated_at, folder_id, deleted_at, revision
+`
+
+type UpdateDrawingIfRevisionParams struct {
+	Name             string
+	SchemaVersion    int64
+	Document         string
+	Now              int64
+	SearchText       sql.NullString
+	ID               string
+	ExpectedRevision int64
+}
+
+type UpdateDrawingIfRevisionRow struct {
+	ID        string
+	Name      string
+	CreatedAt int64
+	UpdatedAt int64
+	FolderID  sql.NullString
+	DeletedAt sql.NullInt64
+	Revision  int64
+}
+
+// UpdateDrawingIfRevision replaces a drawing only if it is still at
+// @expected_revision: the check and the write are one statement, so two
+// conditional saves can never both succeed (ADR 0062). No row means a
+// conflict or a missing drawing. Like UpsertDrawing, it keeps created_at,
+// the folder and deleted_at.
+func (q *Queries) UpdateDrawingIfRevision(ctx context.Context, arg UpdateDrawingIfRevisionParams) (UpdateDrawingIfRevisionRow, error) {
+	row := q.db.QueryRowContext(ctx, updateDrawingIfRevision,
+		arg.Name,
+		arg.SchemaVersion,
+		arg.Document,
+		arg.Now,
+		arg.SearchText,
+		arg.ID,
+		arg.ExpectedRevision,
+	)
+	var i UpdateDrawingIfRevisionRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.FolderID,
+		&i.DeletedAt,
+		&i.Revision,
 	)
 	return i, err
 }
 
 const upsertDrawing = `-- name: UpsertDrawing :one
-INSERT INTO drawings (id, name, schema_version, document, created_at, updated_at, search_text)
-VALUES (?1, ?2, ?3, ?4, ?5, ?5, ?6)
+INSERT INTO drawings (id, name, schema_version, document, created_at, updated_at, search_text, revision)
+VALUES (?1, ?2, ?3, ?4, ?5, ?5, ?6, 1)
 ON CONFLICT (id) DO UPDATE SET
     name           = excluded.name,
     schema_version = excluded.schema_version,
     document       = excluded.document,
     updated_at     = excluded.updated_at,
-    search_text    = excluded.search_text
-RETURNING id, name, created_at, updated_at, folder_id, deleted_at
+    search_text    = excluded.search_text,
+    revision       = drawings.revision + 1
+RETURNING id, name, created_at, updated_at, folder_id, deleted_at, revision
 `
 
 type UpsertDrawingParams struct {
@@ -360,6 +452,7 @@ type UpsertDrawingRow struct {
 	UpdatedAt int64
 	FolderID  sql.NullString
 	DeletedAt sql.NullInt64
+	Revision  int64
 }
 
 // UpsertDrawing inserts or replaces a drawing in one statement, so created_at
@@ -367,6 +460,7 @@ type UpsertDrawingRow struct {
 // not in the update set: auto-save keeps a trashed drawing in Trash (ADR 0046).
 // search_text is replaced with the request's value, NULL when the client sent
 // none, so the index never describes an older document (ADR 0047).
+// revision starts at 1 and goes up by one on every replace (ADR 0062).
 func (q *Queries) UpsertDrawing(ctx context.Context, arg UpsertDrawingParams) (UpsertDrawingRow, error) {
 	row := q.db.QueryRowContext(ctx, upsertDrawing,
 		arg.ID,
@@ -384,6 +478,7 @@ func (q *Queries) UpsertDrawing(ctx context.Context, arg UpsertDrawingParams) (U
 		&i.UpdatedAt,
 		&i.FolderID,
 		&i.DeletedAt,
+		&i.Revision,
 	)
 	return i, err
 }

@@ -232,3 +232,53 @@ func TestOpenUpgradesADatabaseToSearchText(t *testing.T) {
 		t.Errorf("drawings after down = %d, %v; want 2", n, err)
 	}
 }
+
+// A database from before revisions (migrations 1-4) gives its drawings
+// revision 1, and the migration can be undone (ADR 0062).
+func TestOpenUpgradesADatabaseToRevisions(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "yodo.db")
+	ctx := context.Background()
+
+	old, err := sql.Open("sqlite", "file:"+filepath.ToSlash(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider, err := goose.NewProvider(goose.DialectSQLite3, old, migrations.FS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := provider.UpTo(ctx, 4); err != nil {
+		t.Fatalf("migrate to 4: %v", err)
+	}
+	if _, err := old.ExecContext(ctx,
+		"INSERT INTO drawings (id, name, schema_version, document, created_at, updated_at) VALUES ('a', 'A', 1, '{}', 10, 20), ('b', 'B', 1, '{}', 11, 21)"); err != nil {
+		t.Fatal(err)
+	}
+	if err := old.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	sqlDB, err := Open(ctx, path)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer func() { _ = sqlDB.Close() }()
+	var n int
+	if err := sqlDB.QueryRowContext(ctx, "SELECT count(*) FROM drawings WHERE revision = 1").Scan(&n); err != nil || n != 2 {
+		t.Fatalf("rows at revision 1 = %d, %v; want 2", n, err)
+	}
+
+	provider, err = goose.NewProvider(goose.DialectSQLite3, sqlDB, migrations.FS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := provider.DownTo(ctx, 4); err != nil {
+		t.Fatalf("migrate down to 4: %v", err)
+	}
+	if _, err := sqlDB.ExecContext(ctx, "SELECT revision FROM drawings"); err == nil {
+		t.Error("revision still exists after the down migration")
+	}
+	if err := sqlDB.QueryRowContext(ctx, "SELECT count(*) FROM drawings").Scan(&n); err != nil || n != 2 {
+		t.Errorf("drawings after down = %d, %v; want 2", n, err)
+	}
+}

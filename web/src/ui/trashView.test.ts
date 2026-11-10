@@ -13,6 +13,7 @@ const d = (id: string, deletedAt: number): DrawingSummary => ({
   name: id,
   createdAt: 0,
   updatedAt: 0,
+  revision: 1,
   deletedAt,
 })
 

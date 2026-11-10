@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { createDocument } from '../core/document/create.ts'
 import type { YodoDocument } from '../core/document/types.ts'
 import { createEditor, type Editor } from '../core/editor/editor.ts'
@@ -8,7 +8,11 @@ import {
   withFileIds,
   type AutoSaver,
 } from './autosave.ts'
-import { InMemoryDrawingRepository } from './memory.ts'
+import {
+  InMemoryDrawingRepository,
+  InMemoryFolderRepository,
+  MemoryData,
+} from './memory.ts'
 import type { DrawingRepository } from './repository.ts'
 
 const DELAY = 1000
@@ -40,6 +44,8 @@ function deferredRepository() {
     listTrash: async () => [],
     searchIndex: async () => [],
     get: async () => undefined,
+    getWithRevision: async () => undefined,
+    getRevision: async () => undefined,
     delete: async () => {},
     move: async () => undefined,
     trash: async () => undefined,
@@ -50,7 +56,13 @@ function deferredRepository() {
         saves.push({
           doc,
           resolve: () =>
-            resolve({ id: doc.id, name: doc.name, createdAt: 0, updatedAt: 0 }),
+            resolve({
+              id: doc.id,
+              name: doc.name,
+              createdAt: 0,
+              updatedAt: 0,
+              revision: 1,
+            }),
           reject,
         })
       }),
@@ -269,4 +281,173 @@ test('drops a fileId once its last image is removed', async () => {
 test('withFileIds returns the same document when the list is already right', () => {
   const doc = createDocument()
   expect(withFileIds(doc)).toBe(doc)
+})
+
+describe('revisions and conflicts (ADR 0062)', () => {
+  /** The editor's drawing, stored at revision 1 by "this tab". */
+  async function stored() {
+    const doc = editor.store.getState().document
+    await repository.save(doc)
+    return doc
+  }
+
+  /** Another tab or agent saves the drawing: it moves to revision 2. */
+  async function savedElsewhere(doc: YodoDocument) {
+    await repository.save({ ...doc, name: 'Theirs' })
+  }
+
+  function setUpAt(revision: number, repo: DrawingRepository = repository) {
+    saver = createAutoSaver(editor.store, repo, { delay: DELAY, revision })
+    stop = saver.start()
+  }
+
+  function copies() {
+    return repository
+      .list()
+      .then((all) => all.filter((s) => s.name.endsWith('(conflicted copy)')))
+  }
+
+  test('each save expects the last revision and advances it', async () => {
+    const doc = await stored()
+    const save = vi.spyOn(repository, 'save')
+    setUpAt(1)
+
+    change('a')
+    await vi.advanceTimersByTimeAsync(DELAY)
+    change('b')
+    await vi.advanceTimersByTimeAsync(DELAY)
+
+    expect(save.mock.calls.map(([, options]) => options)).toEqual([
+      { expectedRevision: 1 },
+      { expectedRevision: 2 },
+    ])
+    expect(saver.revision()).toBe(3)
+    expect(await repository.getRevision(doc.id)).toBe(3)
+  })
+
+  test('a conflict saves the local version as a copy and leaves theirs', async () => {
+    const doc = await stored()
+    setUpAt(1)
+    await savedElsewhere(doc)
+
+    change('Mine')
+    await vi.advanceTimersByTimeAsync(DELAY)
+
+    expect((await repository.get(doc.id))?.name).toBe('Theirs')
+    const [copy] = await copies()
+    expect(copy?.name).toBe('Mine (conflicted copy)')
+    expect(saver.conflict()).toEqual({ copyId: copy!.id, saved: true })
+    expect(saver.status.getState()).toBe('saved')
+    const saved = await repository.get(copy!.id)
+    expect(saved?.elements).toEqual(editor.store.getState().document.elements)
+  })
+
+  test('after a conflict every later save goes to the same copy', async () => {
+    const doc = await stored()
+    setUpAt(1)
+    await savedElsewhere(doc)
+    change('Mine')
+    await vi.advanceTimersByTimeAsync(DELAY)
+
+    change('Mine later')
+    expect(await finalSave(saver)).toBe(true)
+
+    const all = await copies()
+    expect(all.map((s) => s.name)).toEqual(['Mine later (conflicted copy)'])
+    expect((await repository.get(doc.id))?.name).toBe('Theirs')
+    expect(saver.conflict()).toMatchObject({ saved: true })
+  })
+
+  test('the copy goes into the original drawing’s folder', async () => {
+    const data = new MemoryData()
+    repository = new InMemoryDrawingRepository({ data })
+    const folders = new InMemoryFolderRepository({ data })
+    const doc = await stored()
+    await folders.save({
+      id: 'f',
+      name: 'Work',
+      icon: 'folder',
+      color: 'graphite',
+    })
+    await repository.move(doc.id, 'f')
+    setUpAt(1)
+    await savedElsewhere(doc)
+
+    change('Mine')
+    await vi.advanceTimersByTimeAsync(DELAY)
+
+    expect((await copies())[0]?.folderId).toBe('f')
+  })
+
+  test('an edit made while the copy is being saved ends up in the copy', async () => {
+    const doc = await stored()
+    // Copy saves wait until the test releases them.
+    const release: (() => void)[] = []
+    const realSave = repository.save.bind(repository)
+    vi.spyOn(repository, 'save').mockImplementation((d, options) =>
+      d.id === doc.id
+        ? realSave(d, options)
+        : new Promise((resolve) => release.push(() => resolve(realSave(d)))),
+    )
+    setUpAt(1)
+    await savedElsewhere(doc)
+
+    change('Mine')
+    await vi.advanceTimersByTimeAsync(DELAY)
+    expect(release).toHaveLength(1)
+    change('Mine, edited during the copy')
+    release.shift()!()
+    await vi.advanceTimersByTimeAsync(0)
+    await vi.advanceTimersByTimeAsync(DELAY)
+    release.shift()?.()
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect((await copies()).map((s) => s.name)).toEqual([
+      'Mine, edited during the copy (conflicted copy)',
+    ])
+    expect(saver.isDirty()).toBe(false)
+  })
+
+  test('a failed copy save is an error that retries into the same copy', async () => {
+    const doc = await stored()
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    let failCopies = true
+    const realSave = repository.save.bind(repository)
+    vi.spyOn(repository, 'save').mockImplementation((d, options) =>
+      d.id !== doc.id && failCopies
+        ? Promise.reject(new Error('quota'))
+        : realSave(d, options),
+    )
+    setUpAt(1)
+    await savedElsewhere(doc)
+
+    change('Mine')
+    await vi.advanceTimersByTimeAsync(DELAY)
+    expect(saver.status.getState()).toBe('error')
+    expect(saver.conflict()?.saved).toBe(false)
+    const copyId = saver.conflict()!.copyId
+    // Closing now would lose the local version, so finalSave says so.
+    expect(await finalSave(saver)).toBe(false)
+
+    failCopies = false
+    change('Mine again')
+    expect(await finalSave(saver)).toBe(true)
+    expect(saver.conflict()).toEqual({ copyId, saved: true })
+    expect((await copies()).map((s) => s.id)).toEqual([copyId])
+    error.mockRestore()
+  })
+
+  test('a drawing deleted elsewhere is kept as a copy too', async () => {
+    const doc = await stored()
+    setUpAt(1)
+    await repository.delete(doc.id)
+
+    change('Mine')
+    await vi.advanceTimersByTimeAsync(DELAY)
+
+    expect((await copies()).map((s) => s.name)).toEqual([
+      'Mine (conflicted copy)',
+    ])
+    expect(await repository.get(doc.id)).toBeUndefined()
+  })
 })

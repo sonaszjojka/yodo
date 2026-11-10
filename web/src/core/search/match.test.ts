@@ -3,7 +3,7 @@ import type { DrawingSummary } from '../../storage/repository.ts'
 import { searchDrawings, type SearchIndexEntry } from './match.ts'
 
 function summary(id: string, name: string): DrawingSummary {
-  return { id, name, createdAt: 1, updatedAt: 1 }
+  return { id, name, createdAt: 1, updatedAt: 1, revision: 1 }
 }
 
 const plan = summary('1', 'Budget plan')

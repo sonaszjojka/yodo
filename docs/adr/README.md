@@ -72,3 +72,4 @@ Why Yodo is built the way it is. See [0001](0001-record-architecture-decisions.m
 | [0059](0059-developer-certificate-of-origin-instead-of-a-cla.md) | Require a DCO sign-off instead of a CLA | Accepted |
 | [0060](0060-sign-release-images-and-attach-provenance.md) | Sign release images with cosign (keyless); attach provenance and an SBOM; run OpenSSF Scorecard | Accepted |
 | [0061](0061-mcp-server-as-a-typescript-package-in-mcp.md) | MCP server as a TypeScript package in `mcp/`: stdio, SDK v2, relative imports of core/storage, Vite bundle, npm `yodo-mcp` | Accepted |
+| [0062](0062-revision-counter-and-if-match-for-safe-concurrent-saves.md) | Safe concurrent saves: an integer `revision` per drawing, `If-Match` on `PUT` with `412` on a mismatch, conflicted copies in the editor; extends 0030 | Accepted |

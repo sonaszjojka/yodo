@@ -13,6 +13,7 @@ const d = (id: string, folderId?: string): DrawingSummary => ({
   name: id,
   createdAt: 1,
   updatedAt: 1,
+  revision: 1,
   ...(folderId === undefined ? {} : { folderId }),
 })
 const drawings = [d('a', 'f1'), d('b'), d('c', 'f1'), d('d', 'f2')]

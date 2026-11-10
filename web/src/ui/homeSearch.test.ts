@@ -3,7 +3,14 @@ import type { DrawingSummary } from '../storage/repository.ts'
 import { isSearching, needsIndex, searchView } from './homeSearch.ts'
 
 function summary(id: string, name: string, folderId?: string): DrawingSummary {
-  return { id, name, createdAt: 1, updatedAt: 1, ...(folderId && { folderId }) }
+  return {
+    id,
+    name,
+    createdAt: 1,
+    updatedAt: 1,
+    revision: 1,
+    ...(folderId && { folderId }),
+  }
 }
 
 const drawings = [

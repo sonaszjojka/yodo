@@ -10,6 +10,7 @@ import {
   toStrictJson,
 } from './http.ts'
 import { HttpFolderRepository } from './httpFolders.ts'
+import { RevisionConflictError } from './repository.ts'
 
 // The behaviour shared with other repositories is proven against the real
 // server by `http.server-test.ts`; these tests cover the HTTP mapping alone.
@@ -117,6 +118,81 @@ function docWithText(...texts: string[]) {
     elements: texts.map((text) => ({ ...createText([0, 0]), text })),
   }
 }
+
+describe('HttpDrawingRepository revisions (ADR 0062)', () => {
+  const summary = {
+    id: 'a',
+    name: 'A',
+    createdAt: 1,
+    updatedAt: 2,
+    revision: 4,
+  }
+
+  test('save sends If-Match only with an expected revision', async () => {
+    const { fetch, repo } = repoReplying(() => Response.json(summary))
+    const doc = createDocument()
+    await repo.save(doc)
+    await repo.save(doc, { expectedRevision: 3 })
+    const headers = fetch.mock.calls.map(([, init]) =>
+      new Headers(init?.headers).get('If-Match'),
+    )
+    expect(headers).toEqual([null, '"3"'])
+  })
+
+  test('a 412 rejects with the revision from the ETag', async () => {
+    const { repo } = repoReplying(
+      () => new Response('newer', { status: 412, headers: { ETag: '"7"' } }),
+    )
+    const error = await repo
+      .save(createDocument(), { expectedRevision: 3 })
+      .catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(RevisionConflictError)
+    expect((error as RevisionConflictError).currentRevision).toBe(7)
+  })
+
+  test('a 412 without an ETag means the drawing is gone', async () => {
+    const { repo } = repoReplying(() => new Response('', { status: 412 }))
+    const error = await repo
+      .save(createDocument(), { expectedRevision: 3 })
+      .catch((e: unknown) => e)
+    expect((error as RevisionConflictError).currentRevision).toBeUndefined()
+  })
+
+  test('getWithRevision reads the ETag of the GET', async () => {
+    const doc = createDocument()
+    const { repo } = repoReplying(
+      () => new Response(JSON.stringify(doc), { headers: { ETag: '"5"' } }),
+    )
+    expect(await repo.getWithRevision(doc.id)).toEqual({ doc, revision: 5 })
+  })
+
+  test('getWithRevision fails on a missing or odd ETag rather than guessing', async () => {
+    const doc = createDocument()
+    for (const headers of [[], [['ETag', 'W/"5"']], [['ETag', '"x"']]] as [
+      string,
+      string,
+    ][][]) {
+      const { repo } = repoReplying(
+        () => new Response(JSON.stringify(doc), { headers }),
+      )
+      await expect(repo.getWithRevision(doc.id)).rejects.toThrow(/ETag/)
+    }
+  })
+
+  test('getRevision uses HEAD, and a 404 is undefined', async () => {
+    const { fetch, repo } = repoReplying(
+      () => new Response(null, { headers: { ETag: '"9"' } }),
+    )
+    expect(await repo.getRevision('a')).toBe(9)
+    expect(request(fetch)).toMatchObject({
+      url: 'https://example.test/yodo/api/drawings/a',
+      method: 'HEAD',
+    })
+    const missing = repoReplying(() => new Response(null, { status: 404 }))
+    expect(await missing.repo.getRevision('a')).toBeUndefined()
+    expect(await missing.repo.getWithRevision('a')).toBeUndefined()
+  })
+})
 
 describe('HttpDrawingRepository search (ADR 0047)', () => {
   test('save sends the canvas text percent-encoded in a header', async () => {
