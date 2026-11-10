@@ -5,8 +5,19 @@
 import { Client } from '@modelcontextprotocol/client'
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
+
+// The bundle carries third-party code, so its licenses ship beside it (ADR
+// 0061); `files: ["dist"]` publishes both.
+const licenses = readFileSync(
+  new URL('../dist/THIRD_PARTY_LICENSES.md', import.meta.url),
+  'utf8',
+)
+for (const name of ['@modelcontextprotocol/server', 'zod']) {
+  assert.ok(licenses.includes(name), `THIRD_PARTY_LICENSES.md lacks ${name}`)
+}
 
 const TOKEN = 'smoke-test-token-0123456789abcdef'
 const SUMMARY = {

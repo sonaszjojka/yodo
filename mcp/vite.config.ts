@@ -10,6 +10,9 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     minify: false,
+    // The bundle carries third-party code (the SDK, zod, …), so their licenses
+    // ship beside it (ADR 0061, Consequences).
+    license: { fileName: 'THIRD_PARTY_LICENSES.md' },
     rolldownOptions: {
       output: {
         format: 'es',
