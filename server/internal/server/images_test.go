@@ -28,7 +28,7 @@ func pngBytes(t *testing.T) ([]byte, string) {
 func newImagesHandler(t *testing.T) (http.Handler, string) {
 	t.Helper()
 	dir := filepath.Join(t.TempDir(), "images")
-	return newHandler(builtFS, mustParse(t, "http://example.com"), nil, dir, nil, nil), dir
+	return newHandler(builtFS, mustParse(t, "http://example.com"), nil, dir, nil, APIToken{}, nil), dir
 }
 
 func doImage(h http.Handler, method, path string, body []byte) *httptest.ResponseRecorder {

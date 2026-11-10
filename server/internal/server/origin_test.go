@@ -108,7 +108,7 @@ func TestRequireAllowedOrigin(t *testing.T) {
 				req.Header.Set("Origin", tt.origin)
 			}
 			rec := httptest.NewRecorder()
-			requireAllowedOrigin(mustParse(t, tt.allowed), next).ServeHTTP(rec, req)
+			requireAllowedOrigin(mustParse(t, tt.allowed), APIToken{}, next).ServeHTTP(rec, req)
 
 			if rec.Code != tt.want {
 				t.Fatalf("status = %d, want %d", rec.Code, tt.want)
@@ -131,7 +131,7 @@ func TestParseAllowedOriginsDefaultsAreFresh(t *testing.T) {
 func TestZeroAllowedOriginsBlocksEverything(t *testing.T) {
 	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	rec := httptest.NewRecorder()
-	requireAllowedOrigin(AllowedOrigins{}, next).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	requireAllowedOrigin(AllowedOrigins{}, APIToken{}, next).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
 	if rec.Code != http.StatusForbidden {
 		t.Errorf("status = %d, want %d", rec.Code, http.StatusForbidden)
 	}

@@ -64,3 +64,32 @@ func TestRunAcceptsPassword(t *testing.T) {
 		t.Fatalf("run: %v", err)
 	}
 }
+
+// A weak or malformed YODO_API_TOKEN must stop startup, and the error must
+// not echo the value (ADR 0063).
+func TestRunRejectsBadAPIToken(t *testing.T) {
+	const value = "too-short-token"
+	env := map[string]string{"YODO_ADDR": "127.0.0.1:0", "YODO_DATA_DIR": t.TempDir(), "YODO_API_TOKEN": value}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := run(ctx, func(k string) string { return env[k] })
+	if err == nil || !strings.Contains(err.Error(), "YODO_API_TOKEN") {
+		t.Fatalf("err = %v, want a YODO_API_TOKEN error", err)
+	}
+	if strings.Contains(err.Error(), value) {
+		t.Errorf("error %q leaks the token value", err)
+	}
+}
+
+func TestRunAcceptsAPIToken(t *testing.T) {
+	env := map[string]string{
+		"YODO_ADDR":      "127.0.0.1:0",
+		"YODO_DATA_DIR":  filepath.Join(t.TempDir(), "data"),
+		"YODO_API_TOKEN": "0123456789abcdef0123456789abcdef",
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := run(ctx, func(k string) string { return env[k] }); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+}
