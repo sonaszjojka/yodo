@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Yodo is a local-first, Excalidraw-like drawing app. It's a monorepo (ADR 0012): `web/` (React + Vite + TS), `server/` (Go), `e2e/` (Playwright), `docs/`. The project is early: `docs/roadmap.md` lists what exists and what's next, and `docs/plan.md` has the current status.
+Yodo is a local-first, Excalidraw-like drawing app. It's a monorepo (ADR 0012): `web/` (React + Vite + TS), `server/` (Go), `e2e/` (Playwright), `mcp/` (MCP server for agents, ADR 0061), `docs/`. The project is early: `docs/roadmap.md` lists what exists and what's next, and `docs/plan.md` has the current status.
 
 ## Commands
 Node 26 (`web/.nvmrc`, `nvm use`), Go 1.27. golangci-lint 2.15 is a separate binary (`brew install golangci-lint`), and sqlc is pinned in `server/go.mod` and runs via `go tool` (ADR 0017).
@@ -34,6 +34,16 @@ Node 26 (`web/.nvmrc`, `nvm use`), Go 1.27. golangci-lint 2.15 is a separate bin
 | Performance benchmark | `npm run perf` (on demand, headed system Chrome; `PERF_RECORD=1` appends to `docs/perf/results.jsonl`; ADR 0042, `docs/perf/README.md`) |
 | Export visual baselines | `npm run test:visual` · update after a deliberate rendering change: `npm run test:visual:update`, then review the image diff (needs Docker; runs in the pinned Playwright image, same as CI's `visual` job; ADR 0044) |
 
+**mcp/** (run from `mcp/`; needs `npm ci` in `web/` too, ADR 0061)
+| Task | Command |
+|---|---|
+| Tests | `npm test` (Vitest) · one file: `npx vitest run src/path/file.test.ts` |
+| Lint | `npm run lint` (oxlint, with the import-boundary rule) |
+| Format | `npm run format` · check: `npm run format:check` |
+| Type-check | `npm run typecheck` |
+| Bundle | `npm run build` (one file, `dist/index.js`) · then `npm run smoke` (spawns it over stdio against a stub API) |
+| Run | `YODO_URL=http://127.0.0.1:8080 YODO_API_TOKEN=… node dist/index.js` (stdio; try it with `npx @modelcontextprotocol/inspector`) |
+
 **Docker image** (run from the repo root): `docker build -t yodo .`, then `docker run -p 127.0.0.1:8080:8080 -v yodo-data:/data yodo`. The build copies `web/dist` into `server/internal/webui/dist/` for `go:embed` (ADR 0019).
 
 Before calling a task done, run the test, lint, format-check and type-check commands for every part that changed (definition of done, `docs/conventions.md`).
@@ -51,6 +61,7 @@ Before calling a task done, run the test, lint, format-check and type-check comm
 - **Server.** Stdlib `net/http` (ADR 0009); SQLite via the pure-Go modernc driver, sqlc-generated queries from `queries/`, and goose migrations in `migrations/` embedded and applied at startup (ADR 0010). The drawings API under `/api/drawings` mirrors `DrawingRepository` (ADR 0030); `/api/images/{hash}` stores image files under `<YODO_DATA_DIR>/images` (ADR 0040). Auth: none in hosted mode; localhost-only plus optional `YODO_PASSWORD` when self-hosted, and every request passes Host/Origin checks against `YODO_ALLOWED_ORIGINS` (ADR 0020). An optional `YODO_API_TOKEN` bearer lets non-browser clients in without `Origin` or a login; `Host` and a present `Origin` are still checked (ADR 0063, `internal/server/token.go`).
 - **Text** is either a free `text` element or a shape's `label` (ADR 0026), edited in a textarea over the canvas (ADR 0027). The text tool only makes free text; a label is edited by double-click or Enter on the selected shape (ADR 0051). Layout is a pure core function with an injected `measure`; fonts are Fontsource packages (ADR 0025).
 - **Export.** PNG export draws the scene again with `renderScene` on an offscreen canvas at the chosen scale and theme (ADR 0041); the pure parts are in `web/src/core/export/`. SVG export is a second, pure path in `web/src/core/export/svg/`: it builds an SVG from the rough.js generator with the same seeds and options, and embeds the fonts it uses (ADR 0043).
+- **MCP server** (`mcp/`, ADR 0061): a stdio server on the v2 SDK, bundled by Vite into one file. It reuses `web/src/core` and `web/src/storage` by relative import, and an oxlint rule keeps it to those (no `ui/`, no `indexeddb.ts`), so shared modules must run in Node. Read-only tools `list_drawings`, `search_drawings` and `get_drawing` return compact text (ids and drawn bounds) over `HttpDrawingRepository`, with `YODO_URL` and the `YODO_API_TOKEN` bearer (ADR 0063). Tests use `createMcpHandler` for the 2026-07-28 protocol and `InMemoryTransport` for a 2025-era client.
 - **Colours** are stored as light-theme values and adapted when rendering in dark mode (ADR 0015).
 - **CI and releases.** `.github/workflows/ci.yml` runs the same commands as above, filtered by path, and publishes the Docker image: `edge` from `main`, and `X.Y.Z`, `X.Y` plus `latest` on a `vX.Y.Z` tag (ADR 0049). The hosted app deploys to Pages from that tag too, not on merge to `main` (ADR 0057). release-please keeps a release PR open from Conventional Commits; merging it creates the tag and `CHANGELOG.md` entry (ADR 0058), and release images are signed with cosign (ADR 0060). Other workflows: `pr-title` (Conventional Commit PR titles), `codeql`, `scorecard`, `stale`; Dependabot updates dependencies weekly. Required checks on `main`: `ci`, `conventional-title`, `analyze (go)` and `analyze (javascript-typescript)`. A new job in `ci.yml` must be added to the `ci` job's `needs`; a check from another workflow must be added to the ruleset "Protect main" instead. Actions are pinned by commit SHA (ADR 0018).
 - **Tests** follow the pyramid in ADR 0011: Vitest for core and UI, `httptest` against a real temp SQLite file for Go, and a few Playwright e2e and visual tests.

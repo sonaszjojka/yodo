@@ -58,7 +58,7 @@ Replace `X.Y.Z` with a release that came after this was added; `1.0.0` and `edge
 
 ## Develop
 
-The monorepo has `web/` (React + Vite + TypeScript) and `server/` (Go). Commands and architecture are in [`CLAUDE.md`](CLAUDE.md), decisions in [`docs/adr/`](docs/adr/README.md) and working conventions in [`docs/conventions.md`](docs/conventions.md).
+The monorepo has `web/` (React + Vite + TypeScript), `server/` (Go), `e2e/` (Playwright) and `mcp/` (the MCP server for agents). Commands and architecture are in [`CLAUDE.md`](CLAUDE.md), decisions in [`docs/adr/`](docs/adr/README.md) and working conventions in [`docs/conventions.md`](docs/conventions.md).
 
 Build the image locally with `docker build -t yodo .`. A plain `go build` in `server/` serves "frontend not built" until `web/dist` is copied into `server/internal/webui/dist/` ([ADR 0019](docs/adr/0019-docker-image-build-and-publishing.md)).
 
