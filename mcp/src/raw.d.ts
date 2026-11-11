@@ -5,3 +5,10 @@ declare module '*?raw' {
   const text: string
   export default text
 }
+
+// `?inline` asset imports: the file as a base64 `data:` URL, bundled into
+// `dist/index.js` (the fonts, ADR 0065).
+declare module '*?inline' {
+  const dataUrl: string
+  export default dataUrl
+}

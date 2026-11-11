@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   createDocument,
+  createImage,
   createShape,
 } from '../../web/src/core/document/create.ts'
 import type {
@@ -11,6 +12,7 @@ import { drawnBounds } from '../../web/src/core/geometry/curve.ts'
 import type { DrawingSummary } from '../../web/src/storage/repository.ts'
 import {
   formatDrawing,
+  formatRender,
   formatSearch,
   formatSummaries,
   MAX_ELEMENTS,
@@ -281,6 +283,56 @@ describe('formatSearch', () => {
   it('says when nothing matches', () => {
     expect(formatSearch({ names: [], text: [] }, 'zzz')).toBe(
       'No drawings match "zzz".',
+    )
+  })
+})
+
+describe('formatRender', () => {
+  const doc = { ...createDocument('Plan'), id: 'd1' }
+  const box = createShape('rectangle', { x: 0, y: 0, width: 10, height: 10 }, 1)
+
+  it('maps PNG pixels to drawing coordinates', () => {
+    expect(
+      formatRender({
+        doc,
+        revision: 3,
+        format: 'png',
+        theme: 'light',
+        elements: [box],
+        frame: { x: -16, y: 20, width: 300, height: 150 },
+        scale: 2,
+      }),
+    ).toBe(
+      [
+        'Rendered "Plan" (id d1, rev 3) as PNG, light: 1 elements',
+        'frame -16,20 300x150 in drawing units',
+        'scale 2: 600x300 px; pixel (px,py) is drawing point (-16 + px/2, 20 + py/2)',
+      ].join('\n'),
+    )
+  })
+
+  it('has no scale line for an SVG, and names image placeholders', () => {
+    const image = createImage(
+      'f1',
+      { width: 40, height: 40 },
+      {
+        x: 0,
+        y: 0,
+        width: 400,
+        height: 400,
+      },
+    )
+    const text = formatRender({
+      doc,
+      revision: 1,
+      format: 'svg',
+      theme: 'dark',
+      elements: [box, image],
+      frame: { x: 0, y: 0, width: 50, height: 50 },
+    })
+    expect(text).not.toContain('scale')
+    expect(text.split('\n').at(-1)).toBe(
+      "1 image elements are drawn as grey placeholders: render_drawing can't load image files yet.",
     )
   })
 })

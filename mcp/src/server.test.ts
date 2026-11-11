@@ -130,12 +130,13 @@ function failing(error: unknown): DrawingRepository {
 
 describe.each(backends)('tools %s', (_name, make) => {
   describe('tools/list', () => {
-    it('offers exactly the three read-only tools, plus the instructions', async () => {
+    it('offers exactly the four read-only tools, plus the instructions', async () => {
       const client = await connect(await seeded(make))
       const { tools } = await client.listTools()
       expect(tools.map((t) => t.name).sort()).toEqual([
         'get_drawing',
         'list_drawings',
+        'render_drawing',
         'search_drawings',
       ])
       for (const tool of tools) {
@@ -270,6 +271,83 @@ describe.each(backends)('tools %s', (_name, make) => {
       expect(textOf(result)).toBe(
         'No drawing with id "nope". Call list_drawings or search_drawings for ids.',
       )
+    })
+  })
+
+  describe('render_drawing', () => {
+    type Block = {
+      type: string
+      text?: string
+      data?: string
+      mimeType?: string
+    }
+
+    async function render(args: Record<string, unknown>) {
+      const client = await connect(await seeded(make))
+      const result = await client.callTool({
+        name: 'render_drawing',
+        arguments: { id: 'd-login', ...args },
+      })
+      return { result, blocks: result.content as Block[] }
+    }
+
+    it('returns the whole drawing as a PNG image, with its frame', async () => {
+      const { result, blocks } = await render({})
+      expect(result.isError).not.toBe(true)
+      expect(blocks.map((b) => b.type)).toEqual(['text', 'image'])
+      expect(blocks[0]!.text).toContain('frame -6,4 132x82')
+      expect(blocks[0]!.text).toContain('scale 1')
+      expect(blocks[1]!.mimeType).toBe('image/png')
+      const png = Buffer.from(blocks[1]!.data!, 'base64')
+      expect(png.subarray(1, 4).toString('latin1')).toBe('PNG')
+    })
+
+    it('returns an SVG in the dark theme', async () => {
+      const { blocks } = await render({ format: 'svg', theme: 'dark' })
+      expect(blocks[1]!.mimeType).toBe('image/svg+xml')
+      const svg = Buffer.from(blocks[1]!.data!, 'base64').toString('utf8')
+      expect(svg).toContain('<svg')
+      expect(svg).toMatch(/>Password<.*>reset</s)
+    })
+
+    it('renders chosen ids or a region', async () => {
+      const byIds = await render({ ids: ['d-login-box'] })
+      expect(byIds.result.isError).not.toBe(true)
+      expect(byIds.blocks[0]!.text).toContain('1 elements')
+      const byRegion = await render({
+        region: { x: 0, y: 0, width: 40, height: 30 },
+      })
+      expect(byRegion.result.isError).not.toBe(true)
+      expect(byRegion.blocks[0]!.text).toContain('frame 0,0 40x30')
+    })
+
+    it('rejects ids and a region together', async () => {
+      const { result, blocks } = await render({
+        ids: ['d-login-box'],
+        region: { x: 0, y: 0, width: 40, height: 30 },
+      })
+      expect(result.isError).toBe(true)
+      expect(blocks[0]!.text).toContain('either ids or region')
+    })
+
+    it('names an unknown element id', async () => {
+      const { result, blocks } = await render({ ids: ['nope'] })
+      expect(result.isError).toBe(true)
+      expect(blocks[0]!.text).toContain('"nope"')
+    })
+
+    it('says how to find ids when the drawing is missing', async () => {
+      const { result, blocks } = await render({ id: 'nope' })
+      expect(result.isError).toBe(true)
+      expect(blocks[0]!.text).toBe(
+        'No drawing with id "nope". Call list_drawings or search_drawings for ids.',
+      )
+    })
+
+    it('refuses an empty drawing', async () => {
+      const { result, blocks } = await render({ id: 'd-empty' })
+      expect(result.isError).toBe(true)
+      expect(blocks[0]!.text).toContain('no elements')
     })
   })
 })

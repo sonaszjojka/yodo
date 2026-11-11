@@ -156,3 +156,47 @@ export function formatDrawing(
   }
   return lines.join('\n')
 }
+
+export interface RenderSummary {
+  doc: YodoDocument
+  revision: number
+  format: 'png' | 'svg'
+  theme: 'light' | 'dark'
+  elements: readonly YodoElement[]
+  frame: Bounds
+  /** PNG only: pixels per drawing unit. */
+  scale?: number
+}
+
+/**
+ * The text beside a rendered image: what it shows and how its pixels map to
+ * drawing coordinates, so the agent can place things by what it sees.
+ */
+export function formatRender({
+  doc,
+  revision,
+  format,
+  theme,
+  elements,
+  frame,
+  scale,
+}: RenderSummary): string {
+  const lines = [
+    `Rendered ${quote(doc.name)} (id ${doc.id}, rev ${revision}) as ${format.toUpperCase()}, ${theme}: ${elements.length} elements`,
+    `frame ${box(frame)} in drawing units`,
+  ]
+  if (scale !== undefined) {
+    const s = Math.round(scale * 1000) / 1000
+    lines.push(
+      `scale ${s}: ${Math.ceil(frame.width * scale)}x${Math.ceil(frame.height * scale)} px; ` +
+        `pixel (px,py) is drawing point (${Math.round(frame.x)} + px/${s}, ${Math.round(frame.y)} + py/${s})`,
+    )
+  }
+  const images = elements.filter((element) => element.type === 'image').length
+  if (images > 0) {
+    lines.push(
+      `${images} image elements are drawn as grey placeholders: render_drawing can't load image files yet.`,
+    )
+  }
+  return lines.join('\n')
+}

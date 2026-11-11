@@ -83,6 +83,7 @@ try {
       assert.deepEqual(tools.map((t) => t.name).sort(), [
         'get_drawing',
         'list_drawings',
+        'render_drawing',
         'search_drawings',
       ])
       const text = textOf(
@@ -92,7 +93,7 @@ try {
     },
   )
   console.log(
-    'smoke: ok (3 tools; list_drawings reached the API with the token)',
+    'smoke: ok (4 tools; list_drawings reached the API with the token)',
   )
 } finally {
   api.close()
@@ -121,8 +122,21 @@ try {
       }),
     )
     assert.match(outline, /8 elements/)
+    // The native canvas loads outside the bundle, with the bundled fonts
+    // (ADR 0065).
+    const render = await client.callTool({
+      name: 'render_drawing',
+      arguments: { id: EXPORT_ID, theme: 'dark' },
+    })
+    assert.match(textOf(render), /as PNG, dark: 8 elements/)
+    const image = (render.content as { type: string; data?: string }[])[1]
+    assert.equal(image?.type, 'image')
+    const png = Buffer.from(image.data ?? '', 'base64')
+    assert.equal(png.subarray(1, 4).toString('latin1'), 'PNG')
   })
-  console.log('smoke: ok (list_drawings and get_drawing read YODO_MCP_DIR)')
+  console.log(
+    'smoke: ok (list_drawings, get_drawing and render_drawing read YODO_MCP_DIR)',
+  )
 } finally {
   rmSync(dir, { recursive: true, force: true })
 }

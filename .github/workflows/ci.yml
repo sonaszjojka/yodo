@@ -63,6 +63,9 @@ jobs:
               - 'web/src/storage/**'
               - 'web/package.json'
               - 'web/package-lock.json'
+              # render_drawing is compared with the export baselines (ADR 0065).
+              - 'e2e/visual/scenes.ts'
+              - 'e2e/visual/__screenshots__/**'
               - '.github/workflows/**'
 
   web:

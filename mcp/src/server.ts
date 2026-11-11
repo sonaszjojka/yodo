@@ -9,14 +9,25 @@ import { HttpError } from '../../web/src/storage/http.ts'
 import type { DrawingRepository } from '../../web/src/storage/repository.ts'
 import {
   formatDrawing,
+  formatRender,
   formatSearch,
   formatSummaries,
   MAX_ELEMENTS,
 } from './format.ts'
+import {
+  fitScale,
+  MAX_RENDER_SIDE,
+  renderPng,
+  renderSvg,
+  selectForRender,
+  type RenderTarget,
+} from './render/render.ts'
+import { nodeMeasure } from './render/measure.ts'
 import pkg from '../package.json' with { type: 'json' }
 
 export const INSTRUCTIONS = `Yodo is a whiteboard app. These tools read the user's drawings.
-Call list_drawings or search_drawings to find a drawing's id, then get_drawing for its outline.
+Call list_drawings or search_drawings to find a drawing's id, then get_drawing for its outline,
+or render_drawing to see it as an image.
 Coordinates are world units: x grows to the right and y grows downward.`
 
 /** Tells the agent that a tool only reads, so a client can skip confirmations. */
@@ -27,6 +38,17 @@ interface TextResult {
   content: { type: 'text'; text: string }[]
   isError?: boolean
 }
+
+/** render_drawing's result: its text, then the image (MCP image content). */
+interface ImageResult {
+  [key: string]: unknown
+  content: [
+    { type: 'text'; text: string },
+    { type: 'image'; data: string; mimeType: 'image/png' | 'image/svg+xml' },
+  ]
+}
+
+type ToolResult = TextResult | ImageResult
 
 function text(body: string): TextResult {
   return { content: [{ type: 'text', text: body }] }
@@ -99,7 +121,7 @@ export function createServer(
     { instructions: INSTRUCTIONS },
   )
 
-  async function run(body: () => Promise<TextResult>): Promise<TextResult> {
+  async function run(body: () => Promise<ToolResult>): Promise<ToolResult> {
     try {
       return await body()
     } catch (error) {
@@ -187,6 +209,118 @@ export function createServer(
           )
         }
         return text(formatDrawing(found.doc, found.revision, offset))
+      }),
+  )
+
+  server.registerTool(
+    'render_drawing',
+    {
+      title: 'Render a drawing',
+      description:
+        'Draws a drawing as an image you can look at, as Yodo exports it: the whole drawing, ' +
+        'only some elements (ids), or one area (region, clipped there). ' +
+        `PNG by default (the longer side at most ${MAX_RENDER_SIDE} px; use region to zoom in), or SVG. ` +
+        'The text beside the image says how its pixels map to drawing coordinates.',
+      inputSchema: z.object({
+        id: z
+          .string()
+          .min(1)
+          .describe('A drawing id from list_drawings or search_drawings.'),
+        ids: z
+          .array(z.string().min(1))
+          .min(1)
+          .optional()
+          .describe(
+            'Draw only these element ids (from get_drawing). Leave out for the whole drawing.',
+          ),
+        region: z
+          .object({
+            x: z.number(),
+            y: z.number(),
+            width: z.number().positive(),
+            height: z.number().positive(),
+          })
+          .optional()
+          .describe(
+            'Draw only this area, in drawing units (the coordinates get_drawing prints).',
+          ),
+        format: z
+          .enum(['png', 'svg'])
+          .optional()
+          .describe('png (default) or svg.'),
+        theme: z
+          .enum(['light', 'dark'])
+          .optional()
+          .describe('light (default) or dark.'),
+        scale: z
+          .number()
+          .min(0.1)
+          .max(4)
+          .optional()
+          .describe(
+            `PNG pixels per drawing unit (default 1), reduced if the image would pass ${MAX_RENDER_SIDE} px.`,
+          ),
+      }),
+      annotations: READ_ONLY,
+    },
+    ({ id, ids, region, format = 'png', theme = 'light', scale = 1 }) =>
+      run(async () => {
+        if (ids && region) {
+          return failure(
+            'Pass either ids or region, not both: ids draws chosen elements, region draws one area.',
+          )
+        }
+        const found = await repo.getWithRevision(id)
+        if (!found) {
+          return failure(
+            `No drawing with id ${JSON.stringify(id)}. Call list_drawings or search_drawings for ids.`,
+          )
+        }
+        const target: RenderTarget = ids
+          ? { kind: 'ids', ids }
+          : region
+            ? { kind: 'region', region }
+            : { kind: 'all' }
+        const selection = selectForRender(
+          found.doc.elements,
+          target,
+          nodeMeasure(),
+        )
+        if ('error' in selection) return failure(selection.error)
+        const { elements, frame } = selection
+        const summary = {
+          doc: found.doc,
+          revision: found.revision,
+          format,
+          theme,
+          elements,
+          frame,
+        }
+        if (format === 'svg') {
+          const svg = renderSvg(elements, frame, { theme })
+          return {
+            content: [
+              { type: 'text', text: formatRender(summary) },
+              {
+                type: 'image',
+                data: Buffer.from(svg, 'utf8').toString('base64'),
+                mimeType: 'image/svg+xml',
+              },
+            ],
+          }
+        }
+        const fitted = fitScale(frame, scale)
+        const png = renderPng(elements, frame, { theme, scale: fitted })
+        return {
+          content: [
+            { type: 'text', text: formatRender({ ...summary, scale: fitted }) },
+            {
+              type: 'image',
+              data: png.toString('base64'),
+              mimeType: 'image/png',
+            },
+          ],
+        }
       }),
   )
 
