@@ -336,6 +336,23 @@ describe('formatRender', () => {
     )
   })
 
+  it('keeps a large origin exact to a hundredth of a unit', () => {
+    // Six significant digits printed 1234567 as 1234570: 6 px off at scale 2.
+    const frame = { x: 1234567.123, y: -9876543.456, width: 100, height: 100 }
+    const line = formatRender({
+      doc,
+      revision: 1,
+      format: 'png',
+      theme: 'light',
+      elements: [box],
+      frame,
+      scale: 2,
+    }).split('\n')[2]!
+    expect(line).toBe(
+      'scale 2: 200x200 px; pixel (px,py) is drawing point (1234567.12 + px/2, -9876543.46 + py/2)',
+    )
+  })
+
   it('has no scale line for an SVG, and names image placeholders', () => {
     const image = createImage(
       'f1',

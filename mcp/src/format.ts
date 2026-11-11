@@ -34,6 +34,11 @@ function precise(value: number): number {
   return Number(value.toPrecision(6))
 }
 
+/** A coordinate to two decimals: at most 0.02 px off at the largest scale. */
+function hundredths(value: number): number {
+  return Math.round(value * 100) / 100
+}
+
 function iso(epochMs: number): string {
   return new Date(epochMs).toISOString()
 }
@@ -191,12 +196,13 @@ export function formatRender({
     `frame ${box(frame)} in drawing units`,
   ]
   if (scale !== undefined) {
-    // Six significant digits, not fixed decimals: a fitted scale can be tiny
-    // (0.0004096), and the mapping must stay exact to well under a pixel.
+    // The scale to six significant digits, since a fitted one can be tiny
+    // (0.0004096); the origin to a hundredth of a unit, since it can be
+    // large (1234567). Either way the mapping stays well under a pixel off.
     const s = precise(scale)
     lines.push(
       `scale ${s}: ${Math.ceil(frame.width * scale)}x${Math.ceil(frame.height * scale)} px; ` +
-        `pixel (px,py) is drawing point (${precise(frame.x)} + px/${s}, ${precise(frame.y)} + py/${s})`,
+        `pixel (px,py) is drawing point (${hundredths(frame.x)} + px/${s}, ${hundredths(frame.y)} + py/${s})`,
     )
   }
   const images = elements.filter((element) => element.type === 'image').length
