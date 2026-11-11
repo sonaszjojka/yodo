@@ -9,9 +9,9 @@ ADR [0064](0064-file-backend-for-the-mcp-server.md) makes `FileDrawingRepository
 ## Decision
 Every operation that writes the directory (`save`, `trash`, `restore`, `emptyTrash`, `delete`) holds a **directory-wide lock file**, `<YODO_MCP_DIR>/.lock`, from its revision check through its last rename. Reads take no lock: renames are atomic, and a crash between two renames is already covered by ADR 0064's "Trash wins".
 
-- **Acquire** by creating `.lock` exclusively (`open(path, 'wx')`). The file holds JSON: a random token, the pid, the host name and the time.
+- **Acquire** by writing the holder's JSON (a random token, the pid, the host name and the time) to a file of its own, then `link`ing it to `.lock`. The link fails if `.lock` exists, so a lock is created exclusively and is never seen half written.
 - **Busy:** if the lock exists, retry every 25 ms for up to 5 s. After that the call fails with an error saying that another Yodo MCP process is writing and the call should be retried. A write takes milliseconds, so waiting is rare.
-- **Stale:** a lock is taken over when its process is gone (same host, and `process.kill(pid, 0)` reports no such process) or when it is older than 30 s. A lock that stays unreadable for the whole wait is taken over too; a holder writes its details right after creating the file, so a briefly empty lock isn't stale. The takeover renames the lock to a unique name, then deletes it.
+- **Stale:** a lock is taken over when its process is gone (same host, and `process.kill(pid, 0)` reports no such process) or when it is older than 30 s. An unreadable lock can only be a corrupt leftover, so it is judged by its file time against the same 30 s; a waiter's own timeout never makes a lock stale. The takeover renames the lock to a unique name, then deletes it.
 - **Release** deletes `.lock` only if it still holds this process's token, so a process never removes a lock that someone else took over.
 - The in-process queue stays, so calls in one process still run in order and never contend with each other.
 
@@ -24,5 +24,5 @@ Every operation that writes the directory (`save`, `trash`, `restore`, `emptyTra
 ## Consequences
 - Two processes writing the same drawing now behave as ADR 0062 requires: one save wins, and the other gets `RevisionConflictError`, which the tools turn into "re-read and retry".
 - Taking over a stale lock has a narrow race: two processes that judge the same lock stale at the same moment. It needs a crash first and then simultaneous writers, and the outcome is two writers, which is the behaviour before this ADR. This is accepted.
-- On a network file system, `wx` creation is only as atomic as the server makes it; `YODO_MCP_DIR` is meant to be a local folder (ADR 0064).
+- On a network file system, `link` is only as atomic as the server makes it; `YODO_MCP_DIR` is meant to be a local folder (ADR 0064).
 - `.lock` isn't a `.yodo` file, so listings already ignore it.

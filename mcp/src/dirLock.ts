@@ -2,7 +2,15 @@
 // sharing YODO_MCP_DIR take turns (ADR 0067). Held only for one operation.
 
 import { randomUUID } from 'node:crypto'
-import { mkdir, open, readFile, rename, rm } from 'node:fs/promises'
+import {
+  link,
+  mkdir,
+  readFile,
+  rename,
+  rm,
+  stat,
+  writeFile,
+} from 'node:fs/promises'
 import { hostname } from 'node:os'
 import { join } from 'node:path'
 
@@ -67,7 +75,7 @@ const sleep = (ms: number) => new Promise((done) => setTimeout(done, ms))
 
 /**
  * Runs `task` while holding `<dir>/.lock`. The lock is created exclusively,
- * taken over when stale (its process is gone, it is too old, or unreadable),
+ * taken over when stale (its process is gone, or it is too old),
  * and removed afterwards only if it is still ours.
  */
 export async function withDirLock<T>(
@@ -84,54 +92,35 @@ export async function withDirLock<T>(
   await mkdir(dir, { recursive: true })
   const token = randomUUID()
   const deadline = now() + timeoutMs
+  // The lock is written in full under a name of its own, then linked into
+  // place: `link` fails if `.lock` exists, so no process ever sees a lock
+  // half written (Codex review round 2).
+  const draft = join(dir, `${LOCK_FILE}-new-${token}`)
+  const holder: Holder = {
+    token,
+    pid: process.pid,
+    host: hostname(),
+    at: now(),
+  }
+  await writeFile(draft, JSON.stringify(holder), {
+    encoding: 'utf8',
+    flag: 'wx',
+  })
 
-  for (;;) {
-    try {
-      const handle = await open(path, 'wx')
+  try {
+    for (;;) {
       try {
-        const holder: Holder = {
-          token,
-          pid: process.pid,
-          host: hostname(),
-          at: now(),
-        }
-        await handle.writeFile(JSON.stringify(holder), 'utf8')
-      } finally {
-        await handle.close()
-      }
-      break
-    } catch (error) {
-      if (errorCode(error) !== 'EEXIST') throw error
-    }
-    let text: string
-    try {
-      text = await readFile(path, 'utf8')
-    } catch (error) {
-      // Released between our attempt and this read: try again at once.
-      if (errorCode(error) === 'ENOENT') continue
-      throw error
-    }
-    const holder = parseHolder(text)
-    // A holder that has written nothing yet looks unreadable for a moment, so
-    // only an unreadable lock that stays that way past `staleMs` is stale.
-    const stale =
-      holder === undefined
-        ? false
-        : now() - holder.at > staleMs ||
-          (holder.host === hostname() && !isAlive(holder.pid))
-    if (stale || (holder === undefined && now() > deadline)) {
-      // Move it aside first, so only one process removes a given lock.
-      const aside = join(dir, `${LOCK_FILE}-stale-${randomUUID()}`)
-      try {
-        await rename(path, aside)
-        await rm(aside, { force: true })
+        await link(draft, path)
+        break
       } catch (error) {
-        if (errorCode(error) !== 'ENOENT') throw error
+        if (errorCode(error) !== 'EEXIST') throw error
       }
-      continue
+      if (await takeOverIfStale(dir, path, staleMs, now)) continue
+      if (now() > deadline) throw new LockBusyError(dir)
+      await sleep(retryMs)
     }
-    if (now() > deadline) throw new LockBusyError(dir)
-    await sleep(retryMs)
+  } finally {
+    await rm(draft, { force: true })
   }
 
   try {
@@ -139,6 +128,46 @@ export async function withDirLock<T>(
   } finally {
     await release(path, token)
   }
+}
+
+/**
+ * Removes the lock at `path` if it is stale, and says whether to try again
+ * at once. A lock is stale when its process is gone (same host) or it is
+ * older than `staleMs`. Locks are never written half, so an unreadable one is
+ * a corrupt leftover, judged by its file time alone.
+ */
+async function takeOverIfStale(
+  dir: string,
+  path: string,
+  staleMs: number,
+  now: () => number,
+): Promise<boolean> {
+  let text: string
+  let modified: number
+  try {
+    text = await readFile(path, 'utf8')
+    modified = (await stat(path)).mtimeMs
+  } catch (error) {
+    // Released between our attempt and this read: try again at once.
+    if (errorCode(error) === 'ENOENT') return true
+    throw error
+  }
+  const holder = parseHolder(text)
+  const stale =
+    holder === undefined
+      ? now() - modified > staleMs
+      : now() - holder.at > staleMs ||
+        (holder.host === hostname() && !isAlive(holder.pid))
+  if (!stale) return false
+  // Move it aside first, so only one process removes a given lock.
+  const aside = join(dir, `${LOCK_FILE}-stale-${randomUUID()}`)
+  try {
+    await rename(path, aside)
+    await rm(aside, { force: true })
+  } catch (error) {
+    if (errorCode(error) !== 'ENOENT') throw error
+  }
+  return true
 }
 
 /** Removes the lock if it is still ours; one taken over is left alone. */

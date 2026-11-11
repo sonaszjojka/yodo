@@ -1,4 +1,11 @@
-import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import {
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  utimes,
+  writeFile,
+} from 'node:fs/promises'
 import { hostname, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
@@ -111,12 +118,44 @@ describe('withDirLock (ADR 0067)', () => {
     )
   })
 
-  test('waits out an unreadable lock, then takes it over', async () => {
+  test('never takes over a fresh unreadable lock, even past its deadline', async () => {
+    // Codex review round 2: a waiter past its deadline stole a lock another
+    // process had just created. A fresh lock is busy, however it reads.
     const dir = await tempDir()
     await writeFile(join(dir, LOCK_FILE), '')
+    let ran = false
+    await expect(
+      withDirLock(
+        dir,
+        async () => {
+          ran = true
+        },
+        { timeoutMs: 40, retryMs: 10 },
+      ),
+    ).rejects.toBeInstanceOf(LockBusyError)
+    expect(ran).toBe(false)
+    expect(await readdir(dir)).toEqual([LOCK_FILE])
+  })
+
+  test('takes over an unreadable lock older than the stale limit', async () => {
+    const dir = await tempDir()
+    const path = join(dir, LOCK_FILE)
+    await writeFile(path, '')
+    const old = new Date(Date.now() - 60_000)
+    await utimes(path, old, old)
     expect(
       await withDirLock(dir, async () => 'ran', { timeoutMs: 40, retryMs: 10 }),
     ).toBe('ran')
+  })
+
+  test('a lock is never seen half written', async () => {
+    const dir = await tempDir()
+    const seen = await withDirLock(dir, async () =>
+      JSON.parse(await readFile(join(dir, LOCK_FILE), 'utf8')),
+    )
+    expect(seen).toMatchObject({ pid: process.pid, host: hostname() })
+    // No temp file is left beside it.
+    expect(await readdir(dir)).toEqual([])
   })
 
   test('leaves a lock that someone else took over meanwhile', async () => {
