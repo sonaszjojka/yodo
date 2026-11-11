@@ -72,10 +72,20 @@ function pickFiles(fileIds: readonly string[], files: unknown): YodoFiles {
 
 /**
  * The export file's text for `doc` and its images. Only the images listed in
- * `doc.fileIds` are written; one without data in `files` is an error.
+ * `doc.fileIds` are written; one without data in `files` is an error. `meta`
+ * is the MCP file backend's metadata (ADR 0064); the app's export passes none.
  */
-export function serializeYodoFile(doc: YodoDocument, files: YodoFiles): string {
-  return JSON.stringify({ ...doc, files: pickFiles(doc.fileIds, files) })
+export function serializeYodoFile(
+  doc: YodoDocument,
+  files: YodoFiles,
+  meta?: unknown,
+): string {
+  const picked = pickFiles(doc.fileIds, files)
+  return JSON.stringify(
+    meta === undefined
+      ? { ...doc, files: picked }
+      : { ...doc, files: picked, meta },
+  )
 }
 
 /**
@@ -89,15 +99,18 @@ export function parseYodoFile(
   text: string,
   steps: Migrations = migrations,
   target: number = CURRENT_SCHEMA_VERSION,
-): { document: YodoDocument; files: YodoFiles } {
+): { document: YodoDocument; files: YodoFiles; meta: unknown } {
   let raw: unknown
   try {
     raw = JSON.parse(text)
   } catch {
     throw new DocumentError('invalid-json', 'The file is not valid JSON')
   }
-  // Split the images off first, so migrations only ever see the document.
-  const { files, ...rest } = isRecord(raw) ? raw : { files: undefined }
+  // Split the images and the file backend's metadata (ADR 0064) off first, so
+  // migrations only ever see the document. Core doesn't interpret `meta`.
+  const { files, meta, ...rest } = isRecord(raw)
+    ? raw
+    : { files: undefined, meta: undefined }
   const migrated = migrateWith(isRecord(raw) ? rest : raw, steps, target)
 
   const seen = new Set<string>()
@@ -125,5 +138,5 @@ export function parseYodoFile(
       )
     }
   }
-  return { document, files: pickFiles(document.fileIds, files) }
+  return { document, files: pickFiles(document.fileIds, files), meta }
 }

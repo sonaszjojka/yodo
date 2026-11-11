@@ -1,6 +1,6 @@
 // The MCP server: read-only tools over a DrawingRepository (ADR 0061). The
-// repository is injected, so tests use the in-memory one and `index.ts` the
-// HTTP one with the API token.
+// repository is injected: `index.ts` passes the HTTP one with the API token,
+// or the file one (ADR 0064), and tests run the tools over both kinds.
 
 import { McpServer } from '@modelcontextprotocol/server'
 import * as z from 'zod'
@@ -40,7 +40,20 @@ function failure(body: string): TextResult {
  * A failed call as a tool result the agent can act on, rather than a protocol
  * error it can't (ADR 0061: limits and bad input say how to fix the call).
  */
-export function toolError(error: unknown, baseUrl?: URL): TextResult {
+export function toolError(
+  error: unknown,
+  { baseUrl, dir }: ServerOptions = {},
+): TextResult {
+  // A Node file-system error from the file backend carries a `code` (ADR 0064).
+  if (
+    dir !== undefined &&
+    typeof (error as { code?: unknown })?.code === 'string'
+  ) {
+    return failure(
+      `Can't read the drawings in ${dir}: ${(error as Error).message}. ` +
+        'Check that YODO_MCP_DIR is a folder this process can read and write.',
+    )
+  }
   const where = baseUrl ? ` at ${baseUrl.href}` : ''
   if (error instanceof HttpError) {
     if (error.status === 401) {
@@ -73,11 +86,13 @@ export function toolError(error: unknown, baseUrl?: URL): TextResult {
 export interface ServerOptions {
   /** Named in connection errors so the user sees which URL failed. */
   baseUrl?: URL
+  /** The file backend's directory, named in file-system errors. */
+  dir?: string
 }
 
 export function createServer(
   repo: DrawingRepository,
-  { baseUrl }: ServerOptions = {},
+  options: ServerOptions = {},
 ): McpServer {
   const server = new McpServer(
     { name: 'yodo', version: pkg.version },
@@ -88,7 +103,7 @@ export function createServer(
     try {
       return await body()
     } catch (error) {
-      return toolError(error, baseUrl)
+      return toolError(error, options)
     }
   }
 

@@ -40,10 +40,12 @@ describe('withBearer', () => {
 describe('the HTTP repository as index.ts builds it', () => {
   it('calls the API under a sub-path with the bearer token', async () => {
     const { fetch, calls } = recorder()
-    const { baseUrl, token } = readConfig({
+    const config = readConfig({
       YODO_URL: 'https://yodo.example.com/yodo',
       YODO_API_TOKEN: 't0k3n',
     })
+    if (config.backend !== 'http') throw new Error('expected HTTP')
+    const { baseUrl, token } = config
     const repo = new HttpDrawingRepository({
       baseUrl,
       fetch: withBearer(fetch, token),
