@@ -23,20 +23,84 @@ import {
   type RenderTarget,
 } from './render/render.ts'
 import { nodeMeasure } from './render/measure.ts'
+import {
+  addElements,
+  connectElements,
+  deleteElements,
+  updateElements,
+} from './write/apply.ts'
+import { createDrawing, writeDrawing, type Written } from './write/save.ts'
+import {
+  connectionSpec,
+  elementPatch,
+  MAX_ITEMS,
+  newElementSpec,
+} from './write/spec.ts'
+import { createDocument } from '../../web/src/core/document/create.ts'
 import pkg from '../package.json' with { type: 'json' }
 
-export const INSTRUCTIONS = `Yodo is a whiteboard app. These tools read the user's drawings.
+export const INSTRUCTIONS = `Yodo is a whiteboard app. These tools read and edit the user's drawings.
 Call list_drawings or search_drawings to find a drawing's id, then get_drawing for its outline,
 or render_drawing to see it as an image.
-Coordinates are world units: x grows to the right and y grows downward.`
+Coordinates are world units: x grows to the right and y grows downward.
+
+To draw, use create_drawing for a new drawing, or add_elements, update_elements, delete_elements
+and connect on an existing one. Elements are small JSON objects:
+- rectangle, diamond, ellipse: x, y, width, height (top-left and size), optional label (its text).
+- note: a sticky note at x, y (200x200 unless you give width and height), optional label.
+- text: x, y (top-left) and text; its size is measured for you.
+- line, arrow: points, a list of absolute [x, y] points, at least two.
+Optional styles: strokeColor and backgroundColor (#rrggbb, or "transparent" for a background),
+fillStyle, strokeWidth, strokeStyle, roughness (0 is clean, 1 hand-drawn), opacity (0-100),
+fontFamily (hand, sans, mono), fontSize, textAlign; arrows take startArrowhead and endArrowhead.
+Give an element an id (letters, digits, - and _) to refer to it later in the same session;
+otherwise one is made. Use connect, not a plain arrow, to join two elements: its arrow stays
+attached when they move.
+Every write takes the drawing's revision (the "rev" get_drawing shows). If someone else saved
+in between, the write is refused: call get_drawing again and retry.`
 
 /** Tells the agent that a tool only reads, so a client can skip confirmations. */
 const READ_ONLY = { readOnlyHint: true, openWorldHint: false } as const
+
+/** A write that edits only the user's drawings; only deletes lose work. */
+function writes(destructive = false) {
+  return {
+    readOnlyHint: false,
+    openWorldHint: false,
+    idempotentHint: false,
+    destructiveHint: destructive,
+  } as const
+}
+
+const drawingId = z
+  .string()
+  .min(1)
+  .describe(
+    'A drawing id from list_drawings, search_drawings or create_drawing.',
+  )
+const revision = z
+  .number()
+  .int()
+  .min(1)
+  .optional()
+  .describe(
+    'The revision you read (the "rev" from get_drawing or a previous write). Refused if the drawing has changed since.',
+  )
+const writtenIds = z.array(z.string())
+
+function writeOutput(key: 'created' | 'updated' | 'deleted') {
+  return z.object({
+    drawingId: z.string().describe('The drawing that was written.'),
+    revision: z.number().int().describe('Its revision after this write.'),
+    [key]: writtenIds.describe(`Ids of the ${key} elements, in order.`),
+  })
+}
 
 interface TextResult {
   [key: string]: unknown
   content: { type: 'text'; text: string }[]
   isError?: boolean
+  structuredContent?: Record<string, unknown>
 }
 
 /** render_drawing's result: its text, then the image (MCP image content). */
@@ -322,6 +386,172 @@ export function createServer(
           ],
         }
       }),
+  )
+
+  /** A write's result: the facts as text, and the same as structured content. */
+  function result(
+    key: 'created' | 'updated' | 'deleted',
+    outcome: Written,
+  ): TextResult {
+    if ('error' in outcome) return failure(outcome.error)
+    const { drawingId: id, revision: rev, ids } = outcome
+    return {
+      ...text(
+        `Drawing ${JSON.stringify(id)} is now at revision ${rev}. ` +
+          `${key[0]!.toUpperCase()}${key.slice(1)} ${ids.length} element(s)` +
+          (ids.length > 0 ? `: ${ids.join(', ')}.` : '.'),
+      ),
+      structuredContent: { drawingId: id, revision: rev, [key]: ids },
+    }
+  }
+
+  const elements = z
+    .array(newElementSpec)
+    .max(MAX_ITEMS)
+    .describe(
+      'Elements to add, drawn in this order on top (see the server instructions for the fields).',
+    )
+
+  server.registerTool(
+    'create_drawing',
+    {
+      title: 'Create a drawing',
+      description:
+        'Creates a new drawing, optionally with elements, and returns its id, revision and the new element ids. ' +
+        'Join elements afterwards with connect.',
+      inputSchema: z.object({
+        name: z.string().trim().min(1).max(200).describe('The drawing name.'),
+        elements: elements.optional(),
+      }),
+      outputSchema: writeOutput('created'),
+      annotations: writes(),
+    },
+    ({ name, elements: specs = [] }) =>
+      run(async () =>
+        result(
+          'created',
+          await createDrawing(repo, createDocument(name), (doc) =>
+            addElements(doc, specs, nodeMeasure()),
+          ),
+        ),
+      ),
+  )
+
+  server.registerTool(
+    'add_elements',
+    {
+      title: 'Add elements',
+      description:
+        'Adds rectangles, diamonds, ellipses, notes, text, lines and arrows to a drawing, on top of what is there. ' +
+        'Line and arrow points are absolute. Returns the new ids; give your own ids to refer to elements later.',
+      inputSchema: z.object({
+        drawingId,
+        revision,
+        elements: elements.min(1),
+      }),
+      outputSchema: writeOutput('created'),
+      annotations: writes(),
+    },
+    ({ drawingId: id, revision: rev, elements: specs }) =>
+      run(async () =>
+        result(
+          'created',
+          await writeDrawing(repo, id, rev, (doc) =>
+            addElements(doc, specs, nodeMeasure()),
+          ),
+        ),
+      ),
+  )
+
+  server.registerTool(
+    'update_elements',
+    {
+      title: 'Update elements',
+      description:
+        'Changes existing elements by id: move (x, y), resize (width, height), new points (absolute), ' +
+        'text, label ("" removes it), fonts or styles. Only the fields an element has are accepted. ' +
+        'Arrows attached to a moved element follow it; an arrow moved by itself, or an arrow end moved, comes loose.',
+      inputSchema: z.object({
+        drawingId,
+        revision,
+        patches: z
+          .array(elementPatch)
+          .min(1)
+          .max(MAX_ITEMS)
+          .describe('One object per element: its id and the fields to change.'),
+      }),
+      outputSchema: writeOutput('updated'),
+      annotations: writes(),
+    },
+    ({ drawingId: id, revision: rev, patches }) =>
+      run(async () =>
+        result(
+          'updated',
+          await writeDrawing(repo, id, rev, (doc) =>
+            updateElements(doc, patches, nodeMeasure()),
+          ),
+        ),
+      ),
+  )
+
+  server.registerTool(
+    'delete_elements',
+    {
+      title: 'Delete elements',
+      description:
+        'Deletes elements by id. Arrows attached to them stay where they are, detached.',
+      inputSchema: z.object({
+        drawingId,
+        revision,
+        ids: z
+          .array(z.string().min(1))
+          .min(1)
+          .max(MAX_ITEMS)
+          .describe('Ids of the elements to delete (from get_drawing).'),
+      }),
+      outputSchema: writeOutput('deleted'),
+      annotations: writes(true),
+    },
+    ({ drawingId: id, revision: rev, ids }) =>
+      run(async () =>
+        result(
+          'deleted',
+          await writeDrawing(repo, id, rev, (doc) => deleteElements(doc, ids)),
+        ),
+      ),
+  )
+
+  server.registerTool(
+    'connect',
+    {
+      title: 'Connect elements',
+      description:
+        'Draws an arrow from one element to another for each connection, attached at both ends ' +
+        'so it follows when either moves. Ends attach to rectangles, diamonds, ellipses, notes, images, ' +
+        'lines and arrows (including an arrow made earlier in the same call). Returns the arrow ids.',
+      inputSchema: z.object({
+        drawingId,
+        revision,
+        connections: z
+          .array(connectionSpec)
+          .min(1)
+          .max(MAX_ITEMS)
+          .describe(
+            'One object per arrow: from and to element ids, plus optional id and style.',
+          ),
+      }),
+      outputSchema: writeOutput('created'),
+      annotations: writes(),
+    },
+    ({ drawingId: id, revision: rev, connections }) =>
+      run(async () =>
+        result(
+          'created',
+          await writeDrawing(repo, id, rev, (doc) =>
+            connectElements(doc, connections),
+          ),
+        ),
+      ),
   )
 
   return server

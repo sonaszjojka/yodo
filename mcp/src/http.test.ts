@@ -2,9 +2,12 @@
 // bearer fetch, against a stub that plays the server's part.
 
 import { describe, expect, it } from 'vitest'
+import { createDocument } from '../../web/src/core/document/create.ts'
 import { HttpDrawingRepository } from '../../web/src/storage/http.ts'
 import { withBearer } from './auth.ts'
 import { readConfig } from './config.ts'
+import { addElements } from './write/apply.ts'
+import { writeDrawing } from './write/save.ts'
 
 type Fetch = typeof globalThis.fetch
 
@@ -53,5 +56,64 @@ describe('the HTTP repository as index.ts builds it', () => {
     await repo.list()
     expect(calls[0].url).toBe('https://yodo.example.com/yodo/api/drawings')
     expect(calls[0].headers.get('Authorization')).toBe('Bearer t0k3n')
+  })
+})
+
+describe('a write over HTTP (ADR 0062, 0066)', () => {
+  const doc = { ...createDocument('Flow'), id: 'd1' }
+  const box = { type: 'rectangle', x: 0, y: 0, width: 10, height: 10 } as const
+
+  /** Serves `doc` at revision 3 and answers the PUT with `put`. */
+  function server(put: () => Response) {
+    const calls: Request[] = []
+    const fetch: Fetch = async (input, init) => {
+      const request = new Request(input, init)
+      calls.push(request)
+      if (request.method === 'GET') {
+        return Response.json(doc, { headers: { ETag: '"3"' } })
+      }
+      return put()
+    }
+    const repo = new HttpDrawingRepository({
+      baseUrl: new URL('http://h/'),
+      fetch,
+    })
+    return { repo, calls }
+  }
+
+  const add = (repo: HttpDrawingRepository) =>
+    writeDrawing(repo, 'd1', undefined, (d) =>
+      addElements(d, [{ ...box, id: 'b' }], () => 0),
+    )
+
+  it('saves with If-Match set to the revision it read', async () => {
+    const { repo, calls } = server(() =>
+      Response.json({
+        id: 'd1',
+        name: 'Flow',
+        createdAt: 1,
+        updatedAt: 2,
+        revision: 4,
+      }),
+    )
+    expect(await add(repo)).toEqual({
+      drawingId: 'd1',
+      revision: 4,
+      ids: ['b'],
+    })
+    const put = calls.find((c) => c.method === 'PUT')!
+    expect(put.url).toBe('http://h/api/drawings/d1')
+    expect(put.headers.get('If-Match')).toBe('"3"')
+  })
+
+  it('turns a 412 into the re-read and retry error', async () => {
+    const { repo } = server(
+      () => new Response(null, { status: 412, headers: { ETag: '"5"' } }),
+    )
+    expect(await add(repo)).toEqual({
+      error:
+        'Drawing "d1" changed since revision 3 (it is now at revision 5). ' +
+        'Call get_drawing again and retry with the new revision.',
+    })
   })
 })

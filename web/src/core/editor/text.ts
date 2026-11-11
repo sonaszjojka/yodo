@@ -141,8 +141,11 @@ export function withText(
   return { ...element, text, width, height }
 }
 
-/** A shape with its label set to `text`, grown taller if the text needs it. */
-function withLabel(
+/**
+ * A shape with its label set to `text`, grown taller if the text needs it.
+ * Blank text removes the label. Also used by the MCP write tools (ADR 0066).
+ */
+export function withLabel(
   shape: LabelledShape,
   text: string,
   measure: Measure,

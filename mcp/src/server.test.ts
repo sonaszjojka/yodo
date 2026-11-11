@@ -130,21 +130,45 @@ function failing(error: unknown): DrawingRepository {
 
 describe.each(backends)('tools %s', (_name, make) => {
   describe('tools/list', () => {
-    it('offers exactly the four read-only tools, plus the instructions', async () => {
+    it('offers the read and write tools, plus the instructions', async () => {
       const client = await connect(await seeded(make))
       const { tools } = await client.listTools()
-      expect(tools.map((t) => t.name).sort()).toEqual([
+      const reads = [
         'get_drawing',
         'list_drawings',
         'render_drawing',
         'search_drawings',
-      ])
+      ]
+      const writes = [
+        'add_elements',
+        'connect',
+        'create_drawing',
+        'delete_elements',
+        'update_elements',
+      ]
+      expect(tools.map((t) => t.name).sort()).toEqual(
+        [...reads, ...writes].sort(),
+      )
       for (const tool of tools) {
-        expect(tool.annotations).toMatchObject({
-          readOnlyHint: true,
-          openWorldHint: false,
-        })
         expect(tool.description).toBeTruthy()
+        if (reads.includes(tool.name)) {
+          expect(tool.annotations).toMatchObject({
+            readOnlyHint: true,
+            openWorldHint: false,
+          })
+          continue
+        }
+        expect(tool.annotations).toMatchObject({
+          readOnlyHint: false,
+          openWorldHint: false,
+          idempotentHint: false,
+          destructiveHint: tool.name === 'delete_elements',
+        })
+        // Every write says what its structured result looks like.
+        expect(tool.outputSchema).toMatchObject({
+          type: 'object',
+          required: expect.arrayContaining(['drawingId', 'revision']),
+        })
       }
       expect(client.getInstructions()).toBe(INSTRUCTIONS)
       // The stateless 2026-07-28 protocol: no 2025-era `initialize` handshake.
@@ -348,6 +372,239 @@ describe.each(backends)('tools %s', (_name, make) => {
       const { result, blocks } = await render({ id: 'd-empty' })
       expect(result.isError).toBe(true)
       expect(blocks[0]!.text).toContain('no elements')
+    })
+  })
+})
+
+type CallResult = Awaited<ReturnType<Client['callTool']>>
+
+interface Written {
+  drawingId: string
+  revision: number
+  created?: string[]
+  updated?: string[]
+  deleted?: string[]
+}
+
+function written(result: CallResult): Written {
+  expect(result.isError).toBeFalsy()
+  return result.structuredContent as unknown as Written
+}
+
+const twoBoxes = [
+  { type: 'rectangle', id: 'a', x: 0, y: 0, width: 100, height: 50 },
+  { type: 'rectangle', id: 'b', x: 200, y: 0, width: 100, height: 50 },
+]
+
+describe.each(backends)('write tools %s', (_name, make) => {
+  async function call(
+    client: Client,
+    name: string,
+    args: Record<string, unknown>,
+  ): Promise<CallResult> {
+    return client.callTool({ name, arguments: args })
+  }
+
+  async function outline(client: Client, id: string) {
+    return textOf(await call(client, 'get_drawing', { id }))
+  }
+
+  describe('create_drawing', () => {
+    it('creates a drawing with its elements and returns the ids', async () => {
+      const repo = await seeded(make)
+      const client = await connect(repo)
+      const result = await call(client, 'create_drawing', {
+        name: 'Agent sketch',
+        elements: [...twoBoxes, { type: 'text', x: 0, y: 100, text: 'Hello' }],
+      })
+      const out = written(result)
+      expect(out.created).toHaveLength(3)
+      expect(out.created?.slice(0, 2)).toEqual(['a', 'b'])
+      expect(out.revision).toBe(1)
+      expect(textOf(result)).toContain(out.drawingId)
+      const summaries = await repo.list()
+      expect(summaries.map((s) => s.name)).toContain('Agent sketch')
+      const text = await outline(client, out.drawingId)
+      expect(text).toContain('Hello')
+    })
+
+    it('creates an empty drawing', async () => {
+      const client = await connect(await seeded(make))
+      const out = written(
+        await call(client, 'create_drawing', { name: 'Blank' }),
+      )
+      expect(out.created).toEqual([])
+    })
+
+    it('refuses a bad element and saves nothing', async () => {
+      const repo = await seeded(make)
+      const client = await connect(repo)
+      const result = await call(client, 'create_drawing', {
+        name: 'Bad',
+        elements: [twoBoxes[0], twoBoxes[0]],
+      })
+      expect(result.isError).toBe(true)
+      expect(textOf(result)).toContain('"a" is already used')
+      expect((await repo.list()).map((s) => s.name)).not.toContain('Bad')
+    })
+  })
+
+  describe('add_elements', () => {
+    it('adds elements on top and bumps the revision', async () => {
+      const client = await connect(await seeded(make))
+      const out = written(
+        await call(client, 'add_elements', {
+          drawingId: 'd-login',
+          elements: [
+            { type: 'note', id: 'n1', x: 300, y: 0, label: 'Remember' },
+          ],
+        }),
+      )
+      expect(out).toEqual({
+        drawingId: 'd-login',
+        revision: 2,
+        created: ['n1'],
+      })
+      expect(await outline(client, 'd-login')).toContain('n1')
+    })
+
+    it('refuses a transparent note through the schema', async () => {
+      const client = await connect(await seeded(make))
+      const result = await call(client, 'add_elements', {
+        drawingId: 'd-login',
+        elements: [
+          { type: 'note', x: 0, y: 0, backgroundColor: 'transparent' },
+        ],
+      })
+      expect(result.isError).toBe(true)
+    })
+  })
+
+  describe('update_elements', () => {
+    it('changes elements and reports their ids', async () => {
+      const client = await connect(await seeded(make))
+      const out = written(
+        await call(client, 'update_elements', {
+          drawingId: 'd-login',
+          patches: [{ id: 'd-login-box', x: 500, label: 'Forgot password' }],
+        }),
+      )
+      expect(out).toEqual({
+        drawingId: 'd-login',
+        revision: 2,
+        updated: ['d-login-box'],
+      })
+      const text = await outline(client, 'd-login')
+      expect(text).toContain('Forgot password')
+      expect(text).toContain('500,')
+    })
+  })
+
+  describe('delete_elements', () => {
+    it('deletes elements and reports their ids', async () => {
+      const client = await connect(await seeded(make))
+      const out = written(
+        await call(client, 'delete_elements', {
+          drawingId: 'd-login',
+          ids: ['d-login-box'],
+        }),
+      )
+      expect(out).toEqual({
+        drawingId: 'd-login',
+        revision: 2,
+        deleted: ['d-login-box'],
+      })
+      expect(await outline(client, 'd-login')).not.toContain('d-login-box')
+    })
+  })
+
+  describe('connect', () => {
+    it('adds a bound arrow between two elements', async () => {
+      const client = await connect(await seeded(make))
+      const created = written(
+        await call(client, 'create_drawing', {
+          name: 'Flow',
+          elements: twoBoxes,
+        }),
+      )
+      const out = written(
+        await call(client, 'connect', {
+          drawingId: created.drawingId,
+          revision: created.revision,
+          connections: [{ from: 'a', to: 'b', id: 'a-b' }],
+        }),
+      )
+      expect(out).toEqual({
+        drawingId: created.drawingId,
+        revision: 2,
+        created: ['a-b'],
+      })
+      const text = await outline(client, created.drawingId)
+      expect(text).toMatch(/a-b.*a.*b/)
+    })
+  })
+
+  describe('conflicts and missing drawings', () => {
+    it('refuses a stale revision with a re-read hint and changes nothing', async () => {
+      const repo = await seeded(make)
+      const client = await connect(repo)
+      const result = await call(client, 'delete_elements', {
+        drawingId: 'd-login',
+        revision: 7,
+        ids: ['d-login-box'],
+      })
+      expect(result.isError).toBe(true)
+      expect(textOf(result)).toBe(
+        'Drawing "d-login" changed since revision 7 (it is now at revision 1). ' +
+          'Call get_drawing again and retry with the new revision.',
+      )
+      const stored = await repo.getWithRevision('d-login')
+      expect(stored?.revision).toBe(1)
+      expect(stored?.doc.elements).toHaveLength(1)
+    })
+
+    it('turns a save that loses a race into the same hint', async () => {
+      const repo = await seeded(make)
+      // Another writer saves between the tool's read and its save.
+      const racing = new Proxy(repo, {
+        get(target, key, receiver) {
+          if (key === 'save') {
+            return async (...args: Parameters<DrawingRepository['save']>) => {
+              const found = await target.getWithRevision('d-login')
+              await target.save(found!.doc)
+              return target.save(...args)
+            }
+          }
+          const value = Reflect.get(target, key, receiver)
+          return typeof value === 'function' ? value.bind(target) : value
+        },
+      })
+      const client = await connect(racing)
+      const result = await call(client, 'add_elements', {
+        drawingId: 'd-login',
+        elements: [{ type: 'text', x: 0, y: 0, text: 'late' }],
+      })
+      expect(result.isError).toBe(true)
+      expect(textOf(result)).toContain(
+        'changed since revision 1 (it is now at revision 2)',
+      )
+      expect(textOf(result)).toContain('Call get_drawing again and retry')
+    })
+
+    it('names a missing drawing', async () => {
+      const client = await connect(await seeded(make))
+      for (const [name, args] of [
+        ['add_elements', { elements: [twoBoxes[0]] }],
+        ['update_elements', { patches: [{ id: 'x', x: 1 }] }],
+        ['delete_elements', { ids: ['x'] }],
+        ['connect', { connections: [{ from: 'a', to: 'b' }] }],
+      ] as const) {
+        const result = await call(client, name, { drawingId: 'nope', ...args })
+        expect(result.isError).toBe(true)
+        expect(textOf(result)).toBe(
+          'No drawing with id "nope". Call list_drawings or search_drawings for ids.',
+        )
+      }
     })
   })
 })

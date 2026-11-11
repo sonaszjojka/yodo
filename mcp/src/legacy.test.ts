@@ -31,7 +31,8 @@ describe('a 2025-era client', () => {
       // The 2025 handshake, not the stateless 2026-07-28 opening.
       expect(methods[0]).toBe('initialize')
       const { tools } = await client.listTools()
-      expect(tools).toHaveLength(4)
+      // Four reads and five writes (ADR 0066).
+      expect(tools).toHaveLength(9)
       const result = await client.callTool({
         name: 'list_drawings',
         arguments: {},
