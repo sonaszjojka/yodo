@@ -339,3 +339,40 @@ describe('FileDrawingRepository Trash files', () => {
     },
   )
 })
+
+describe('FileDrawingRepository across processes (ADR 0067)', () => {
+  test('two repositories on one directory never both win a save', async () => {
+    const dir = await tempDir()
+    // Two instances share no in-process queue, like two MCP processes.
+    const first = new FileDrawingRepository({ dir })
+    const second = new FileDrawingRepository({ dir })
+    const doc = drawing('Shared')
+    await first.save(doc)
+    for (let round = 1; round <= 5; round++) {
+      const results = await Promise.allSettled([
+        first.save(
+          { ...doc, name: `first ${round}` },
+          { expectedRevision: round },
+        ),
+        second.save(
+          { ...doc, name: `second ${round}` },
+          { expectedRevision: round },
+        ),
+      ])
+      const won = results.filter((r) => r.status === 'fulfilled')
+      expect(won).toHaveLength(1)
+      const loser = results.find((r) => r.status === 'rejected')
+      expect((loser as PromiseRejectedResult).reason).toMatchObject({
+        name: 'RevisionConflictError',
+        currentRevision: round + 1,
+      })
+      const stored = await first.getWithRevision(doc.id)
+      expect(stored?.revision).toBe(round + 1)
+      expect(stored?.doc.name).toBe(
+        (won[0] as PromiseFulfilledResult<{ name: string }>).value.name,
+      )
+    }
+    // The lock is gone once nobody writes.
+    expect(await readdir(dir)).not.toContain('.lock')
+  })
+})
