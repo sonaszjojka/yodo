@@ -311,6 +311,31 @@ describe('formatRender', () => {
     )
   })
 
+  it('keeps the mapping exact for a tiny scale and a fractional origin', () => {
+    // A 5,000,000-unit region fits 2048 px at scale 0.0004096; rounding it to
+    // 3 decimals printed "px/0". The origin keeps its fraction too.
+    const frame = { x: 10.25, y: -3.5, width: 5_000_000, height: 1000 }
+    const scale = 2048 / frame.width
+    const line = formatRender({
+      doc,
+      revision: 1,
+      format: 'png',
+      theme: 'light',
+      elements: [box],
+      frame,
+      scale,
+    }).split('\n')[2]!
+    expect(line).toBe(
+      'scale 0.0004096: 2048x1 px; pixel (px,py) is drawing point (10.25 + px/0.0004096, -3.5 + py/0.0004096)',
+    )
+    // The printed formula lands the right edge on the frame's right edge.
+    const [, x, divisor] = /\((\S+) \+ px\/(\S+),/.exec(line)!
+    expect(Number(x) + 2048 / Number(divisor)).toBeCloseTo(
+      frame.x + frame.width,
+      0,
+    )
+  })
+
   it('has no scale line for an SVG, and names image placeholders', () => {
     const image = createImage(
       'f1',
