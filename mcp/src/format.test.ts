@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   createDocument,
+  createImage,
   createShape,
 } from '../../web/src/core/document/create.ts'
 import type {
@@ -11,6 +12,7 @@ import { drawnBounds } from '../../web/src/core/geometry/curve.ts'
 import type { DrawingSummary } from '../../web/src/storage/repository.ts'
 import {
   formatDrawing,
+  formatRender,
   formatSearch,
   formatSummaries,
   MAX_ELEMENTS,
@@ -281,6 +283,98 @@ describe('formatSearch', () => {
   it('says when nothing matches', () => {
     expect(formatSearch({ names: [], text: [] }, 'zzz')).toBe(
       'No drawings match "zzz".',
+    )
+  })
+})
+
+describe('formatRender', () => {
+  const doc = { ...createDocument('Plan'), id: 'd1' }
+  const box = createShape('rectangle', { x: 0, y: 0, width: 10, height: 10 }, 1)
+
+  it('maps PNG pixels to drawing coordinates', () => {
+    expect(
+      formatRender({
+        doc,
+        revision: 3,
+        format: 'png',
+        theme: 'light',
+        elements: [box],
+        frame: { x: -16, y: 20, width: 300, height: 150 },
+        scale: 2,
+      }),
+    ).toBe(
+      [
+        'Rendered "Plan" (id d1, rev 3) as PNG, light: 1 elements',
+        'frame -16,20 300x150 in drawing units',
+        'scale 2: 600x300 px; pixel (px,py) is drawing point (-16 + px/2, 20 + py/2)',
+      ].join('\n'),
+    )
+  })
+
+  it('keeps the mapping exact for a tiny scale and a fractional origin', () => {
+    // A 5,000,000-unit region fits 2048 px at scale 0.0004096; rounding it to
+    // 3 decimals printed "px/0". The origin keeps its fraction too.
+    const frame = { x: 10.25, y: -3.5, width: 5_000_000, height: 1000 }
+    const scale = 2048 / frame.width
+    const line = formatRender({
+      doc,
+      revision: 1,
+      format: 'png',
+      theme: 'light',
+      elements: [box],
+      frame,
+      scale,
+    }).split('\n')[2]!
+    expect(line).toBe(
+      'scale 0.0004096: 2048x1 px; pixel (px,py) is drawing point (10.25 + px/0.0004096, -3.5 + py/0.0004096)',
+    )
+    // The printed formula lands the right edge on the frame's right edge.
+    const [, x, divisor] = /\((\S+) \+ px\/(\S+),/.exec(line)!
+    expect(Number(x) + 2048 / Number(divisor)).toBeCloseTo(
+      frame.x + frame.width,
+      0,
+    )
+  })
+
+  it('keeps a large origin exact to a hundredth of a unit', () => {
+    // Six significant digits printed 1234567 as 1234570: 6 px off at scale 2.
+    const frame = { x: 1234567.123, y: -9876543.456, width: 100, height: 100 }
+    const line = formatRender({
+      doc,
+      revision: 1,
+      format: 'png',
+      theme: 'light',
+      elements: [box],
+      frame,
+      scale: 2,
+    }).split('\n')[2]!
+    expect(line).toBe(
+      'scale 2: 200x200 px; pixel (px,py) is drawing point (1234567.12 + px/2, -9876543.46 + py/2)',
+    )
+  })
+
+  it('has no scale line for an SVG, and names image placeholders', () => {
+    const image = createImage(
+      'f1',
+      { width: 40, height: 40 },
+      {
+        x: 0,
+        y: 0,
+        width: 400,
+        height: 400,
+      },
+    )
+    const text = formatRender({
+      doc,
+      revision: 1,
+      format: 'svg',
+      theme: 'dark',
+      elements: [box, image],
+      frame: { x: 0, y: 0, width: 50, height: 50 },
+    })
+    expect(text).not.toContain('scale')
+    expect(text.split('\n').at(-1)).toBe(
+      "1 image elements are drawn as grey placeholders: render_drawing can't load image files yet.",
     )
   })
 })

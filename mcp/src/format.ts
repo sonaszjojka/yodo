@@ -29,6 +29,16 @@ function box({ x, y, width, height }: Bounds): string {
   return `${r(x)},${r(y)} ${r(width)}x${r(height)}`
 }
 
+/** A number to six significant digits, without trailing zeros. */
+function precise(value: number): number {
+  return Number(value.toPrecision(6))
+}
+
+/** A coordinate to two decimals: at most 0.02 px off at the largest scale. */
+function hundredths(value: number): number {
+  return Math.round(value * 100) / 100
+}
+
 function iso(epochMs: number): string {
   return new Date(epochMs).toISOString()
 }
@@ -152,6 +162,53 @@ export function formatDrawing(
   if (end < total) {
     lines.push(
       `… ${total - end} more elements: call get_drawing with offset ${end} for the next ones.`,
+    )
+  }
+  return lines.join('\n')
+}
+
+export interface RenderSummary {
+  doc: YodoDocument
+  revision: number
+  format: 'png' | 'svg'
+  theme: 'light' | 'dark'
+  elements: readonly YodoElement[]
+  frame: Bounds
+  /** PNG only: pixels per drawing unit. */
+  scale?: number
+}
+
+/**
+ * The text beside a rendered image: what it shows and how its pixels map to
+ * drawing coordinates, so the agent can place things by what it sees.
+ */
+export function formatRender({
+  doc,
+  revision,
+  format,
+  theme,
+  elements,
+  frame,
+  scale,
+}: RenderSummary): string {
+  const lines = [
+    `Rendered ${quote(doc.name)} (id ${doc.id}, rev ${revision}) as ${format.toUpperCase()}, ${theme}: ${elements.length} elements`,
+    `frame ${box(frame)} in drawing units`,
+  ]
+  if (scale !== undefined) {
+    // The scale to six significant digits, since a fitted one can be tiny
+    // (0.0004096); the origin to a hundredth of a unit, since it can be
+    // large (1234567). Either way the mapping stays well under a pixel off.
+    const s = precise(scale)
+    lines.push(
+      `scale ${s}: ${Math.ceil(frame.width * scale)}x${Math.ceil(frame.height * scale)} px; ` +
+        `pixel (px,py) is drawing point (${hundredths(frame.x)} + px/${s}, ${hundredths(frame.y)} + py/${s})`,
+    )
+  }
+  const images = elements.filter((element) => element.type === 'image').length
+  if (images > 0) {
+    lines.push(
+      `${images} image elements are drawn as grey placeholders: render_drawing can't load image files yet.`,
     )
   }
   return lines.join('\n')
