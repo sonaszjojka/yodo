@@ -49,38 +49,70 @@ import {
   type Measure,
 } from '../text/layout.ts'
 
-export type SceneContext = Pick<
-  CanvasRenderingContext2D,
-  | 'setTransform'
-  | 'clearRect'
-  | 'fillRect'
-  | 'save'
-  | 'restore'
-  | 'globalAlpha'
-  | 'beginPath'
-  | 'rect'
-  | 'drawImage'
-  | 'roundRect'
-  | 'stroke'
-  | 'fill'
-  | 'strokeStyle'
-  | 'fillStyle'
-  | 'lineWidth'
-  | 'font'
-  | 'textAlign'
-  | 'textBaseline'
-  | 'measureText'
-  | 'fillText'
-  | 'moveTo'
-  | 'lineTo'
-  | 'quadraticCurveTo'
-  | 'lineCap'
-  | 'lineJoin'
-  | 'setLineDash'
-  | 'shadowColor'
-  | 'shadowBlur'
-  | 'shadowOffsetY'
->
+/**
+ * A decoded picture the context can draw (a browser `CanvasImageSource`, or a
+ * `@napi-rs/canvas` `Image` in the MCP server). Opaque to the core.
+ */
+export type SceneImage = object
+
+/**
+ * The members of the Canvas 2D context the scene uses, written out rather than
+ * picked from the DOM's `CanvasRenderingContext2D`: the MCP server type-checks
+ * this module in Node, without the DOM lib (ADR 0061, 0065). The browser's
+ * context and `@napi-rs/canvas`'s both fit it. Style properties also accept
+ * gradients and patterns (`object`) so that a real context is assignable.
+ */
+export interface SceneContext {
+  setTransform(
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+  ): void
+  clearRect(x: number, y: number, width: number, height: number): void
+  fillRect(x: number, y: number, width: number, height: number): void
+  save(): void
+  restore(): void
+  globalAlpha: number
+  beginPath(): void
+  rect(x: number, y: number, width: number, height: number): void
+  drawImage(
+    image: SceneImage,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  ): void
+  roundRect(
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    radii?: number | number[],
+  ): void
+  stroke(): void
+  fill(): void
+  strokeStyle: string | object
+  fillStyle: string | object
+  lineWidth: number
+  font: string
+  textAlign: 'start' | 'end' | 'left' | 'right' | 'center'
+  textBaseline:
+    'top' | 'hanging' | 'middle' | 'alphabetic' | 'ideographic' | 'bottom'
+  measureText(text: string): { width: number }
+  fillText(text: string, x: number, y: number, maxWidth?: number): void
+  moveTo(x: number, y: number): void
+  lineTo(x: number, y: number): void
+  quadraticCurveTo(cpx: number, cpy: number, x: number, y: number): void
+  lineCap: 'butt' | 'round' | 'square'
+  lineJoin: 'bevel' | 'miter' | 'round'
+  setLineDash(segments: number[]): void
+  shadowColor: string
+  shadowBlur: number
+  shadowOffsetY: number
+}
 /** The return value (a Drawable) is unused, so fakes may return nothing. */
 export interface SceneRough {
   rectangle(...args: Parameters<RoughCanvas['rectangle']>): unknown
@@ -102,7 +134,7 @@ export interface Surface {
    * The decoded picture of an image element, or undefined while it loads or
    * if it is missing (a placeholder is drawn then; ADR 0040).
    */
-  images?: (fileId: string) => CanvasImageSource | undefined
+  images?: (fileId: string) => SceneImage | undefined
 
   /** Painted under the elements; transparent when omitted (exports, ADR 0041). */
   background?: string
@@ -315,7 +347,7 @@ function drawImage(
   ctx: SceneContext,
   image: ImageElement,
   theme: Theme,
-  source: CanvasImageSource | undefined,
+  source: SceneImage | undefined,
 ) {
   const { x, y, width, height } = image
   if (source) {
@@ -639,7 +671,7 @@ const SCREEN_MARGIN = 16
  * around its box, which holds it at any angle. Cheap and generous: drawing a
  * few extra elements is fine, skipping a visible one is not.
  */
-function mayBeVisible(
+export function mayBeVisible(
   element: YodoElement,
   view: Bounds,
   zoom: number,
