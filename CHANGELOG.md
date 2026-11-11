@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/sonaszjojka/yodo/compare/v1.4.0...v1.5.0) (2026-11-11)
+
+
+### Features
+
+* **mcp:** add a standalone file backend ([#196](https://github.com/sonaszjojka/yodo/issues/196)) ([694c22e](https://github.com/sonaszjojka/yodo/commit/694c22efcb36e456bcb015a0896c9fd1a986f0be))
+
 ## [1.4.0](https://github.com/sonaszjojka/yodo/compare/v1.3.0...v1.4.0) (2026-11-10)
 
 
