@@ -475,6 +475,12 @@ export function updateElements(
         }
       } else if (!sameBox(before, after)) {
         moved.add(after.id)
+      } else if (
+        (before as { roundness?: string }).roundness !==
+        (after as { roundness?: string }).roundness
+      ) {
+        // Rounded corners change the outline that attached ends sit on.
+        edited.add(after.id)
       }
       elements[at] = after
     }

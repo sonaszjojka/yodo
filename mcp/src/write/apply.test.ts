@@ -311,6 +311,21 @@ describe('updateElements', () => {
     expect(byId<ArrowElement>(doc, 'arr').endBinding?.elementId).toBe('l')
   })
 
+  it('moves a bound arrow end onto the new outline when corners are rounded', () => {
+    let doc = add(createDocument('t'), [
+      { type: 'rectangle', id: 'a', x: 0, y: 0, width: 100, height: 100 },
+      { type: 'rectangle', id: 'b', x: 200, y: 200, width: 100, height: 100 },
+    ])
+    doc = connect(doc, [{ from: 'a', to: 'b', id: 'ab' }])
+    // The facing corners: the start sits exactly on a's sharp corner.
+    expect(ends(byId<ArrowElement>(doc, 'ab'))[0]).toEqual([100, 100])
+    doc = update(doc, [{ id: 'a', roundness: 'round' }])
+    const [start] = ends(byId<ArrowElement>(doc, 'ab'))
+    expect(start[0]).toBeLessThan(100)
+    expect(start[1]).toBeLessThan(100)
+    expect(byId<ArrowElement>(doc, 'ab').startBinding?.elementId).toBe('a')
+  })
+
   it('sets, restyles and removes a label, keeping its alignment', () => {
     let doc = twoBoxes()
     doc = update(doc, [{ id: 'a', label: 'Start', textAlign: 'left' }])
