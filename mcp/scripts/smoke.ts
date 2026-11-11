@@ -81,10 +81,15 @@ try {
     async (client) => {
       const { tools } = await client.listTools()
       assert.deepEqual(tools.map((t) => t.name).sort(), [
+        'add_elements',
+        'connect',
+        'create_drawing',
+        'delete_elements',
         'get_drawing',
         'list_drawings',
         'render_drawing',
         'search_drawings',
+        'update_elements',
       ])
       const text = textOf(
         await client.callTool({ name: 'list_drawings', arguments: {} }),
@@ -93,7 +98,7 @@ try {
     },
   )
   console.log(
-    'smoke: ok (4 tools; list_drawings reached the API with the token)',
+    'smoke: ok (9 tools; list_drawings reached the API with the token)',
   )
 } finally {
   api.close()

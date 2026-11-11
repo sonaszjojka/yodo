@@ -28,6 +28,7 @@ import {
   type SaveOptions,
   type SearchIndexEntry,
 } from '../../web/src/storage/repository.ts'
+import { withDirLock, type LockOptions } from './dirLock.ts'
 
 const EXTENSION = '.yodo'
 const TRASH = '.trash'
@@ -143,12 +144,15 @@ export interface FileRepositoryOptions {
   now?: () => number
   /** Reports a file it skips. Defaults to stderr: stdout is the MCP protocol. */
   warn?: (message: string) => void
+  /** Timing of the cross-process write lock (ADR 0067); tests shorten it. */
+  lock?: LockOptions
 }
 
 export class FileDrawingRepository implements DrawingRepository {
   readonly #dir: string
   readonly #now: () => number
   readonly #warn: (message: string) => void
+  readonly #lock: LockOptions
   /** Every call runs after the one before, so a check and its write are one step. */
   #tail: Promise<unknown> = Promise.resolve()
 
@@ -156,16 +160,27 @@ export class FileDrawingRepository implements DrawingRepository {
     dir,
     now = Date.now,
     warn = (message) => console.error(`yodo-mcp: ${message}`),
+    lock = {},
   }: FileRepositoryOptions) {
     this.#dir = dir
     this.#now = now
     this.#warn = warn
+    this.#lock = lock
   }
 
   #run<T>(task: () => Promise<T>): Promise<T> {
     const result = this.#tail.then(task)
     this.#tail = result.catch(() => {})
     return result
+  }
+
+  /**
+   * A call that writes: in turn within this process, and under the directory
+   * lock across processes, so its revision check and writes are one step for
+   * every process sharing the directory (ADR 0062, 0067).
+   */
+  #runWrite<T>(task: () => Promise<T>): Promise<T> {
+    return this.#run(() => withDirLock(this.#dir, task, this.#lock))
   }
 
   #livePath(name: string): string {
@@ -332,7 +347,7 @@ export class FileDrawingRepository implements DrawingRepository {
     doc: YodoDocument,
     { expectedRevision }: SaveOptions = {},
   ): Promise<DrawingSummary> {
-    return this.#run(async () => {
+    return this.#runWrite(async () => {
       if (fileNameFor(doc.id) === undefined) {
         throw new Error(
           `Drawing id ${JSON.stringify(doc.id)} can't be a file name`,
@@ -384,7 +399,7 @@ export class FileDrawingRepository implements DrawingRepository {
   }
 
   trash(id: string): Promise<DrawingSummary | undefined> {
-    return this.#run(async () => {
+    return this.#runWrite(async () => {
       const existing = await this.#entry(id)
       if (!existing) return undefined
       if (existing.trashed) return summaryOf(existing)
@@ -401,7 +416,7 @@ export class FileDrawingRepository implements DrawingRepository {
   }
 
   restore(id: string): Promise<DrawingSummary | undefined> {
-    return this.#run(async () => {
+    return this.#runWrite(async () => {
       const existing = await this.#entry(id)
       if (!existing) return undefined
       if (!existing.trashed) return summaryOf(existing)
@@ -416,7 +431,7 @@ export class FileDrawingRepository implements DrawingRepository {
   emptyTrash({
     deletedBefore,
   }: { deletedBefore?: number } = {}): Promise<void> {
-    return this.#run(async () => {
+    return this.#runWrite(async () => {
       for (const { doc, meta } of await this.#trashed()) {
         if (deletedBefore !== undefined && meta.deletedAt! >= deletedBefore) {
           continue
@@ -427,7 +442,7 @@ export class FileDrawingRepository implements DrawingRepository {
   }
 
   delete(id: string): Promise<void> {
-    return this.#run(async () => {
+    return this.#runWrite(async () => {
       const name = fileNameFor(id)
       if (name !== undefined) await this.#remove(name)
     })
