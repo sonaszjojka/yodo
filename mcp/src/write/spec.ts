@@ -159,3 +159,35 @@ export const connectionSpec = z.strictObject({
 })
 
 export type ConnectionSpec = z.infer<typeof connectionSpec>
+
+/** A create_diagram node: its size and place come from the layout (ADR 0068). */
+export const diagramNode = z.strictObject({
+  id: elementId.describe(
+    'Required: edges refer to it, and it becomes the element id.',
+  ),
+  label: content.describe('The text inside the shape; \\n starts a new line.'),
+  shape: z.enum(['rectangle', 'diamond', 'ellipse']).optional(),
+  backgroundColor: background
+    .optional()
+    .describe('Fill colour (#rrggbb, filled solid), or "transparent".'),
+  strokeColor,
+})
+
+export type DiagramNode = z.infer<typeof diagramNode>
+
+export const diagramEdge = z.strictObject({
+  from: z.string().min(1).describe('Id of the node the arrow starts at.'),
+  to: z.string().min(1).describe('Id of the node the arrow points to.'),
+  id: elementId.optional(),
+  label: content.optional().describe('Text shown beside the arrow.'),
+  startArrowhead: arrowhead,
+  endArrowhead: arrowhead.describe('Default "arrow"; null for none.'),
+})
+
+export type DiagramEdge = z.infer<typeof diagramEdge>
+
+export const direction = z
+  .enum(['TB', 'BT', 'LR', 'RL'])
+  .describe(
+    'Which way the graph flows: TB top to bottom (default), BT, LR left to right, RL.',
+  )

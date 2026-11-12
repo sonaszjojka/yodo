@@ -43,10 +43,10 @@ import type { ConnectionSpec, ElementPatch, NewElementSpec } from './spec.ts'
 
 export type Applied = { doc: YodoDocument; ids: string[] } | { error: string }
 
-class SpecError extends Error {}
+export class SpecError extends Error {}
 
 /** Runs `body`, turning a SpecError into the call's error result. */
-function attempt(body: () => Applied): Applied {
+export function attempt(body: () => Applied): Applied {
   try {
     return body()
   } catch (error) {
@@ -58,7 +58,7 @@ function attempt(body: () => Applied): Applied {
 const quote = JSON.stringify
 
 /** The geometry of absolute world points, stored relative to the first. */
-function geometryOf(points: readonly Point[]): LinearGeometry {
+export function geometryOf(points: readonly Point[]): LinearGeometry {
   const [x, y] = points[0]!
   const xs = points.map((p) => p[0])
   const ys = points.map((p) => p[1])
@@ -79,7 +79,7 @@ function absolutePoints(element: { x: number; y: number; points: Point[] }) {
 }
 
 /** The spec's style fields over the built-in style. */
-function styleOf(spec: Partial<ElementStyle>): ElementStyle {
+export function styleOf(spec: Partial<ElementStyle>): ElementStyle {
   const style: ElementStyle = { ...BUILT_IN_STYLE }
   for (const key of Object.keys(style) as (keyof ElementStyle)[]) {
     if (spec[key] !== undefined) {
@@ -90,7 +90,7 @@ function styleOf(spec: Partial<ElementStyle>): ElementStyle {
 }
 
 /** Ids already in `elements`, plus a check that reserves a new one. */
-function idChecker(elements: readonly YodoElement[]) {
+export function idChecker(elements: readonly YodoElement[]) {
   const used = new Set(elements.map((e) => e.id))
   return (wanted: string | undefined): string => {
     if (wanted === undefined) {
@@ -110,7 +110,7 @@ function idChecker(elements: readonly YodoElement[]) {
 }
 
 /** A label set with the spec's font, aligned as asked (default centre). */
-function labelled<T extends YodoElement>(
+export function labelled<T extends YodoElement>(
   shape: T,
   text: string | undefined,
   font: Partial<Pick<TextLabel, 'fontFamily' | 'fontSize' | 'textAlign'>>,
@@ -216,7 +216,11 @@ function check(before: readonly YodoElement[], after: readonly YodoElement[]) {
   }
 }
 
-function changed(doc: YodoDocument, elements: YodoElement[], ids: string[]) {
+export function changed(
+  doc: YodoDocument,
+  elements: YodoElement[],
+  ids: string[],
+) {
   check(doc.elements, elements)
   return { doc: { ...doc, elements }, ids }
 }

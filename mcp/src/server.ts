@@ -23,6 +23,7 @@ import {
   type RenderTarget,
 } from './render/render.ts'
 import { nodeMeasure } from './render/measure.ts'
+import { addDiagram } from './diagram/build.ts'
 import {
   addElements,
   connectElements,
@@ -32,6 +33,9 @@ import {
 import { createDrawing, writeDrawing, type Written } from './write/save.ts'
 import {
   connectionSpec,
+  diagramEdge,
+  diagramNode,
+  direction,
   elementPatch,
   MAX_ITEMS,
   newElementSpec,
@@ -56,6 +60,8 @@ fontFamily (hand, sans, mono), fontSize, textAlign; arrows take startArrowhead a
 Give an element an id (letters, digits, - and _) to refer to it later in the same session;
 otherwise one is made. Use connect, not a plain arrow, to join two elements: its arrow stays
 attached when they move.
+For a flowchart or any box-and-arrow diagram, prefer create_diagram: give nodes, edges and a
+direction, and it sizes, places and connects the shapes for you.
 Every write takes the drawing's revision (the "rev" get_drawing shows). If someone else saved
 in between, the write is refused: call get_drawing again and retry.`
 
@@ -552,6 +558,75 @@ export function createServer(
           ),
         ),
       ),
+  )
+
+  server.registerTool(
+    'create_diagram',
+    {
+      title: 'Create a diagram',
+      description:
+        'Lays out a flowchart or box-and-arrow diagram from nodes and edges, with no coordinates needed: ' +
+        'each node becomes a shape sized to its label, each edge an arrow attached at both ends, with its label beside it. ' +
+        'Give name for a new drawing, or drawingId (and revision) to add the diagram below what a drawing has. ' +
+        'Returns the ids: nodes, then arrows, then edge labels.',
+      inputSchema: z.object({
+        name: z
+          .string()
+          .trim()
+          .min(1)
+          .max(200)
+          .optional()
+          .describe('The name of a new drawing. Give this or drawingId.'),
+        drawingId: drawingId
+          .optional()
+          .describe('An existing drawing to add to. Give this or name.'),
+        revision,
+        nodes: z
+          .array(diagramNode)
+          .min(1)
+          .max(MAX_ITEMS)
+          .describe('The shapes: id, label, optional shape and colours.'),
+        edges: z
+          .array(diagramEdge)
+          .max(MAX_ITEMS)
+          .optional()
+          .describe('The arrows between nodes, by node id.'),
+        direction: direction.optional(),
+        x: z
+          .number()
+          .optional()
+          .describe("Left edge of the diagram; default: the drawing's left."),
+        y: z
+          .number()
+          .optional()
+          .describe('Top edge of the diagram; default: below the drawing.'),
+      }),
+      outputSchema: writeOutput('created'),
+      annotations: writes(),
+    },
+    ({ name, drawingId: id, revision: rev, nodes, edges = [], ...place }) =>
+      run(async () => {
+        if ((name === undefined) === (id === undefined)) {
+          return failure(
+            'Give either name (for a new drawing) or drawingId (to add to one), not both or neither.',
+          )
+        }
+        const spec = {
+          nodes,
+          edges,
+          direction: place.direction ?? 'TB',
+          ...(place.x !== undefined ? { x: place.x } : {}),
+          ...(place.y !== undefined ? { y: place.y } : {}),
+        }
+        const change = (doc: Parameters<typeof addDiagram>[0]) =>
+          addDiagram(doc, spec, nodeMeasure())
+        return result(
+          'created',
+          id === undefined
+            ? await createDrawing(repo, createDocument(name!), change)
+            : await writeDrawing(repo, id, rev, change),
+        )
+      }),
   )
 
   return server

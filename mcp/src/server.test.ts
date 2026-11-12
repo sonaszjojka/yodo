@@ -142,6 +142,7 @@ describe.each(backends)('tools %s', (_name, make) => {
       const writes = [
         'add_elements',
         'connect',
+        'create_diagram',
         'create_drawing',
         'delete_elements',
         'update_elements',
@@ -541,6 +542,114 @@ describe.each(backends)('write tools %s', (_name, make) => {
       })
       const text = await outline(client, created.drawingId)
       expect(text).toMatch(/a-b.*a.*b/)
+    })
+  })
+
+  describe('create_diagram', () => {
+    const nodes = [
+      { id: 'start', label: 'Start' },
+      { id: 'ok', label: 'Valid?', shape: 'diamond' },
+      { id: 'done', label: 'Done', shape: 'ellipse' },
+    ]
+    const edges = [
+      { from: 'start', to: 'ok' },
+      { from: 'ok', to: 'done', label: 'yes', id: 'yes' },
+    ]
+
+    it('lays out a new drawing with shapes, bound arrows and labels', async () => {
+      const repo = await seeded(make)
+      const client = await connect(repo)
+      const out = written(
+        await call(client, 'create_diagram', {
+          name: 'Flow',
+          nodes,
+          edges,
+          direction: 'LR',
+        }),
+      )
+      expect(out.revision).toBe(1)
+      expect(out.created?.slice(0, 3)).toEqual(['start', 'ok', 'done'])
+      expect(out.created).toContain('yes')
+      expect(out.created).toHaveLength(6)
+      const stored = await repo.getWithRevision(out.drawingId)
+      expect(stored?.doc.name).toBe('Flow')
+      const arrow = stored?.doc.elements.find((e) => e.id === 'yes')
+      expect(arrow).toMatchObject({
+        type: 'arrow',
+        startBinding: { elementId: 'ok' },
+        endBinding: { elementId: 'done' },
+      })
+      expect(await outline(client, out.drawingId)).toContain('Valid?')
+    })
+
+    it('adds to an existing drawing at its revision', async () => {
+      const repo = await seeded(make)
+      const client = await connect(repo)
+      const out = written(
+        await call(client, 'create_diagram', {
+          drawingId: 'd-login',
+          revision: 1,
+          nodes,
+          edges,
+        }),
+      )
+      expect(out).toMatchObject({ drawingId: 'd-login', revision: 2 })
+      const stored = await repo.getWithRevision('d-login')
+      expect(stored?.doc.elements).toHaveLength(1 + 6)
+    })
+
+    it('refuses a stale revision and changes nothing', async () => {
+      const repo = await seeded(make)
+      const client = await connect(repo)
+      const result = await call(client, 'create_diagram', {
+        drawingId: 'd-login',
+        revision: 7,
+        nodes,
+      })
+      expect(result.isError).toBe(true)
+      expect(textOf(result)).toContain('Call get_drawing again')
+      expect((await repo.getWithRevision('d-login'))?.revision).toBe(1)
+    })
+
+    it('needs exactly one of name and drawingId', async () => {
+      const client = await connect(await seeded(make))
+      for (const args of [
+        { nodes },
+        { name: 'X', drawingId: 'd-login', nodes },
+      ]) {
+        const result = await call(client, 'create_diagram', args)
+        expect(result.isError).toBe(true)
+        expect(textOf(result)).toContain('name')
+        expect(textOf(result)).toContain('drawingId')
+      }
+    })
+
+    it('refuses an edge to a missing node and saves nothing', async () => {
+      const repo = await seeded(make)
+      const client = await connect(repo)
+      const result = await call(client, 'create_diagram', {
+        name: 'Broken',
+        nodes,
+        edges: [{ from: 'start', to: 'nowhere' }],
+      })
+      expect(result.isError).toBe(true)
+      expect(textOf(result)).toContain('"nowhere"')
+      expect((await repo.list()).map((s) => s.name)).not.toContain('Broken')
+    })
+
+    it('renders the result with render_drawing', async () => {
+      const client = await connect(await seeded(make))
+      const out = written(
+        await call(client, 'create_diagram', { name: 'Flow', nodes, edges }),
+      )
+      const result = await client.callTool({
+        name: 'render_drawing',
+        arguments: { id: out.drawingId },
+      })
+      const blocks = result.content as { type: string; data?: string }[]
+      expect(blocks.map((b) => b.type)).toEqual(['text', 'image'])
+      const png = Buffer.from(blocks[1]!.data!, 'base64')
+      expect(png.subarray(1, 4).toString('latin1')).toBe('PNG')
     })
   })
 

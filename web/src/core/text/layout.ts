@@ -111,7 +111,7 @@ type LabelledShape =
   RectangleElement | DiamondElement | EllipseElement | NoteElement
 
 /** How much of each side of the box the shape's inside can hold text in. */
-const INNER_RATIO: Record<LabelledShape['type'], number> = {
+export const INNER_RATIO: Record<LabelledShape['type'], number> = {
   rectangle: 1,
   note: 1,
   // The largest rectangle with the box's proportions inside the shape.
