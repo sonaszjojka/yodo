@@ -339,7 +339,8 @@ export function addDiagram(
     const segments = routes.flatMap((points) =>
       points.slice(1).map((p, j) => [points[j]!, p] as const),
     )
-    const obstacles = [...shapes.values()]
+    // Shapes, then every label already placed, so labels don't land on each other.
+    const obstacles: Bounds[] = [...shapes.values()]
     const texts: TextElement[] = []
     labels.forEach((label, i) => {
       const centre = layout.edges.get(edgeIds[i]!)!.label
@@ -357,6 +358,7 @@ export function addDiagram(
         obstacles,
       )
       texts.push({ ...label, id: reserve(undefined), x: box.x, y: box.y })
+      obstacles.push(box)
     })
 
     const created = [...shapes.values(), ...arrows, ...texts]

@@ -137,7 +137,15 @@ function expectNoCrossings(doc: YodoDocument) {
 
 /** No label touches a node or any arrow, its own included. */
 function expectClearLabels(doc: YodoDocument) {
-  for (const label of texts(doc)) {
+  const labels = texts(doc)
+  labels.forEach((label, i) => {
+    for (const other of labels.slice(i + 1)) {
+      expect(overlaps(label, other), `${label.text} on ${other.text}`).toBe(
+        false,
+      )
+    }
+  })
+  for (const label of labels) {
     for (const shape of boxes(doc)) {
       expect(overlaps(label, shape), `${label.text} on ${shape.id}`).toBe(false)
     }
@@ -373,6 +381,32 @@ describe('addDiagram', () => {
         )
         expectClearLabels(doc)
         expectNoCrossings(doc)
+      }
+    })
+
+    it('stay clear of each other where two edges cross', () => {
+      // Codex review round 1, finding 2: labels used to be placed only
+      // against shapes and arrows, so one could land on another.
+      const nodes = [0, 1, 2, 3].map((n) =>
+        node(String(n), { label: `Node ${n}` }),
+      )
+      const edges = [
+        edge('0', '3', { label: 'edge 0 to 3' }),
+        edge('1', '2', { label: 'edge 1 to 2' }),
+        edge('1', '3', { label: 'edge 1 to 3' }),
+      ]
+      for (const direction of DIRECTIONS) {
+        // With this file's measure and with one close to the hand font's.
+        for (const width of [10, 6.74]) {
+          const { doc } = ok(
+            addDiagram(
+              createDocument('d'),
+              { nodes, edges, direction },
+              (text) => text.length * width,
+            ),
+          )
+          expectClearLabels(doc)
+        }
       }
     })
 
