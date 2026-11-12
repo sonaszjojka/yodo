@@ -126,4 +126,15 @@ describe('layoutGraph', () => {
       layoutGraph([a, b, c], [edge('a', 'b'), edge('a', 'c')], 'TB')
     expect(run()).toEqual(run())
   })
+
+  it('lays out ids that are Object.prototype keys', () => {
+    const ids = ['constructor', 'toString', 'hasOwnProperty', '__proto__']
+    const layout = layoutGraph(
+      ids.map((id) => box(id)),
+      ids.slice(1).map((id, i) => edge(ids[i]!, id, id)),
+      'TB',
+    )
+    expect([...layout.nodes.keys()]).toEqual(ids)
+    expect(layout.edges.get('toString')!.points.length).toBeGreaterThan(1)
+  })
 })

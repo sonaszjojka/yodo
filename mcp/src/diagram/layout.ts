@@ -50,13 +50,18 @@ export function layoutGraph(
     marginy: 0,
   })
   g.setDefaultEdgeLabel(() => ({}))
-  for (const node of nodes) {
-    g.setNode(node.id, { width: node.width, height: node.height })
-  }
-  for (const edge of edges) {
+  // graphlib keys plain objects by node id, so an agent's id such as
+  // "constructor" or "__proto__" would hit Object.prototype. dagre only sees
+  // ids of our own; the result is keyed by the caller's ids again.
+  const inner = new Map(nodes.map((node, i) => [node.id, `n${i}`]))
+  const nodeOf = (id: string) => inner.get(id) ?? id
+  nodes.forEach((node, i) => {
+    g.setNode(`n${i}`, { width: node.width, height: node.height })
+  })
+  edges.forEach((edge, i) => {
     g.setEdge(
-      edge.from,
-      edge.to,
+      nodeOf(edge.from),
+      nodeOf(edge.to),
       edge.label
         ? {
             width: edge.label.width,
@@ -67,13 +72,13 @@ export function layoutGraph(
             labeloffset: LABEL_OFFSET,
           }
         : {},
-      edge.key,
+      `e${i}`,
     )
-  }
+  })
   dagre.layout(g)
 
-  const placed = nodes.map((node) => {
-    const at = g.node(node.id) as { x: number; y: number }
+  const placed = nodes.map((node, i) => {
+    const at = g.node(`n${i}`) as { x: number; y: number }
     return { node, x: at.x - node.width / 2, y: at.y - node.height / 2 }
   })
   const left = Math.min(...placed.map((p) => p.x))
@@ -92,8 +97,12 @@ export function layoutGraph(
     layout.width = Math.max(layout.width, px + node.width)
     layout.height = Math.max(layout.height, py + node.height)
   }
-  for (const edge of edges) {
-    const routed = g.edge({ v: edge.from, w: edge.to, name: edge.key }) as {
+  edges.forEach((edge, i) => {
+    const routed = g.edge({
+      v: nodeOf(edge.from),
+      w: nodeOf(edge.to),
+      name: `e${i}`,
+    }) as {
       points: { x: number; y: number }[]
       x?: number
       y?: number
@@ -104,6 +113,6 @@ export function layoutGraph(
         ? { label: shift(routed.x, routed.y) }
         : {}),
     })
-  }
+  })
   return layout
 }

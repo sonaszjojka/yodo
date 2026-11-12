@@ -473,6 +473,26 @@ describe('addDiagram', () => {
     })
   })
 
+  it('builds a diagram whose ids are Object.prototype keys', () => {
+    const { doc } = diagram(
+      [node('constructor'), node('__proto__'), node('toString')],
+      [
+        edge('constructor', '__proto__', { id: 'hasOwnProperty' }),
+        edge('__proto__', 'toString', { label: 'next' }),
+      ],
+    )
+    expect(boxes(doc).map((e) => e.id)).toEqual([
+      'constructor',
+      '__proto__',
+      'toString',
+    ])
+    expect(arrows(doc)[0]).toMatchObject({
+      id: 'hasOwnProperty',
+      startBinding: { elementId: 'constructor' },
+      endBinding: { elementId: '__proto__' },
+    })
+  })
+
   describe('errors', () => {
     const run = (
       nodes: DiagramNode[],
