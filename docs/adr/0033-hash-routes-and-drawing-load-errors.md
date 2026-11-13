@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-11-04
+- Amended: 2026-11-13 — the routes so far: `#/` (Home), `#/d/<id>` (editor), `#/f/<id>` (folder, 0045), `#/trash` (0046), `#/open/<data>` (open link, [0069](0069-open-links-drawing-in-url-fragment.md))
 
 ## Context
 Roadmap 1.15 adds the Home screen and the routes `#/` (Home) and `#/d/:id` (editor). Hash routing itself was settled in [0007](0007-distribution-pages-and-docker-go-server.md): GitHub Pages has no SPA fallback, and the build must work under `/yodo/` and `/`. Still open: how the app reads the route, and what startup does now that Home exists.
