@@ -8,9 +8,16 @@ import {
   createShape,
   createText,
 } from '../document/create.ts'
-import type { TextElement, YodoElement } from '../document/types.ts'
+import type {
+  ArrowElement,
+  Point,
+  TextElement,
+  YodoElement,
+} from '../document/types.ts'
 import { estimateMeasure, layoutText } from '../text/layout.ts'
 import { BUILT_IN_STYLE } from '../document/create.ts'
+import { lineFromDrag } from '../geometry/line.ts'
+import { type BindableElement, snapToOutline } from './binding.ts'
 import {
   applyDefaults,
   applyStyle,
@@ -249,6 +256,75 @@ describe('roundness (corners)', () => {
     )
     expect(result.elements[0]).toMatchObject({ roundness: 'round' })
     expect(result.elements[1]).toBe(line)
+  })
+})
+
+describe('corners and attached arrows (#202)', () => {
+  const box = { x: 0, y: 0, width: 100, height: 100 }
+
+  // An arrow from `corner` of `shape` to empty space, its start attached.
+  function attached(shape: BindableElement, corner: Point): ArrowElement {
+    const arrow = createLinear(
+      'arrow',
+      lineFromDrag(corner, [corner[0] + 100, corner[1] + 100], false),
+    )
+    return { ...arrow, startBinding: snapToOutline(shape, corner).binding }
+  }
+
+  function startOf(arrow: YodoElement): Point {
+    const [x, y] = (arrow as ArrowElement).points[0]!
+    return [arrow.x + x, arrow.y + y]
+  }
+
+  // The point is on the shape's outline when snapping it there moves nothing.
+  function expectOnOutline(shape: YodoElement, point: Point) {
+    const [x, y] = snapToOutline(shape as BindableElement, point).point
+    expect(x).toBeCloseTo(point[0], 6)
+    expect(y).toBeCloseTo(point[1], 6)
+  }
+
+  test.each([
+    ['rectangle', [100, 100]],
+    ['diamond', [100, 50]],
+  ] as const)(
+    'rounding a %s moves the attached end onto the new outline',
+    (type, corner) => {
+      const shape = createShape(type, box) as BindableElement
+      const arrow = attached(shape, [...corner])
+      const round = applyStyle(
+        doc([shape, arrow]),
+        [shape.id],
+        { roundness: 'round' },
+        estimateMeasure,
+      )
+      const [roundShape, roundArrow] = round.elements
+      expect(startOf(roundArrow!)).not.toEqual(corner)
+      expectOnOutline(roundShape!, startOf(roundArrow!))
+
+      // Each snap stores a new ratio (ADR 0048), so going back to sharp puts
+      // the end on the sharp outline, not back at the corner; undo does that.
+      const sharp = applyStyle(
+        round,
+        [shape.id],
+        { roundness: 'sharp' },
+        estimateMeasure,
+      )
+      const [sharpShape, sharpArrow] = sharp.elements
+      expect(startOf(sharpArrow!)).not.toEqual(startOf(roundArrow!))
+      expectOnOutline(sharpShape!, startOf(sharpArrow!))
+    },
+  )
+
+  test('a change that keeps the corners leaves the arrow alone', () => {
+    const shape = createShape('rectangle', box) as BindableElement
+    const arrow = attached(shape, [100, 100])
+    const result = applyStyle(
+      doc([shape, arrow]),
+      [shape.id],
+      { strokeColor: '#C2453D' },
+      estimateMeasure,
+    )
+    expect(result.elements[1]).toBe(arrow)
   })
 })
 
