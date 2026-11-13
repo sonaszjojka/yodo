@@ -875,9 +875,7 @@ const imageBackends: [
       const repo = new InMemoryDrawingRepository()
       await repo.save(doc)
       const images: ImageSource = {
-        async read(_id, fileIds) {
-          return new Map(fileIds.map((id) => [id, stored[id]]))
-        },
+        open: async () => async (fileId) => stored[fileId],
       }
       return { repo, images }
     },
@@ -900,7 +898,12 @@ const imageBackends: [
       const repo = new FileDrawingRepository({ dir })
       return {
         repo,
-        images: { read: (id, fileIds) => repo.imageFiles(id, fileIds) },
+        images: {
+          async open(id) {
+            const read = await repo.imageFiles(id)
+            return async (fileId) => read(fileId)
+          },
+        },
       }
     },
   ],

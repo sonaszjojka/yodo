@@ -441,20 +441,20 @@ describe('FileDrawingRepository images (ADR 0070)', () => {
 
   test('reads the inlined bytes and type of each image asked for', async () => {
     const { repo, doc } = await withImage()
-    const reads = await repo.imageFiles(doc.id, [hash, 'b'.repeat(64)])
-    expect(reads.get(hash)).toEqual({
+    const read = await repo.imageFiles(doc.id)
+    expect(read(hash)).toEqual({
       bytes: new Uint8Array([1, 2, 3]),
       mimeType: 'image/png',
     })
-    expect(reads.has('b'.repeat(64))).toBe(true)
-    expect(reads.get('b'.repeat(64))).toBeUndefined()
+    expect(read('b'.repeat(64))).toBeUndefined()
+    // Not an own entry of the files section.
+    expect(read('constructor')).toBeUndefined()
   })
 
   test('reads the drawing in Trash too, and nothing for an unknown one', async () => {
     const { repo, doc } = await withImage()
     await repo.trash(doc.id)
-    expect((await repo.imageFiles(doc.id, [hash])).get(hash)).toBeDefined()
-    const none = await repo.imageFiles('nope', [hash])
-    expect(none.get(hash)).toBeUndefined()
+    expect((await repo.imageFiles(doc.id))(hash)).toBeDefined()
+    expect((await repo.imageFiles('nope'))(hash)).toBeUndefined()
   })
 })

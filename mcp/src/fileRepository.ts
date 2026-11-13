@@ -364,28 +364,23 @@ export class FileDrawingRepository implements DrawingRepository {
 
   /**
    * The inlined images of a drawing (live or in Trash) for render_drawing
-   * (ADR 0070): each asked fileId's bytes and type, undefined when the file
-   * doesn't hold it. One read of the file. Images are content-addressed, so a
-   * save since the caller read the drawing can only leave one missing.
+   * (ADR 0070): one read of the file, then a reader that decodes one image's
+   * bytes when asked, undefined when the file doesn't hold it. Images are
+   * content-addressed, so a save since the caller read the drawing can only
+   * leave one missing.
    */
-  imageFiles(
-    id: string,
-    fileIds: readonly string[],
-  ): Promise<Map<string, ImageRead>> {
+  imageFiles(id: string): Promise<(fileId: string) => ImageRead> {
     return this.#run(async () => {
       const files = (await this.#entry(id))?.files ?? {}
-      return new Map(
-        fileIds.map((fileId): [string, ImageRead] => {
-          const entry = Object.hasOwn(files, fileId) ? files[fileId] : undefined
-          return [
-            fileId,
-            entry && {
-              bytes: new Uint8Array(Buffer.from(entry.data, 'base64')),
-              mimeType: entry.mimeType,
-            },
-          ]
-        }),
-      )
+      return (fileId) => {
+        const entry = Object.hasOwn(files, fileId) ? files[fileId] : undefined
+        return (
+          entry && {
+            bytes: new Uint8Array(Buffer.from(entry.data, 'base64')),
+            mimeType: entry.mimeType,
+          }
+        )
+      }
     })
   }
 

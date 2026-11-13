@@ -41,7 +41,12 @@ function main(): void {
         exportFile: (id, revision) => files.exportFile(id, revision),
       },
       // render_drawing reads the pictures inlined in the file (ADR 0070).
-      images: { read: (id, fileIds) => files.imageFiles(id, fileIds) },
+      images: {
+        async open(id) {
+          const read = await files.imageFiles(id)
+          return async (fileId) => read(fileId)
+        },
+      },
     }
   }
   // Default legacy serving: a 2025-era client that opens with `initialize` is

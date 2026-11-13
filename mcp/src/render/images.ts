@@ -35,17 +35,21 @@ export const IMAGE_LIMITS: ImageLimits = {
 export type ImageRead =
   { bytes: Uint8Array; mimeType: string } | { error: string } | undefined
 
+/** Reads one image of an open drawing; never throws for one image. */
+export type ImageReader = (fileId: string) => Promise<ImageRead>
+
 /** Where render_drawing gets image bytes: one per backend (ADR 0070). */
 export interface ImageSource {
-  /** Each requested fileId's bytes in drawing `drawingId`; never throws for one image. */
-  read(
-    drawingId: string,
-    fileIds: readonly string[],
-  ): Promise<Map<string, ImageRead>>
+  /** Opens drawing `drawingId` to read its images one at a time, on demand. */
+  open(drawingId: string): Promise<ImageReader>
 }
 
-/** Requests the HTTP source runs at a time. */
-export const HTTP_IMAGE_CONCURRENCY = 4
+/**
+ * Images read ahead of the one being checked. Each read's bytes are dropped
+ * once it is checked and decoded, so at most this many are held at a time,
+ * however many images a drawing has.
+ */
+export const IMAGE_WINDOW = 4
 
 /**
  * The self-hosted server's images, `GET /api/images/{hash}` through a
@@ -54,34 +58,22 @@ export const HTTP_IMAGE_CONCURRENCY = 4
  */
 export function httpImageSource(repo: HttpImageRepository): ImageSource {
   return {
-    async read(_drawingId, fileIds) {
-      const result = new Map<string, ImageRead>()
-      const queue = [...fileIds]
-      async function worker() {
-        for (let fileId = queue.shift(); fileId; fileId = queue.shift()) {
-          try {
-            const blob = await repo.get(fileId)
-            result.set(
-              fileId,
-              blob && {
-                bytes: new Uint8Array(await blob.arrayBuffer()),
-                mimeType: blob.type,
-              },
-            )
-          } catch (error) {
-            result.set(fileId, {
-              error: error instanceof Error ? error.message : String(error),
-            })
+    async open() {
+      return async (fileId) => {
+        try {
+          const blob = await repo.get(fileId)
+          return (
+            blob && {
+              bytes: new Uint8Array(await blob.arrayBuffer()),
+              mimeType: blob.type,
+            }
+          )
+        } catch (error) {
+          return {
+            error: error instanceof Error ? error.message : String(error),
           }
         }
       }
-      await Promise.all(
-        Array.from(
-          { length: Math.min(HTTP_IMAGE_CONCURRENCY, fileIds.length) },
-          worker,
-        ),
-      )
-      return result
     },
   }
 }
@@ -119,7 +111,9 @@ const RASTER_TYPES: readonly string[] = IMAGE_TYPES
 /**
  * Reads and decodes the pictures of the image elements in `elements` (the
  * ones being rendered), each fileId once, in element order, so the limits
- * favour what is drawn first. Without a source every image is a placeholder.
+ * favour what is drawn first. Reads run at most IMAGE_WINDOW ahead, so the
+ * limits bound what is held, not only what is kept. Without a source every
+ * image is a placeholder.
  */
 export async function loadSceneImages(
   elements: readonly YodoElement[],
@@ -142,17 +136,32 @@ export async function loadSceneImages(
   if (!source) {
     for (const fileId of uses.keys()) failed.set(fileId, 'not loaded')
   } else if (uses.size > 0) {
-    const reads = await source.read(drawingId, [...uses.keys()])
+    const read = await source.open(drawingId)
+    const fileIds = [...uses.keys()]
+    const pending = new Map<number, Promise<ImageRead>>()
+    let started = 0
     let pixels = 0
     let svgBytes = 0
-    for (const [fileId, count] of uses) {
-      const read = reads.get(fileId)
+    for (const [index, fileId] of fileIds.entries()) {
+      while (started < fileIds.length && started < index + IMAGE_WINDOW) {
+        // A reader may still throw; that is one image's failure.
+        pending.set(
+          started,
+          read(fileIds[started]!).catch((error: unknown) => ({
+            error: error instanceof Error ? error.message : String(error),
+          })),
+        )
+        started++
+      }
+      const bytesRead = await pending.get(index)!
+      pending.delete(index)
+      const count = uses.get(fileId)!
       const reason = await (async (): Promise<
         PlaceholderReason | undefined
       > => {
-        if (!read) return 'missing'
-        if ('error' in read) return `read failed: ${read.error}`
-        const { bytes, mimeType } = read
+        if (!bytesRead) return 'missing'
+        if ('error' in bytesRead) return `read failed: ${bytesRead.error}`
+        const { bytes, mimeType } = bytesRead
         if (!RASTER_TYPES.includes(mimeType)) return 'unsupported type'
         if (bytes.byteLength > MAX_IMAGE_BYTES) return 'too large'
         const size = imageSize(bytes)

@@ -9,11 +9,11 @@ Issue [#199](https://github.com/sonaszjojka/yodo/issues/199), the follow-up [006
 Core looks images up synchronously while it draws (`Surface['images']`, `SvgDeps.imageData`), so they must be loaded first. Images may be up to 10 MB each (0040) and any size in pixels, while one tool call runs inside the agent's MCP process: without limits, a render could decode gigabytes of pixels or return an SVG of hundreds of megabytes.
 
 ## Decision
-- **An injected image source.** `createServer` takes an optional `ImageSource` (`mcp/src/render/images.ts`) that reads the bytes of given fileIds for a drawing, and never throws for a single image. `index.ts` passes one per backend:
-  - **HTTP:** `HttpImageRepository` over the same bearer `fetch`, at most 4 requests at a time;
-  - **files:** `FileDrawingRepository.imageFiles`, one read of the drawing's `files`.
+- **An injected image source.** `createServer` takes an optional `ImageSource` (`mcp/src/render/images.ts`) that opens a drawing and reads its images one at a time, never throwing for a single image. `index.ts` passes one per backend:
+  - **HTTP:** `HttpImageRepository` over the same bearer `fetch`;
+  - **files:** `FileDrawingRepository.imageFiles`, one read of the drawing's `files`, then each image's base64 decoded only when it is read.
   Without a source, images stay placeholders.
-- **Load, then draw.** Only the image elements being rendered are loaded, each `fileId` once. Each is checked (a raster type from `IMAGE_TYPES`, at most `MAX_IMAGE_BYTES`), sized from its header without decoding, then decoded with `@napi-rs/canvas`'s `loadImage`. PNG draws the decoded image; SVG embeds the bytes as a `data:` URI.
+- **Load, then draw.** Only the image elements being rendered are loaded, each `fileId` once, in element order, reading at most **4** ahead: each image's bytes are dropped once it is checked, so the limits bound what is held as well as what is kept. Each is checked (a raster type from `IMAGE_TYPES`, at most `MAX_IMAGE_BYTES`), sized from its header without decoding, then decoded with `@napi-rs/canvas`'s `loadImage`. PNG draws the decoded image; SVG embeds the bytes as a `data:` URI.
 - **Limits.** An image past a limit becomes a placeholder:
   - decoded pixels: at most **25 megapixels** per image, and **50 megapixels** for the whole render;
   - SVG only: at most **8 MB** of embedded image bytes, counted once per element that shows them (an image used three times counts three times). Every use of an image that doesn't fit becomes a placeholder.

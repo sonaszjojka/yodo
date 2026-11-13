@@ -217,14 +217,10 @@ describe('real images (ADR 0070)', () => {
   }
   const frame = { x: 0, y: 0, width: 40, height: 40 }
   const red: ImageSource = {
-    async read(_id, fileIds) {
-      return new Map(
-        fileIds.map((id) => [
-          id,
-          { bytes: solidPng(4, 4), mimeType: 'image/png' },
-        ]),
-      )
-    },
+    open: async () => async () => ({
+      bytes: solidPng(4, 4),
+      mimeType: 'image/png',
+    }),
   }
 
   it('draws the picture in a PNG, and the placeholder without one', async () => {

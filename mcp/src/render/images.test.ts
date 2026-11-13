@@ -17,28 +17,33 @@ function image(id: string, fileId: string, x = 0): ImageElement {
 
 /** A source over fixed reads that records what it was asked for. */
 function fake(reads: Record<string, ImageRead>) {
-  const calls: string[][] = []
+  const calls: string[] = []
+  const opened: string[] = []
   const source: ImageSource = {
-    async read(_drawingId, fileIds) {
-      calls.push([...fileIds])
-      return new Map(fileIds.map((id) => [id, reads[id]]))
+    async open(drawingId) {
+      opened.push(drawingId)
+      return async (fileId) => {
+        calls.push(fileId)
+        return reads[fileId]
+      }
     },
   }
-  return { source, calls }
+  return { source, calls, opened }
 }
 
 const png = (bytes = solidPng(4, 4)) => ({ bytes, mimeType: 'image/png' })
 
 describe('loadSceneImages', () => {
   it('reads only the rendered images, each fileId once', async () => {
-    const { source, calls } = fake({ f1: png(), f2: png() })
+    const { source, calls, opened } = fake({ f1: png(), f2: png() })
     const loaded = await loadSceneImages(
       [image('a', 'f1'), image('b', 'f1'), image('c', 'f2')],
       source,
       'd',
       'png',
     )
-    expect(calls).toEqual([['f1', 'f2']])
+    expect(opened).toEqual(['d'])
+    expect(calls).toEqual(['f1', 'f2'])
     expect(loaded.count).toBe(3)
     expect(loaded.placeholders).toEqual([])
     expect(loaded.lookup('f1')).toBeDefined()
@@ -60,9 +65,9 @@ describe('loadSceneImages', () => {
   })
 
   it('does not read when nothing is an image', async () => {
-    const { source, calls } = fake({})
+    const { source, opened } = fake({})
     const loaded = await loadSceneImages([], source, 'd', 'png')
-    expect(calls).toEqual([])
+    expect(opened).toEqual([])
     expect(loaded).toMatchObject({ count: 0, placeholders: [] })
   })
 
@@ -106,6 +111,25 @@ describe('loadSceneImages', () => {
       ['e-cut', 'undecodable'],
     ])
     expect(loaded.lookup('ok')).toBeDefined()
+  })
+
+  it("turns a reader that throws into that one image's failure", async () => {
+    const source: ImageSource = {
+      open: async () => async (fileId) => {
+        if (fileId === 'bad') throw new Error('disk gone')
+        return png()
+      },
+    }
+    const loaded = await loadSceneImages(
+      [image('a', 'bad'), image('b', 'good')],
+      source,
+      'd',
+      'png',
+    )
+    expect(loaded.placeholders).toEqual([
+      { elementId: 'a', fileId: 'bad', reason: 'read failed: disk gone' },
+    ])
+    expect(loaded.lookup('good')).toBeDefined()
   })
 
   it('refuses an image over the pixel limit before decoding it', async () => {
