@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { ConfigError, readConfig, type Config } from './config.ts'
+import {
+  ConfigError,
+  HOSTED_APP_URL,
+  readConfig,
+  type FileConfig,
+} from './config.ts'
 
 const paths = { home: '/home/ada', cwd: '/work' }
+
+function files(env: Record<string, string | undefined>) {
+  const config = readConfig(env, paths)
+  if (config.backend !== 'files') throw new Error('expected the file backend')
+  return config
+}
 
 function http(env: Record<string, string | undefined>) {
   const config = readConfig(env, paths)
@@ -42,7 +53,9 @@ describe('readConfig', () => {
 
 // Without YODO_URL the server keeps files in a directory (ADR 0064).
 describe('readConfig for the file backend', () => {
-  it.each<[Record<string, string>, Config]>([
+  const hosted = new URL(HOSTED_APP_URL)
+
+  it.each<[Record<string, string>, Omit<FileConfig, 'appUrl'>]>([
     [{}, { backend: 'files', dir: '/home/ada/Yodo' }],
     [{ YODO_URL: '  ' }, { backend: 'files', dir: '/home/ada/Yodo' }],
     [{ YODO_MCP_DIR: '/data/yodo' }, { backend: 'files', dir: '/data/yodo' }],
@@ -54,7 +67,22 @@ describe('readConfig for the file backend', () => {
     [{ YODO_MCP_DIR: 'drawings' }, { backend: 'files', dir: '/work/drawings' }],
     [{ YODO_MCP_DIR: '' }, { backend: 'files', dir: '/home/ada/Yodo' }],
   ])('reads %j as %j', (env, config) => {
-    expect(readConfig(env, paths)).toEqual(config)
+    expect(readConfig(env, paths)).toEqual({ ...config, appUrl: hosted })
+  })
+
+  it.each([
+    ['https://draw.example.com/yodo', 'https://draw.example.com/yodo/'],
+    ['http://127.0.0.1:5173/?x=1#/d/a', 'http://127.0.0.1:5173/'],
+    ['  ', HOSTED_APP_URL],
+  ])('reads YODO_APP_URL %j as %s', (raw, root) => {
+    expect(files({ YODO_APP_URL: raw }).appUrl.href).toBe(root)
+  })
+
+  it.each([
+    ['not a url', 'YODO_APP_URL is not a valid URL'],
+    ['javascript:alert(1)', 'YODO_APP_URL must be an http or https URL'],
+  ])('rejects YODO_APP_URL %j', (raw, message) => {
+    expect(() => readConfig({ YODO_APP_URL: raw }, paths)).toThrow(message)
   })
 
   it('prefers YODO_URL when both are set', () => {

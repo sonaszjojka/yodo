@@ -29,8 +29,16 @@ function main(): void {
     options = { baseUrl }
   } else {
     // No server: drawings are `.yodo` files in a directory (ADR 0064).
-    repo = new FileDrawingRepository({ dir: config.dir })
-    options = { dir: config.dir }
+    const files = new FileDrawingRepository({ dir: config.dir })
+    repo = files
+    options = {
+      dir: config.dir,
+      // Write results name the file and an open link for it (ADR 0069).
+      openLinks: {
+        appUrl: config.appUrl,
+        exportFile: (id, revision) => files.exportFile(id, revision),
+      },
+    }
   }
   // Default legacy serving: a 2025-era client that opens with `initialize` is
   // pinned to its own instance from the same factory (ADR 0061). Every

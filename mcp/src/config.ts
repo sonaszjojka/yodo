@@ -17,7 +17,12 @@ export interface FileConfig {
   backend: 'files'
   /** `YODO_MCP_DIR` as an absolute path; `~/Yodo` by default. */
   dir: string
+  /** `YODO_APP_URL`: the Yodo app open links point to (ADR 0069), ending in `/`. */
+  appUrl: URL
 }
+
+/** The hosted app (ADR 0007), where open links point unless told otherwise. */
+export const HOSTED_APP_URL = 'https://sonaszjojka.github.io/yodo/'
 
 export type Config = HttpConfig | FileConfig
 
@@ -44,6 +49,23 @@ function readDir(raw: string | undefined, { home, cwd }: Paths): string {
   return resolve(cwd, dir)
 }
 
+/** An http(s) app root: no query or fragment, and a path ending in `/`. */
+function appRoot(name: string, raw: string): URL {
+  let url: URL
+  try {
+    url = new URL(raw)
+  } catch {
+    throw new ConfigError(`${name} is not a valid URL: ${raw}`)
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new ConfigError(`${name} must be an http or https URL: ${raw}`)
+  }
+  if (!url.pathname.endsWith('/')) url.pathname += '/'
+  url.search = ''
+  url.hash = ''
+  return url
+}
+
 export function readConfig(
   env: Record<string, string | undefined>,
   paths: Paths = { home: homedir(), cwd: process.cwd() },
@@ -57,22 +79,18 @@ export function readConfig(
           'self-hosted Yodo, or unset YODO_API_TOKEN to keep drawings in files.',
       )
     }
-    return { backend: 'files', dir: readDir(env.YODO_MCP_DIR, paths) }
-  }
-  let baseUrl: URL
-  try {
-    baseUrl = new URL(raw)
-  } catch {
-    throw new ConfigError(`YODO_URL is not a valid URL: ${raw}`)
-  }
-  if (baseUrl.protocol !== 'http:' && baseUrl.protocol !== 'https:') {
-    throw new ConfigError(`YODO_URL must be an http or https URL: ${raw}`)
+    return {
+      backend: 'files',
+      dir: readDir(env.YODO_MCP_DIR, paths),
+      appUrl: appRoot(
+        'YODO_APP_URL',
+        env.YODO_APP_URL?.trim() || HOSTED_APP_URL,
+      ),
+    }
   }
   // API paths are relative (ADR 0007), so `/yodo` must become `/yodo/` for
   // `api/drawings` to resolve under it rather than replace its last segment.
-  if (!baseUrl.pathname.endsWith('/')) baseUrl.pathname += '/'
-  baseUrl.search = ''
-  baseUrl.hash = ''
+  const baseUrl = appRoot('YODO_URL', raw)
 
   return token
     ? { backend: 'http', baseUrl, token }

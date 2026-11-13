@@ -31,6 +31,7 @@ import {
   updateElements,
 } from './write/apply.ts'
 import { createDrawing, writeDrawing, type Written } from './write/save.ts'
+import { openLinkFor, type OpenLinks } from './openLinks.ts'
 import {
   connectionSpec,
   diagramEdge,
@@ -63,7 +64,9 @@ attached when they move.
 For a flowchart or any box-and-arrow diagram, prefer create_diagram: give nodes, edges and a
 direction, and it sizes, places and connects the shapes for you.
 Every write takes the drawing's revision (the "rev" get_drawing shows). If someone else saved
-in between, the write is refused: call get_drawing again and retry.`
+in between, the write is refused: call get_drawing again and retry.
+When drawings are files, a write's result also names the .yodo file and, unless the drawing is
+large, gives an "Open in Yodo" link: give the user that link (or the file to import) when you're done.`
 
 /** Tells the agent that a tool only reads, so a client can skip confirmations. */
 const READ_ONLY = { readOnlyHint: true, openWorldHint: false } as const
@@ -99,6 +102,16 @@ function writeOutput(key: 'created' | 'updated' | 'deleted') {
     drawingId: z.string().describe('The drawing that was written.'),
     revision: z.number().int().describe('Its revision after this write.'),
     [key]: writtenIds.describe(`Ids of the ${key} elements, in order.`),
+    file: z
+      .string()
+      .optional()
+      .describe("The drawing's .yodo file (file backend only)."),
+    openUrl: z
+      .string()
+      .optional()
+      .describe(
+        'A link that opens this revision in the Yodo app, to give the user (file backend only; absent for large drawings).',
+      ),
   })
 }
 
@@ -180,6 +193,8 @@ export interface ServerOptions {
   baseUrl?: URL
   /** The file backend's directory, named in file-system errors. */
   dir?: string
+  /** With the file backend: write results add the file and an open link (ADR 0069). */
+  openLinks?: OpenLinks
 }
 
 export function createServer(
@@ -395,19 +410,28 @@ export function createServer(
   )
 
   /** A write's result: the facts as text, and the same as structured content. */
-  function result(
+  async function result(
     key: 'created' | 'updated' | 'deleted',
     outcome: Written,
-  ): TextResult {
+  ): Promise<TextResult> {
     if ('error' in outcome) return failure(outcome.error)
     const { drawingId: id, revision: rev, ids } = outcome
+    const summary =
+      `Drawing ${JSON.stringify(id)} is now at revision ${rev}. ` +
+      `${key[0]!.toUpperCase()}${key.slice(1)} ${ids.length} element(s)` +
+      (ids.length > 0 ? `: ${ids.join(', ')}.` : '.')
+    const structured = { drawingId: id, revision: rev, [key]: ids }
+    if (!options.openLinks) {
+      return { ...text(summary), structuredContent: structured }
+    }
+    const link = await openLinkFor(options.openLinks, id, rev)
     return {
-      ...text(
-        `Drawing ${JSON.stringify(id)} is now at revision ${rev}. ` +
-          `${key[0]!.toUpperCase()}${key.slice(1)} ${ids.length} element(s)` +
-          (ids.length > 0 ? `: ${ids.join(', ')}.` : '.'),
-      ),
-      structuredContent: { drawingId: id, revision: rev, [key]: ids },
+      ...text(`${summary}\n${link.text}`),
+      structuredContent: {
+        ...structured,
+        ...(link.file !== undefined ? { file: link.file } : {}),
+        ...(link.openUrl !== undefined ? { openUrl: link.openUrl } : {}),
+      },
     }
   }
 

@@ -376,3 +376,47 @@ describe('FileDrawingRepository across processes (ADR 0067)', () => {
     expect(await readdir(dir)).not.toContain('.lock')
   })
 })
+
+describe('FileDrawingRepository.exportFile (ADR 0069)', () => {
+  test('gives the path and the export text without metadata', async () => {
+    const { dir, repo } = await setup()
+    const doc = { ...drawing('Plan'), fileIds: ['f1'] }
+    // An app export with an image, dropped into the folder.
+    await writeFile(live(dir, doc.id), serializeYodoFile(doc, { f1: png }))
+
+    const exported = await repo.exportFile(doc.id, 1)
+
+    expect(exported).toEqual({
+      path: live(dir, doc.id),
+      text: expect.any(String),
+    })
+    const parsed = parseYodoFile((exported as { text: string }).text)
+    expect(parsed.document).toEqual(doc)
+    expect(parsed.files).toEqual({ f1: png })
+    expect(parsed.meta).toBeUndefined()
+  })
+
+  test('says changed when another process saved since that revision', async () => {
+    const dir = await tempDir()
+    const agent = new FileDrawingRepository({ dir })
+    const other = new FileDrawingRepository({ dir })
+    const doc = drawing('Shared')
+    const { revision } = await agent.save(doc)
+    await other.save({ ...doc, name: 'Edited elsewhere' })
+
+    expect(await agent.exportFile(doc.id, revision)).toEqual({
+      path: live(dir, doc.id),
+      changed: true,
+    })
+  })
+
+  test('is undefined for a missing or trashed drawing', async () => {
+    const { repo } = await setup()
+    const doc = drawing('Gone')
+    await repo.save(doc)
+    await repo.trash(doc.id)
+
+    expect(await repo.exportFile(doc.id, 1)).toBeUndefined()
+    expect(await repo.exportFile('nope', 1)).toBeUndefined()
+  })
+})

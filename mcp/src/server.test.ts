@@ -21,7 +21,14 @@ import { HttpError } from '../../web/src/storage/http.ts'
 import { InMemoryDrawingRepository } from '../../web/src/storage/memory.ts'
 import type { DrawingRepository } from '../../web/src/storage/repository.ts'
 import { FileDrawingRepository } from './fileRepository.ts'
-import { createServer, INSTRUCTIONS, toolError } from './server.ts'
+import {
+  createServer,
+  INSTRUCTIONS,
+  toolError,
+  type ServerOptions,
+} from './server.ts'
+import { parseYodoFile } from '../../web/src/core/document/file.ts'
+import { decodeOpenLinkData } from '../../web/src/core/document/openLink.ts'
 
 const clients: Client[] = []
 const dirs: string[] = []
@@ -50,10 +57,11 @@ const backends: [string, MakeRepository][] = [
   ],
 ]
 
-async function connect(repo: DrawingRepository): Promise<Client> {
-  const handler = createMcpHandler(() =>
-    createServer(repo, { baseUrl: new URL('http://127.0.0.1:8080/') }),
-  )
+async function connect(
+  repo: DrawingRepository,
+  options: ServerOptions = { baseUrl: new URL('http://127.0.0.1:8080/') },
+): Promise<Client> {
+  const handler = createMcpHandler(() => createServer(repo, options))
   const transport = new StreamableHTTPClientTransport(
     new URL('http://mcp.test/mcp'),
     {
@@ -759,6 +767,72 @@ describe('errors from the server', () => {
     expect(textOf(result)).toBe(
       "Can't reach Yodo at http://127.0.0.1:8080/: fetch failed. Is the server running, and is YODO_URL right?",
     )
+  })
+})
+
+describe('open links with the file backend (ADR 0069)', () => {
+  const appUrl = new URL('https://draw.example.com/yodo/')
+
+  async function fileClient() {
+    const dir = await mkdtemp(join(tmpdir(), 'yodo-mcp-'))
+    dirs.push(dir)
+    const repo = new FileDrawingRepository({ dir })
+    const client = await connect(repo, {
+      dir,
+      openLinks: {
+        appUrl,
+        exportFile: (id, revision) => repo.exportFile(id, revision),
+      },
+    })
+    return { dir, repo, client }
+  }
+
+  it('every write returns the file and a link to that revision', async () => {
+    const { dir, client } = await fileClient()
+    const created = await client.callTool({
+      name: 'create_drawing',
+      arguments: { name: 'Linked', elements: twoBoxes },
+    })
+    const out = created.structuredContent as {
+      drawingId: string
+      file: string
+      openUrl: string
+    }
+    expect(out.file).toBe(join(dir, `${out.drawingId}.yodo`))
+    expect(out.openUrl.startsWith(`${appUrl.href}#/open/`)).toBe(true)
+    expect(textOf(created)).toContain(`Open in Yodo: ${out.openUrl}`)
+
+    const connected = await client.callTool({
+      name: 'connect',
+      arguments: {
+        drawingId: out.drawingId,
+        connections: [{ from: 'a', to: 'b' }],
+      },
+    })
+    const after = connected.structuredContent as { openUrl: string }
+    const data = after.openUrl.slice(`${appUrl.href}#/open/`.length)
+    const { document } = parseYodoFile(await decodeOpenLinkData(data))
+    expect(document.name).toBe('Linked')
+    expect(document.elements.map((e) => e.type)).toEqual([
+      'rectangle',
+      'rectangle',
+      'arrow',
+    ])
+  })
+
+  it('without openLinks (the HTTP backend) results have neither field', async () => {
+    const client = await connect(new InMemoryDrawingRepository())
+    const result = await client.callTool({
+      name: 'create_drawing',
+      arguments: { name: 'Plain' },
+    })
+    expect(result.structuredContent).not.toHaveProperty('file')
+    expect(result.structuredContent).not.toHaveProperty('openUrl')
+    expect(textOf(result)).not.toContain('Open in Yodo')
+  })
+
+  it('the instructions tell the agent to hand the link over', () => {
+    expect(INSTRUCTIONS).toContain('Open in Yodo')
   })
 })
 
