@@ -4,6 +4,7 @@ import {
   BUILT_IN_STYLE,
   createDocument,
   createLinear,
+  createNote,
   createShape,
   createText,
 } from '../core/document/create.ts'
@@ -278,6 +279,16 @@ describe('StylePanel fill style needs a background', () => {
 
   test('a mixed background still shows it, for the filled ones', () => {
     expect(sections(render(editorWith([rect, filled])))).toContain('Fill style')
+  })
+
+  test('a note does not count: its paper fill ignores the fill style', () => {
+    const note = {
+      ...createNote({ x: 0, y: 0, width: 50, height: 50 }, 1),
+      id: 'note',
+    }
+    expect(sections(render(editorWith([rect, note])))).not.toContain(
+      'Fill style',
+    )
   })
 
   test('the defaults follow the same rule', () => {
