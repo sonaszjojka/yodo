@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'vitest'
-import { createImage, createLinear, createShape } from '../document/create.ts'
+import {
+  createImage,
+  createLinear,
+  createNote,
+  createShape,
+} from '../document/create.ts'
 import type {
   PencilElement,
   Point,
@@ -266,5 +271,42 @@ describe('image', () => {
     ['well outside', [200, 30], false],
   ])('%s', (_name, point, expected) => {
     expect(hits(placed, point)).toBe(expected)
+  })
+})
+
+describe('square corners reach as far as the eraser ring shows (#142)', () => {
+  // Diagonally off the bottom-right corner (100, 60): `inside` is just within
+  // the circular reach, `outside` just beyond it, yet inside the square
+  // REACH x REACH box beyond the corner.
+  const inside: Point = [100 + REACH * 0.7, 60 + REACH * 0.7]
+  const outside: Point = [100 + REACH * 0.75, 60 + REACH * 0.75]
+  const text: TextElement = {
+    ...createShape('rectangle', BOX),
+    type: 'text',
+    text: 'Hello',
+    fontFamily: 'hand',
+    fontSize: 20,
+    textAlign: 'left',
+  }
+  const image = {
+    ...createImage(
+      'a'.repeat(64),
+      { width: 100, height: 60 },
+      { x: 0, y: 0, width: 1000, height: 1000 },
+    ),
+    ...BOX,
+  }
+  // A note has no stroke, so give it the same reach as the others.
+  const note = { ...createNote(BOX), strokeWidth: 2 }
+
+  test.each<[string, YodoElement]>([
+    ['transparent rectangle', createShape('rectangle', BOX)],
+    ['filled rectangle', filled(createShape('rectangle', BOX))],
+    ['note', note],
+    ['image', image],
+    ['text', text],
+  ])('a %s hits within the circle and misses beyond it', (_, element) => {
+    expect(hits(element, inside)).toBe(true)
+    expect(hits(element, outside)).toBe(false)
   })
 })

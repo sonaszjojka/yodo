@@ -111,12 +111,13 @@ export function hitTest(
     case 'note':
     case 'image':
     case 'text': {
-      const inOuter =
-        px >= x - reach &&
-        px <= x + width + reach &&
-        py >= y - reach &&
-        py <= y + height + reach
-      if (!inOuter) return false
+      // Distance from the box, so off a corner the reach is a circle (like
+      // the eraser's cursor ring), not a square (#142).
+      const outside = Math.hypot(
+        Math.max(x - px, 0, px - (x + width)),
+        Math.max(y - py, 0, py - (y + height)),
+      )
+      if (outside > reach) return false
       // Text has no outline to aim at, so its whole box counts.
       if (filled || element.type === 'text' || element.type === 'image') {
         return true
