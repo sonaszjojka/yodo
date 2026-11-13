@@ -1,6 +1,7 @@
 // The export dialog's options and the pure rules around them (ADR 0041), kept
 // apart from the component so they are unit-tested without a DOM.
 import { scaleFits, type ExportScope } from '../core/export/exportScene.ts'
+import type { YodoElement } from '../core/document/types.ts'
 import type { Bounds } from '../core/geometry/rect.ts'
 
 export const SCALES = [1, 2, 3] as const
@@ -65,6 +66,19 @@ export function fittingScale(frame: Bounds, wanted: number) {
   return [...SCALES]
     .reverse()
     .find((scale) => scale <= wanted && scaleFits(frame, scale))
+}
+
+/**
+ * Whether any image among `elements` is still loading (`ImageCache.loading`),
+ * so a PNG drawn now would show its grey placeholder instead of the picture.
+ */
+export function picturesLoading(
+  elements: readonly YodoElement[],
+  loading: (fileId: string) => boolean,
+) {
+  return elements.some(
+    (element) => element.type === 'image' && loading(element.fileId),
+  )
 }
 
 /** A safe download name: no path or reserved characters, `.<ext>` added once. */

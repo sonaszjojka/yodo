@@ -112,6 +112,32 @@ describe('createImageCache', () => {
     expect(cache.get(id)).toBeUndefined()
   })
 
+  test('reports a picture as loading until it decodes', async () => {
+    const repo = new InMemoryImageRepository()
+    const id = await repo.put(pngBlob())
+    const cache = createImageCache(repo, decode)
+
+    expect(cache.loading(id)).toBe(false) // nobody asked for it yet
+    cache.get(id)
+    expect(cache.loading(id)).toBe(true)
+    await tick()
+
+    expect(cache.loading(id)).toBe(false)
+  })
+
+  test('a load that finds nothing stops loading and tells subscribers', async () => {
+    const repo = new InMemoryImageRepository()
+    const cache = createImageCache(repo, decode)
+    const listener = vi.fn()
+    cache.subscribe(listener)
+
+    cache.get('0'.repeat(64))
+    await tick()
+
+    expect(cache.loading('0'.repeat(64))).toBe(false)
+    expect(listener).toHaveBeenCalledTimes(1)
+  })
+
   test('retryMissing loads the missing pictures again, e.g. after a login', async () => {
     const repo = new InMemoryImageRepository()
     const hash = await new InMemoryImageRepository().put(pngBlob())

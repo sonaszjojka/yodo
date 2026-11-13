@@ -23,6 +23,7 @@ import {
   fittingScale,
   initialChoices,
   neighbourFormat,
+  picturesLoading,
   pngFileName,
   SCALES,
   svgFileName,
@@ -263,7 +264,16 @@ export function ExportDialog({
       : frame && scale
         ? exportSize(frame, scale)
         : undefined
-  const ready = isYodo || (isSvg ? svgReady : job !== null && drawn === job)
+  // A PNG drawn while a picture is still loading has its placeholder in it;
+  // the load's end bumps `pictures`, so the canvas is drawn again and this
+  // re-checked. A picture that fails counts as done, so it never blocks.
+  const ready =
+    isYodo ||
+    (isSvg
+      ? svgReady
+      : job !== null &&
+        drawn === job &&
+        !picturesLoading(job.elements, imageCache.loading))
 
   function download() {
     if (isYodo) {

@@ -7,7 +7,13 @@ import type { ImageRepository } from '../storage/images.ts'
 export interface ImageCache {
   /** The picture for `fileId`, or undefined while it loads or if it is missing. Starts the load on first ask. */
   get(fileId: string): CanvasImageSource | undefined
-  /** Calls `listener` whenever a picture arrives or a refresh is asked for. */
+  /**
+   * Whether `fileId` was asked for and is still loading or decoding, so a draw
+   * now would show its placeholder. False once it has arrived or turned out
+   * missing, and before anyone asked for it.
+   */
+  loading(fileId: string): boolean
+  /** Calls `listener` whenever a load ends (with a picture or without) or a refresh is asked for. */
   subscribe(listener: () => void): () => void
   /**
    * Forgets that `fileId` was missing, so the next `get` loads it again. Call
@@ -43,8 +49,9 @@ export function createImageCache(
     if (result === 'missing' && stale.delete(fileId)) return load(fileId)
     stale.delete(fileId)
     entries.set(fileId, result)
-    // A missing picture changes nothing on screen, so nobody needs to redraw.
-    if (result !== 'missing') notify()
+    // Even a missing picture is news: the export dialog waits for every load
+    // to end before it enables Copy and Download.
+    notify()
   }
 
   return {
@@ -56,6 +63,9 @@ export function createImageCache(
         return undefined
       }
       return entry === 'loading' || entry === 'missing' ? undefined : entry
+    },
+    loading(fileId) {
+      return entries.get(fileId) === 'loading'
     },
     subscribe(listener) {
       listeners.add(listener)
