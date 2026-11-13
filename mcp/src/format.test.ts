@@ -393,7 +393,7 @@ describe('formatRender', () => {
     ).not.toContain('placeholder')
   })
 
-  it('lists at most 10 placeholders', () => {
+  it('names every placeholder, however many (ADR 0070)', () => {
     const placeholders = Array.from({ length: 13 }, (_, i) => ({
       elementId: `e${i}`,
       fileId: `f${i}`,
@@ -412,7 +412,6 @@ describe('formatRender', () => {
       .at(-1)!
     expect(line).toMatch(/^13 of 13 images are drawn as grey placeholders: e0 /)
     expect(line).toContain('e9 (missing, file f9)')
-    expect(line).not.toContain('e10 ')
-    expect(line).toMatch(/, and 3 more\.$/)
+    expect(line).toMatch(/, e12 \(missing, file f12\)\.$/)
   })
 })

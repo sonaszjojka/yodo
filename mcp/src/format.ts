@@ -181,9 +181,6 @@ export interface RenderSummary {
   images?: Pick<SceneImages, 'count' | 'placeholders'>
 }
 
-/** Placeholders named one by one; the rest are counted. */
-const LISTED_PLACEHOLDERS = 10
-
 /**
  * The text beside a rendered image: what it shows and how its pixels map to
  * drawing coordinates, so the agent can place things by what it sees.
@@ -214,17 +211,14 @@ export function formatRender({
   }
   const placeholders = images?.placeholders ?? []
   if (images && placeholders.length > 0) {
-    const listed = placeholders
-      .slice(0, LISTED_PLACEHOLDERS)
-      .map(
-        ({ elementId, fileId, reason }) =>
-          `${elementId} (${reason}, file ${fileId.slice(0, 8)})`,
-      )
-    const more = placeholders.length - listed.length
+    // Every one is named, so the agent knows which pictures it can't see.
+    const listed = placeholders.map(
+      ({ elementId, fileId, reason }) =>
+        `${elementId} (${reason}, file ${fileId.slice(0, 8)})`,
+    )
     lines.push(
       `${placeholders.length} of ${images.count} images are drawn as grey placeholders: ` +
-        listed.join(', ') +
-        (more > 0 ? `, and ${more} more.` : '.'),
+        `${listed.join(', ')}.`,
     )
   }
   return lines.join('\n')
