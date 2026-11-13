@@ -42,3 +42,6 @@ coverage/
 
 # E2E: the server binary built by `npm run build:app` (ADR 0035)
 /e2e/.bin/
+
+# mcp/: copied from the root by `prepack` for the npm tarball (5.9)
+/mcp/LICENSE
