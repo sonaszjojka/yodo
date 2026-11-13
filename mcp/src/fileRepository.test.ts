@@ -11,6 +11,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
 import {
   createDocument,
+  createImage,
   createShape,
 } from '../../web/src/core/document/create.ts'
 import {
@@ -418,5 +419,42 @@ describe('FileDrawingRepository.exportFile (ADR 0069)', () => {
 
     expect(await repo.exportFile(doc.id, 1)).toBeUndefined()
     expect(await repo.exportFile('nope', 1)).toBeUndefined()
+  })
+})
+
+describe('FileDrawingRepository images (ADR 0070)', () => {
+  const view = { x: 0, y: 0, width: 1000, height: 1000 }
+  const hash = 'a'.repeat(64)
+
+  async function withImage() {
+    const { dir, repo } = await setup()
+    const picture = createImage(hash, { width: 4, height: 4 }, view)
+    const doc = { ...drawing('Pictures'), fileIds: [hash] }
+    doc.elements = [...doc.elements, picture]
+    const data = Buffer.from([1, 2, 3]).toString('base64')
+    await writeFile(
+      live(dir, doc.id),
+      serializeYodoFile(doc, { [hash]: { mimeType: 'image/png', data } }),
+    )
+    return { repo, doc }
+  }
+
+  test('reads the inlined bytes and type of each image asked for', async () => {
+    const { repo, doc } = await withImage()
+    const read = await repo.imageFiles(doc.id)
+    expect(read(hash)).toEqual({
+      bytes: new Uint8Array([1, 2, 3]),
+      mimeType: 'image/png',
+    })
+    expect(read('b'.repeat(64))).toBeUndefined()
+    // Not an own entry of the files section.
+    expect(read('constructor')).toBeUndefined()
+  })
+
+  test('reads the drawing in Trash too, and nothing for an unknown one', async () => {
+    const { repo, doc } = await withImage()
+    await repo.trash(doc.id)
+    expect((await repo.imageFiles(doc.id))(hash)).toBeDefined()
+    expect((await repo.imageFiles('nope'))(hash)).toBeUndefined()
   })
 })

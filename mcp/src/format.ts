@@ -11,6 +11,7 @@ import { drawnBounds } from '../../web/src/core/geometry/curve.ts'
 import { unionBounds, type Bounds } from '../../web/src/core/geometry/rect.ts'
 import type { SearchResults } from '../../web/src/core/search/match.ts'
 import type { DrawingSummary } from '../../web/src/storage/repository.ts'
+import type { SceneImages } from './render/images.ts'
 
 /** Elements listed by `formatDrawing`; the rest are counted, not listed. */
 export const MAX_ELEMENTS = 500
@@ -176,6 +177,8 @@ export interface RenderSummary {
   frame: Bounds
   /** PNG only: pixels per drawing unit. */
   scale?: number
+  /** The image elements drawn and the ones left as placeholders (ADR 0070). */
+  images?: Pick<SceneImages, 'count' | 'placeholders'>
 }
 
 /**
@@ -190,6 +193,7 @@ export function formatRender({
   elements,
   frame,
   scale,
+  images,
 }: RenderSummary): string {
   const lines = [
     `Rendered ${quote(doc.name)} (id ${doc.id}, rev ${revision}) as ${format.toUpperCase()}, ${theme}: ${elements.length} elements`,
@@ -205,10 +209,16 @@ export function formatRender({
         `pixel (px,py) is drawing point (${hundredths(frame.x)} + px/${s}, ${hundredths(frame.y)} + py/${s})`,
     )
   }
-  const images = elements.filter((element) => element.type === 'image').length
-  if (images > 0) {
+  const placeholders = images?.placeholders ?? []
+  if (images && placeholders.length > 0) {
+    // Every one is named, so the agent knows which pictures it can't see.
+    const listed = placeholders.map(
+      ({ elementId, fileId, reason }) =>
+        `${elementId} (${reason}, file ${fileId.slice(0, 8)})`,
+    )
     lines.push(
-      `${images} image elements are drawn as grey placeholders: render_drawing can't load image files yet.`,
+      `${placeholders.length} of ${images.count} images are drawn as grey placeholders: ` +
+        `${listed.join(', ')}.`,
     )
   }
   return lines.join('\n')

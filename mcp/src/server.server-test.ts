@@ -8,10 +8,18 @@ import {
 } from '@modelcontextprotocol/client'
 import { createMcpHandler } from '@modelcontextprotocol/server'
 import { afterAll, describe, expect, inject, it } from 'vitest'
+import { createCanvas, loadImage } from '@napi-rs/canvas'
+import {
+  createDocument,
+  createImage,
+} from '../../web/src/core/document/create.ts'
 import { HttpDrawingRepository } from '../../web/src/storage/http.ts'
+import { HttpImageRepository } from '../../web/src/storage/httpImages.ts'
 import type { DrawingRepository } from '../../web/src/storage/repository.ts'
 import { withBearer } from './auth.ts'
-import { createServer } from './server.ts'
+import { httpImageSource } from './render/images.ts'
+import { solidPng } from './render/solidPng.ts'
+import { createServer, type ServerOptions } from './server.ts'
 
 const baseUrl = new URL(inject('serverUrl'))
 const token = inject('apiToken')
@@ -36,8 +44,13 @@ function repository(fetch: Fetch = withBearer(globalThis.fetch, token)) {
   return new HttpDrawingRepository({ baseUrl, fetch })
 }
 
-async function connect(repo: DrawingRepository): Promise<Client> {
-  const handler = createMcpHandler(() => createServer(repo, { baseUrl }))
+async function connect(
+  repo: DrawingRepository,
+  options: ServerOptions = {},
+): Promise<Client> {
+  const handler = createMcpHandler(() =>
+    createServer(repo, { baseUrl, ...options }),
+  )
   const transport = new StreamableHTTPClientTransport(
     new URL('http://mcp.test/mcp'),
     { fetch: (url, init) => handler.fetch(new Request(url, init)) },
@@ -269,5 +282,50 @@ describe('MCP tools against the Go server', async () => {
     expect(result.isError).toBe(true)
     expect(textOf(result)).toContain('(401): the API token is missing or wrong')
     expect(textOf(result)).not.toContain(wrong)
+  })
+})
+
+describe('render_drawing images from the Go server (ADR 0070)', async () => {
+  const fetch = withBearer(globalThis.fetch, token)
+  const images = new HttpImageRepository({ baseUrl, fetch })
+  const repo = repository()
+  const client = await connect(repo, { images: httpImageSource(images) })
+
+  it('draws an uploaded image, and names one the server lacks', async () => {
+    const png = solidPng(4, 4)
+    const stored = await images.put(new Blob([png], { type: 'image/png' }))
+    const lacking = '0'.repeat(64)
+    const view = { x: 0, y: 0, width: 1000, height: 1000 }
+    const doc = {
+      ...createDocument('Pictures'),
+      fileIds: [stored, lacking],
+      elements: [stored, lacking].map((fileId, i) => ({
+        ...createImage(fileId, { width: 40, height: 40 }, view),
+        id: `img-${i}`,
+        x: i * 40,
+        y: 0,
+      })),
+    }
+    await repo.save(doc)
+
+    const result = await client.callTool({
+      name: 'render_drawing',
+      arguments: {
+        id: doc.id,
+        region: { x: 0, y: 0, width: 80, height: 40 },
+      },
+    })
+    expect(result.isError, textOf(result)).toBeFalsy()
+    expect(textOf(result)).toContain(
+      '1 of 2 images are drawn as grey placeholders: img-1 (missing, file 00000000).',
+    )
+    const [, block] = result.content as { data: string }[]
+    const image = await loadImage(Buffer.from(block!.data, 'base64'))
+    const canvas = createCanvas(image.width, image.height)
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(image, 0, 0)
+    expect([...ctx.getImageData(20, 20, 1, 1).data.subarray(0, 3)]).toEqual([
+      255, 0, 0,
+    ])
   })
 })

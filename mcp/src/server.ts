@@ -22,6 +22,7 @@ import {
   selectForRender,
   type RenderTarget,
 } from './render/render.ts'
+import { type ImageSource, loadSceneImages } from './render/images.ts'
 import { nodeMeasure } from './render/measure.ts'
 import { addDiagram } from './diagram/build.ts'
 import {
@@ -195,6 +196,8 @@ export interface ServerOptions {
   dir?: string
   /** With the file backend: write results add the file and an open link (ADR 0069). */
   openLinks?: OpenLinks
+  /** Where render_drawing reads pictures; without it, images are placeholders (ADR 0070). */
+  images?: ImageSource
 }
 
 export function createServer(
@@ -373,6 +376,12 @@ export function createServer(
         )
         if ('error' in selection) return failure(selection.error)
         const { elements, frame } = selection
+        const images = await loadSceneImages(
+          elements,
+          options.images,
+          id,
+          format,
+        )
         const summary = {
           doc: found.doc,
           revision: found.revision,
@@ -380,9 +389,10 @@ export function createServer(
           theme,
           elements,
           frame,
+          images,
         }
         if (format === 'svg') {
-          const svg = renderSvg(elements, frame, { theme })
+          const svg = renderSvg(elements, frame, { theme, images })
           return {
             content: [
               { type: 'text', text: formatRender(summary) },
@@ -395,7 +405,11 @@ export function createServer(
           }
         }
         const fitted = fitScale(frame, scale)
-        const png = renderPng(elements, frame, { theme, scale: fitted })
+        const png = renderPng(elements, frame, {
+          theme,
+          scale: fitted,
+          images,
+        })
         return {
           content: [
             { type: 'text', text: formatRender({ ...summary, scale: fitted }) },

@@ -123,8 +123,21 @@ export interface IngestOptions {
   decode?: (file: Blob) => Promise<{ width: number; height: number }>
 }
 
+/**
+ * The browser's `createImageBitmap`, typed here so this module also
+ * type-checks without the DOM lib: the MCP server imports it in Node
+ * (ADR 0061, 0070) but never calls `decodeSize`.
+ */
+interface BitmapGlobal {
+  createImageBitmap(
+    file: Blob,
+  ): Promise<{ width: number; height: number; close(): void }>
+}
+
 export async function decodeSize(file: Blob) {
-  const bitmap = await createImageBitmap(file)
+  const bitmap = await (
+    globalThis as unknown as BitmapGlobal
+  ).createImageBitmap(file)
   const { width, height } = bitmap
   bitmap.close()
   return { width, height }

@@ -29,6 +29,7 @@ import {
   type SearchIndexEntry,
 } from '../../web/src/storage/repository.ts'
 import { withDirLock, type LockOptions } from './dirLock.ts'
+import type { ImageRead } from './render/images.ts'
 
 const EXTENSION = '.yodo'
 const TRASH = '.trash'
@@ -358,6 +359,28 @@ export class FileDrawingRepository implements DrawingRepository {
       const path = this.#livePath(fileNameFor(id)!)
       if (entry.meta.revision !== revision) return { path, changed: true }
       return { path, text: serializeYodoFile(entry.doc, entry.files) }
+    })
+  }
+
+  /**
+   * The inlined images of a drawing (live or in Trash) for render_drawing
+   * (ADR 0070): one read of the file, then a reader that decodes one image's
+   * bytes when asked, undefined when the file doesn't hold it. Images are
+   * content-addressed, so a save since the caller read the drawing can only
+   * leave one missing.
+   */
+  imageFiles(id: string): Promise<(fileId: string) => ImageRead> {
+    return this.#run(async () => {
+      const files = (await this.#entry(id))?.files ?? {}
+      return (fileId) => {
+        const entry = Object.hasOwn(files, fileId) ? files[fileId] : undefined
+        return (
+          entry && {
+            bytes: new Uint8Array(Buffer.from(entry.data, 'base64')),
+            mimeType: entry.mimeType,
+          }
+        )
+      }
     })
   }
 
