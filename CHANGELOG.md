@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.1](https://github.com/sonaszjojka/yodo/compare/v1.7.0...v1.7.1) (2026-11-13)
+
+
+### Bug Fixes
+
+* **web:** fill style only with a background, export waits for images, round corner reach ([#212](https://github.com/sonaszjojka/yodo/issues/212)) ([e9464fd](https://github.com/sonaszjojka/yodo/commit/e9464fd1785f13a2d49447df9ba809a535bc9fa8))
+
 ## [1.7.0](https://github.com/sonaszjojka/yodo/compare/v1.6.0...v1.7.0) (2026-11-13)
 
 
