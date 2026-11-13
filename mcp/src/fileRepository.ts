@@ -339,6 +339,28 @@ export class FileDrawingRepository implements DrawingRepository {
     })
   }
 
+  /**
+   * A live drawing as the app's export file, for an open link (ADR 0069): the
+   * file's path and its text without the `meta` section. `changed` when the
+   * stored revision isn't `revision`, as when another process saved after the
+   * write that asks (ADR 0067), so a link never shows a version the agent
+   * wasn't told about. Undefined for a missing or trashed drawing.
+   */
+  exportFile(
+    id: string,
+    revision: number,
+  ): Promise<
+    { path: string; text: string } | { path: string; changed: true } | undefined
+  > {
+    return this.#run(async () => {
+      const entry = await this.#entry(id)
+      if (!entry || entry.trashed) return undefined
+      const path = this.#livePath(fileNameFor(id)!)
+      if (entry.meta.revision !== revision) return { path, changed: true }
+      return { path, text: serializeYodoFile(entry.doc, entry.files) }
+    })
+  }
+
   getRevision(id: string): Promise<number | undefined> {
     return this.#run(async () => (await this.#entry(id))?.meta.revision)
   }

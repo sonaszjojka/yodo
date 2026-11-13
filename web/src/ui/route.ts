@@ -1,6 +1,7 @@
 // Hash routes (ADR 0007, 0033): `#/` is Home, `#/d/<id>` the editor on one
 // drawing, `#/f/<id>` Home filtered to one folder (ADR 0045), `#/trash` the
-// Trash (ADR 0046). Hashes work on GitHub Pages, which has no SPA fallback.
+// Trash (ADR 0046), `#/open/<data>` a drawing carried in the link (ADR 0069).
+// Hashes work on GitHub Pages, which has no SPA fallback.
 
 import { useSyncExternalStore } from 'react'
 
@@ -8,13 +9,19 @@ export type Route =
   | { name: 'home'; folderId?: string }
   | { name: 'trash' }
   | { name: 'drawing'; id: string }
+  | { name: 'open'; data: string }
 
 const DRAWING = /^#\/d\/([^/]+)$/
 const FOLDER = /^#\/f\/([^/]+)$/
+// Any characters: the open-link screen explains bad data instead of Home
+// silently showing up.
+const OPEN = /^#\/open\/(.*)$/
 
 /** The route for a `location.hash`; anything unknown is Home. */
 export function parseRoute(hash: string): Route {
   if (hash === '#/trash') return { name: 'trash' }
+  const open = OPEN.exec(hash)
+  if (open) return { name: 'open', data: open[1]! }
   const drawing = DRAWING.exec(hash)
   const folder = FOLDER.exec(hash)
   const match = drawing ?? folder
@@ -31,14 +38,19 @@ export function parseRoute(hash: string): Route {
 export function routeHash(route: Route): string {
   if (route.name === 'trash') return '#/trash'
   if (route.name === 'drawing') return `#/d/${encodeURIComponent(route.id)}`
+  if (route.name === 'open') return `#/open/${route.data}`
   return route.folderId === undefined
     ? '#/'
     : `#/f/${encodeURIComponent(route.folderId)}`
 }
 
-/** Goes to a route; it's a history entry, so Back and Forward work. */
-export function navigate(route: Route) {
-  window.location.hash = routeHash(route)
+/**
+ * Goes to a route; it's a history entry, so Back and Forward work. `replace`
+ * swaps the current entry instead, so Back skips it (an imported open link).
+ */
+export function navigate(route: Route, { replace = false } = {}) {
+  if (replace) window.location.replace(routeHash(route))
+  else window.location.hash = routeHash(route)
 }
 
 function subscribe(onChange: () => void) {

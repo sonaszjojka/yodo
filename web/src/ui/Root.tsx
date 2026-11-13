@@ -11,6 +11,7 @@ import type { DrawingRepository } from '../storage/repository.ts'
 import { App } from './App.tsx'
 import { DrawingLoadError } from './DrawingLoadError.tsx'
 import { Home } from './Home.tsx'
+import { OpenLink } from './OpenLink.tsx'
 import { createImageCache, type ImageCache } from './imageCache.ts'
 import { useRoute } from './route.ts'
 import type { EditorNotice } from './useConcurrentEdits.ts'
@@ -50,6 +51,18 @@ export function Root({
     void saved.then((ok) => setLastSaveFailed(!ok))
   }, [])
 
+  if (route.name === 'open') {
+    return (
+      <OpenLink
+        key={route.data}
+        data={route.data}
+        repository={repository}
+        images={images}
+        imageCache={imageCache}
+        waitForEditor={waitForEditor}
+      />
+    )
+  }
   return route.name !== 'drawing' ? (
     <Home
       repository={repository}
