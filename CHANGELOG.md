@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.6.0](https://github.com/sonaszjojka/yodo/compare/v1.5.0...v1.6.0) (2026-11-13)
+
+
+### Features
+
+* **mcp:** add create_diagram with dagre auto-layout ([#203](https://github.com/sonaszjojka/yodo/issues/203)) ([3e2b2da](https://github.com/sonaszjojka/yodo/commit/3e2b2da4060f12fd6695fa4e5fdc7d67ab425d59))
+* **mcp:** add create, add, update, delete and connect write tools ([#201](https://github.com/sonaszjojka/yodo/issues/201)) ([3d134c5](https://github.com/sonaszjojka/yodo/commit/3d134c5aceee65a6e1370d8974de65d01fa36a86))
+* **mcp:** add render_drawing with PNG and SVG output ([#198](https://github.com/sonaszjojka/yodo/issues/198)) ([cd98705](https://github.com/sonaszjojka/yodo/commit/cd98705e1c408b30460bf9c9dac524150cf8185f))
+* **mcp:** ship yodo-mcp on npm, tested against the Go server ([#206](https://github.com/sonaszjojka/yodo/issues/206)) ([f82900a](https://github.com/sonaszjojka/yodo/commit/f82900afc9700e45b8f698c0460353d9cac9f89d))
+* open drawings from #/open links, returned by the MCP file backend ([#205](https://github.com/sonaszjojka/yodo/issues/205)) ([e758ac9](https://github.com/sonaszjojka/yodo/commit/e758ac92f5fb5c3384b66b158526e01ab349c1fb))
+
+
+### Bug Fixes
+
+* resolve code scanning alerts ([#204](https://github.com/sonaszjojka/yodo/issues/204)) ([b61f756](https://github.com/sonaszjojka/yodo/commit/b61f756c2efbb3764149b8efef60d8ebe55d8160))
+
 ## [1.5.0](https://github.com/sonaszjojka/yodo/compare/v1.4.0...v1.5.0) (2026-11-11)
 
 
