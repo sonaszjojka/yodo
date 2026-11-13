@@ -8,9 +8,9 @@ const CENTER = SIZE / 2
 /**
  * The eraser's cursor: a circle with the eraser's reach as its radius. The
  * reach is `HIT_TOLERANCE` screen pixels at any zoom (the editor divides it by
- * the zoom), so the cursor never needs to change size. It is the nominal
- * reach: along an edge it is exact, but a filled shape's hit box is square, so
- * at a corner the eraser reaches a little further than the circle shows.
+ * the zoom), so the cursor never needs to change size. Hit-testing measures
+ * a circular distance, so the circle is the reach off corners too (#142); a
+ * shape's stroke widens it by half the stroke width.
  *
  * A light ring outside a dark one keeps it visible on both themes. The
  * hotspot is the centre; `crosshair` is the fallback if the image is refused.

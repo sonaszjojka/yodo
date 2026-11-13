@@ -4,6 +4,7 @@ import {
   BUILT_IN_STYLE,
   createDocument,
   createLinear,
+  createNote,
   createShape,
   createText,
 } from '../core/document/create.ts'
@@ -80,7 +81,7 @@ describe('StylePanel', () => {
   })
 
   test('a shape gets every shape section and Delete', () => {
-    const html = render(editorWith([rect]))
+    const html = render(editorWith([{ ...rect, backgroundColor: '#F9EBD6' }]))
     expect(html).toContain('>Style</h2>')
     expect(sections(html)).toEqual([
       'Stroke',
@@ -96,7 +97,7 @@ describe('StylePanel', () => {
     ])
     expect(pressed(html)).toEqual([
       'Ink',
-      'None',
+      'Sand',
       'Hatched',
       'Bold',
       'Solid',
@@ -167,7 +168,7 @@ describe('StylePanel', () => {
 
   test('with nothing selected it edits the defaults and says so', () => {
     const editor = editorWith([rect], [])
-    editor.setStyle({ strokeStyle: 'dashed' })
+    editor.setStyle({ strokeStyle: 'dashed', backgroundColor: '#F9EBD6' })
     const html = render(editor)
 
     expect(html).toContain('Defaults for new elements')
@@ -260,5 +261,40 @@ describe('StylePanel arrowheads (ADR 0055)', () => {
     expect(renderToStaticMarkup(<StyleBar editor={editor} />)).toContain(
       'End head: Zero or many',
     )
+  })
+})
+
+describe('StylePanel fill style needs a background', () => {
+  const filled = { ...rect, id: 'filled', backgroundColor: '#F9EBD6' }
+
+  test('a shape with no background has no Fill style section', () => {
+    expect(sections(render(editorWith([rect])))).not.toContain('Fill style')
+  })
+
+  test('it shows once the shape has a background', () => {
+    const editor = editorWith([rect])
+    editor.setStyle({ backgroundColor: '#F9EBD6' })
+    expect(sections(render(editor))).toContain('Fill style')
+  })
+
+  test('a mixed background still shows it, for the filled ones', () => {
+    expect(sections(render(editorWith([rect, filled])))).toContain('Fill style')
+  })
+
+  test('a note does not count: its paper fill ignores the fill style', () => {
+    const note = {
+      ...createNote({ x: 0, y: 0, width: 50, height: 50 }, 1),
+      id: 'note',
+    }
+    expect(sections(render(editorWith([rect, note])))).not.toContain(
+      'Fill style',
+    )
+  })
+
+  test('the defaults follow the same rule', () => {
+    const editor = editorWith([rect], [])
+    expect(sections(render(editor))).not.toContain('Fill style')
+    editor.setStyle({ backgroundColor: '#F9EBD6' })
+    expect(sections(render(editor))).toContain('Fill style')
   })
 })

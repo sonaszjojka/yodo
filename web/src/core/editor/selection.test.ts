@@ -112,6 +112,13 @@ describe('idsAlongPath', () => {
   test('passes through the empty middle of an unfilled shape', () => {
     expect(idsAlongPath([back], [20, 40], [60, 60], 2)).toEqual([])
   })
+
+  test('misses a square corner the eraser ring does not touch (#142)', () => {
+    // Back's stroke is 2, so its reach is 3. This path passes about 3.5 from
+    // its corner (100, 100), inside the square box around the corner.
+    expect(idsAlongPath([back], [102.5, 110], [102.5, 102.5], 2)).toEqual([])
+    expect(idsAlongPath([back], [102, 110], [102, 102], 2)).toEqual([back.id])
+  })
 })
 
 describe('duplicateElements', () => {

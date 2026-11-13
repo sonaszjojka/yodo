@@ -1,9 +1,11 @@
 import { describe, expect, test } from 'vitest'
+import { createImage, createShape } from '../core/document/create.ts'
 import {
   EXPORT_TABS,
   fittingScale,
   initialChoices,
   neighbourFormat,
+  picturesLoading,
   pngFileName,
   svgFileName,
 } from './exportChoices.ts'
@@ -96,5 +98,23 @@ describe('tabs', () => {
     expect(neighbourFormat('yodo', 'ArrowRight')).toBe('png')
     expect(neighbourFormat('png', 'ArrowLeft')).toBe('yodo')
     expect(neighbourFormat('yodo', 'ArrowLeft')).toBe('svg')
+  })
+})
+
+describe('picturesLoading', () => {
+  const view = { x: 0, y: 0, width: 1000, height: 1000 }
+  const box = { x: 0, y: 0, width: 10, height: 10 }
+  const a = createImage('a'.repeat(64), { width: 10, height: 10 }, view)
+  const b = createImage('b'.repeat(64), { width: 10, height: 10 }, view)
+  const rect = createShape('rectangle', box)
+
+  test('is true while any exported image is still loading', () => {
+    const loading = (fileId: string) => fileId === b.fileId
+    expect(picturesLoading([rect, a, b], loading)).toBe(true)
+    expect(picturesLoading([rect, a], loading)).toBe(false)
+  })
+
+  test('is false without images, whatever is loading', () => {
+    expect(picturesLoading([rect], () => true)).toBe(false)
   })
 })

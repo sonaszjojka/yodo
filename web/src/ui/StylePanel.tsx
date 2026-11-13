@@ -31,12 +31,14 @@ import type {
   Roundness,
   StrokeStyle,
   TextAlign,
+  YodoElement,
 } from '../core/document/types.ts'
 import type { Editor, EditorState } from '../core/editor/editor.ts'
 import { commonArrowhead } from '../core/editor/arrowhead.ts'
 import { selectedOf } from '../core/editor/selection.ts'
 import {
   commonStyle,
+  stylesOf,
   type CommonStyle,
   type StyleKey,
   type StylePatch,
@@ -250,6 +252,21 @@ const ORDER: StyleKey[] = [
   'textAlign',
   'opacity',
 ]
+
+/**
+ * Whether a fill style would show on anything: it only draws over a
+ * background, so it's hidden while the background is "None" (as in
+ * Excalidraw). Only elements that have a fill style count: a note's paper
+ * colour ignores it. With nothing selected, the defaults decide.
+ */
+function fillShows(selected: readonly YodoElement[], defaults: CommonStyle) {
+  if (selected.length === 0) return defaults.backgroundColor !== 'transparent'
+  return selected.some(
+    (element) =>
+      stylesOf(element).includes('fillStyle') &&
+      element.backgroundColor !== 'transparent',
+  )
+}
 
 /** The header line of a section: its name and the current value. */
 function SectionTitle({
@@ -729,7 +746,10 @@ export function StylePanel({ editor, panel }: StylePanelProps) {
             Nothing is selected: these apply to what you draw next.
           </p>
         )}
-        {ORDER.filter((key) => key in style).map((key) => {
+        {ORDER.filter(
+          (key) =>
+            key in style && (key !== 'fillStyle' || fillShows(selected, style)),
+        ).map((key) => {
           const value = style[key]!
           if (key === 'opacity') {
             return (
