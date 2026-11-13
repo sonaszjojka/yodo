@@ -1,8 +1,9 @@
 // What `render_drawing` draws and how (roadmap 5.5, ADR 0065). It picks the
 // elements and frame with the export's own helpers, then draws them as the app
 // exports them: PNG through `renderExport` on a `@napi-rs/canvas` canvas
-// (ADR 0041), SVG through `buildSvg` (ADR 0043). Image elements are drawn as
-// the export's placeholder: the server has no image bytes yet.
+// (ADR 0041), SVG through `buildSvg` (ADR 0043). Image elements show the
+// pictures `loadSceneImages` loaded first, else the export's placeholder
+// (ADR 0070).
 import { createCanvas } from '@napi-rs/canvas'
 import rough from 'roughjs'
 import type { YodoElement } from '../../../web/src/core/document/types.ts'
@@ -24,6 +25,7 @@ import {
 } from '../../../web/src/core/render/render.ts'
 import type { Measure } from '../../../web/src/core/text/layout.ts'
 import { embeddedFonts } from './fonts.ts'
+import type { SceneImages } from './images.ts'
 import { nodeMeasure } from './measure.ts'
 
 export type RenderTarget =
@@ -94,13 +96,15 @@ export function fitScale(frame: Bounds, requested: number): number {
 export interface PngOptions {
   theme: Theme
   scale: number
+  /** The pictures to draw; placeholders without. */
+  images?: Pick<SceneImages, 'lookup'>
 }
 
 /** The PNG of `elements` in `frame`, on the page colour of the theme. */
 export function renderPng(
   elements: readonly YodoElement[],
   frame: Bounds,
-  { theme, scale }: PngOptions,
+  { theme, scale, images }: PngOptions,
 ): Buffer {
   nodeMeasure() // registers the fonts the canvas draws text with
   const canvas = createCanvas(1, 1)
@@ -112,6 +116,7 @@ export function renderPng(
     scale,
     theme,
     background: true,
+    images: images?.lookup,
   })
   return canvas.toBuffer('image/png')
 }
@@ -120,7 +125,7 @@ export function renderPng(
 export function renderSvg(
   elements: readonly YodoElement[],
   frame: Bounds,
-  { theme }: { theme: Theme },
+  { theme, images }: { theme: Theme; images?: Pick<SceneImages, 'dataUri'> },
 ): string {
   return buildSvg(
     elements,
@@ -130,7 +135,7 @@ export function renderSvg(
       measure: nodeMeasure(),
       generator: rough.generator(),
       fontCss: fontFaceCss(embeddedFonts(neededFontFiles(elements))),
-      imageData: () => undefined,
+      imageData: (fileId) => images?.dataUri(fileId),
     },
   )
 }

@@ -3,10 +3,12 @@
 
 import { serveStdio } from '@modelcontextprotocol/server/stdio'
 import { HttpDrawingRepository } from '../../web/src/storage/http.ts'
+import { HttpImageRepository } from '../../web/src/storage/httpImages.ts'
 import type { DrawingRepository } from '../../web/src/storage/repository.ts'
 import { withBearer } from './auth.ts'
 import { ConfigError, readConfig } from './config.ts'
 import { FileDrawingRepository } from './fileRepository.ts'
+import { httpImageSource } from './render/images.ts'
 import { createServer, type ServerOptions } from './server.ts'
 
 function main(): void {
@@ -22,11 +24,11 @@ function main(): void {
   let options: ServerOptions
   if (config.backend === 'http') {
     const { baseUrl, token } = config
-    repo = new HttpDrawingRepository({
-      baseUrl,
-      fetch: withBearer(globalThis.fetch, token),
-    })
-    options = { baseUrl }
+    const fetch = withBearer(globalThis.fetch, token)
+    repo = new HttpDrawingRepository({ baseUrl, fetch })
+    // render_drawing reads pictures from /api/images with the token (ADR 0070).
+    const images = httpImageSource(new HttpImageRepository({ baseUrl, fetch }))
+    options = { baseUrl, images }
   } else {
     // No server: drawings are `.yodo` files in a directory (ADR 0064).
     const files = new FileDrawingRepository({ dir: config.dir })
@@ -38,6 +40,8 @@ function main(): void {
         appUrl: config.appUrl,
         exportFile: (id, revision) => files.exportFile(id, revision),
       },
+      // render_drawing reads the pictures inlined in the file (ADR 0070).
+      images: { read: (id, fileIds) => files.imageFiles(id, fileIds) },
     }
   }
   // Default legacy serving: a 2025-era client that opens with `initialize` is

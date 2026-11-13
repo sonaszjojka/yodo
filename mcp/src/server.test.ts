@@ -8,26 +8,33 @@ import {
   StreamableHTTPClientTransport,
 } from '@modelcontextprotocol/client'
 import { createMcpHandler } from '@modelcontextprotocol/server'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { createCanvas, loadImage } from '@napi-rs/canvas'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   createDocument,
+  createImage,
   createShape,
 } from '../../web/src/core/document/create.ts'
 import type { YodoDocument } from '../../web/src/core/document/types.ts'
 import { HttpError } from '../../web/src/storage/http.ts'
 import { InMemoryDrawingRepository } from '../../web/src/storage/memory.ts'
 import type { DrawingRepository } from '../../web/src/storage/repository.ts'
-import { FileDrawingRepository } from './fileRepository.ts'
+import { FileDrawingRepository, fileNameFor } from './fileRepository.ts'
+import type { ImageSource } from './render/images.ts'
+import { solidPng } from './render/solidPng.ts'
 import {
   createServer,
   INSTRUCTIONS,
   toolError,
   type ServerOptions,
 } from './server.ts'
-import { parseYodoFile } from '../../web/src/core/document/file.ts'
+import {
+  parseYodoFile,
+  serializeYodoFile,
+} from '../../web/src/core/document/file.ts'
 import { decodeOpenLinkData } from '../../web/src/core/document/openLink.ts'
 
 const clients: Client[] = []
@@ -833,6 +840,150 @@ describe('open links with the file backend (ADR 0069)', () => {
 
   it('the instructions tell the agent to hand the link over', () => {
     expect(INSTRUCTIONS).toContain('Open in Yodo')
+  })
+})
+
+/** A drawing with one image element per fileId, side by side, 40 units each. */
+function pictures(fileIds: string[]): YodoDocument {
+  const view = { x: 0, y: 0, width: 1000, height: 1000 }
+  return {
+    ...createDocument('Pictures'),
+    id: 'd-pictures',
+    fileIds: [...new Set(fileIds)],
+    elements: fileIds.map((fileId, i) => ({
+      ...createImage(fileId, { width: 40, height: 40 }, view),
+      id: `img-${i}`,
+      x: i * 40,
+      y: 0,
+    })),
+  }
+}
+
+type Stored = Record<string, { bytes: Uint8Array; mimeType: string }>
+
+/** Every backend with its image source, as index.ts wires it (ADR 0070). */
+const imageBackends: [
+  string,
+  (
+    doc: YodoDocument,
+    stored: Stored,
+  ) => Promise<ServerOptions & { repo: DrawingRepository }>,
+][] = [
+  [
+    'in memory',
+    async (doc, stored) => {
+      const repo = new InMemoryDrawingRepository()
+      await repo.save(doc)
+      const images: ImageSource = {
+        async read(_id, fileIds) {
+          return new Map(fileIds.map((id) => [id, stored[id]]))
+        },
+      }
+      return { repo, images }
+    },
+  ],
+  [
+    'in files',
+    async (doc, stored) => {
+      const dir = await mkdtemp(join(tmpdir(), 'yodo-mcp-'))
+      dirs.push(dir)
+      const files = Object.fromEntries(
+        Object.entries(stored).map(([id, { bytes, mimeType }]) => [
+          id,
+          { mimeType, data: Buffer.from(bytes).toString('base64') },
+        ]),
+      )
+      await writeFile(
+        join(dir, `${fileNameFor(doc.id)}.yodo`),
+        serializeYodoFile(doc, files),
+      )
+      const repo = new FileDrawingRepository({ dir })
+      return {
+        repo,
+        images: { read: (id, fileIds) => repo.imageFiles(id, fileIds) },
+      }
+    },
+  ],
+]
+
+describe.each(imageBackends)(
+  'render_drawing images %s (ADR 0070)',
+  (_name, make) => {
+    const good = 'a'.repeat(64)
+    const junk = 'b'.repeat(64)
+    const stored: Stored = {
+      [good]: { bytes: solidPng(4, 4), mimeType: 'image/png' },
+      // Well-formed base64 of bytes that aren't an image.
+      [junk]: {
+        bytes: new TextEncoder().encode('not a png'),
+        mimeType: 'image/png',
+      },
+    }
+
+    async function render(
+      fileIds: string[],
+      args: Record<string, unknown> = {},
+    ) {
+      const { repo, ...options } = await make(pictures(fileIds), stored)
+      const client = await connect(repo, options)
+      const result = await client.callTool({
+        name: 'render_drawing',
+        arguments: {
+          id: 'd-pictures',
+          region: { x: 0, y: 0, width: fileIds.length * 40, height: 40 },
+          ...args,
+        },
+      })
+      expect(result.isError, textOf(result)).toBeFalsy()
+      const [, image] = result.content as { type: string; data?: string }[]
+      return {
+        text: textOf(result),
+        data: Buffer.from(image!.data!, 'base64'),
+      }
+    }
+
+    async function pixelAt(png: Buffer, x: number, y: number) {
+      const image = await loadImage(png)
+      const canvas = createCanvas(image.width, image.height)
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(image, 0, 0)
+      return [...ctx.getImageData(x, y, 1, 1).data.subarray(0, 3)]
+    }
+
+    it('draws the picture in a PNG, with no placeholder line', async () => {
+      const { text, data } = await render([good])
+      expect(await pixelAt(data, 20, 20)).toEqual([255, 0, 0])
+      expect(text).not.toContain('placeholder')
+    })
+
+    it('embeds the picture in an SVG', async () => {
+      const { data } = await render([good], { format: 'svg' })
+      expect(data.toString('utf8')).toContain('href="data:image/png;base64,')
+    })
+
+    it('draws an undecodable image as the placeholder and names it', async () => {
+      const { text, data } = await render([good, junk])
+      expect(await pixelAt(data, 20, 20)).toEqual([255, 0, 0])
+      expect(await pixelAt(data, 60, 20)).toEqual([0xe9, 0xec, 0xef])
+      expect(text).toContain(
+        '1 of 2 images are drawn as grey placeholders: img-1 (undecodable, file bbbbbbbb).',
+      )
+    })
+  },
+)
+
+describe('render_drawing images that are missing (ADR 0070)', () => {
+  it('draws the placeholder and names the image', async () => {
+    const [, make] = imageBackends[0]!
+    const { repo, ...options } = await make(pictures(['c'.repeat(64)]), {})
+    const client = await connect(repo, options)
+    const result = await client.callTool({
+      name: 'render_drawing',
+      arguments: { id: 'd-pictures' },
+    })
+    expect(textOf(result)).toContain(
+      '1 of 1 images are drawn as grey placeholders: img-0 (missing, file cccccccc).',
+    )
   })
 })
 

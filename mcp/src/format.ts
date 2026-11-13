@@ -11,6 +11,7 @@ import { drawnBounds } from '../../web/src/core/geometry/curve.ts'
 import { unionBounds, type Bounds } from '../../web/src/core/geometry/rect.ts'
 import type { SearchResults } from '../../web/src/core/search/match.ts'
 import type { DrawingSummary } from '../../web/src/storage/repository.ts'
+import type { SceneImages } from './render/images.ts'
 
 /** Elements listed by `formatDrawing`; the rest are counted, not listed. */
 export const MAX_ELEMENTS = 500
@@ -176,7 +177,12 @@ export interface RenderSummary {
   frame: Bounds
   /** PNG only: pixels per drawing unit. */
   scale?: number
+  /** The image elements drawn and the ones left as placeholders (ADR 0070). */
+  images?: Pick<SceneImages, 'count' | 'placeholders'>
 }
+
+/** Placeholders named one by one; the rest are counted. */
+const LISTED_PLACEHOLDERS = 10
 
 /**
  * The text beside a rendered image: what it shows and how its pixels map to
@@ -190,6 +196,7 @@ export function formatRender({
   elements,
   frame,
   scale,
+  images,
 }: RenderSummary): string {
   const lines = [
     `Rendered ${quote(doc.name)} (id ${doc.id}, rev ${revision}) as ${format.toUpperCase()}, ${theme}: ${elements.length} elements`,
@@ -205,10 +212,19 @@ export function formatRender({
         `pixel (px,py) is drawing point (${hundredths(frame.x)} + px/${s}, ${hundredths(frame.y)} + py/${s})`,
     )
   }
-  const images = elements.filter((element) => element.type === 'image').length
-  if (images > 0) {
+  const placeholders = images?.placeholders ?? []
+  if (images && placeholders.length > 0) {
+    const listed = placeholders
+      .slice(0, LISTED_PLACEHOLDERS)
+      .map(
+        ({ elementId, fileId, reason }) =>
+          `${elementId} (${reason}, file ${fileId.slice(0, 8)})`,
+      )
+    const more = placeholders.length - listed.length
     lines.push(
-      `${images} image elements are drawn as grey placeholders: render_drawing can't load image files yet.`,
+      `${placeholders.length} of ${images.count} images are drawn as grey placeholders: ` +
+        listed.join(', ') +
+        (more > 0 ? `, and ${more} more.` : '.'),
     )
   }
   return lines.join('\n')

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   createDocument,
-  createImage,
   createShape,
 } from '../../web/src/core/document/create.ts'
 import type {
@@ -354,27 +353,66 @@ describe('formatRender', () => {
   })
 
   it('has no scale line for an SVG, and names image placeholders', () => {
-    const image = createImage(
-      'f1',
-      { width: 40, height: 40 },
-      {
-        x: 0,
-        y: 0,
-        width: 400,
-        height: 400,
-      },
-    )
     const text = formatRender({
       doc,
       revision: 1,
       format: 'svg',
       theme: 'dark',
-      elements: [box, image],
+      elements: [box],
       frame: { x: 0, y: 0, width: 50, height: 50 },
+      images: {
+        count: 3,
+        placeholders: [
+          {
+            elementId: 'el-a',
+            fileId: '3f2a1b0c'.padEnd(64, '9'),
+            reason: 'missing',
+          },
+          { elementId: 'el-b', fileId: 'f2', reason: 'undecodable' },
+        ],
+      },
     })
     expect(text).not.toContain('scale')
     expect(text.split('\n').at(-1)).toBe(
-      "1 image elements are drawn as grey placeholders: render_drawing can't load image files yet.",
+      '2 of 3 images are drawn as grey placeholders: el-a (missing, file 3f2a1b0c), el-b (undecodable, file f2).',
     )
+  })
+
+  it('has no image line when every image is drawn, or there is none', () => {
+    const base = {
+      doc,
+      revision: 1,
+      format: 'png' as const,
+      theme: 'light' as const,
+      elements: [box],
+      frame: { x: 0, y: 0, width: 50, height: 50 },
+    }
+    expect(formatRender(base)).not.toContain('image')
+    expect(
+      formatRender({ ...base, images: { count: 4, placeholders: [] } }),
+    ).not.toContain('placeholder')
+  })
+
+  it('lists at most 10 placeholders', () => {
+    const placeholders = Array.from({ length: 13 }, (_, i) => ({
+      elementId: `e${i}`,
+      fileId: `f${i}`,
+      reason: 'missing' as const,
+    }))
+    const line = formatRender({
+      doc,
+      revision: 1,
+      format: 'png',
+      theme: 'light',
+      elements: [box],
+      frame: { x: 0, y: 0, width: 50, height: 50 },
+      images: { count: 13, placeholders },
+    })
+      .split('\n')
+      .at(-1)!
+    expect(line).toMatch(/^13 of 13 images are drawn as grey placeholders: e0 /)
+    expect(line).toContain('e9 (missing, file f9)')
+    expect(line).not.toContain('e10 ')
+    expect(line).toMatch(/, and 3 more\.$/)
   })
 })

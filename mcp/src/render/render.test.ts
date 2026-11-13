@@ -2,6 +2,7 @@ import { createCanvas, loadImage } from '@napi-rs/canvas'
 import { describe, expect, it } from 'vitest'
 import {
   BUILT_IN_STYLE,
+  createImage,
   createShape,
   createText,
 } from '../../../web/src/core/document/create.ts'
@@ -11,6 +12,7 @@ import {
   DARK_CANVAS,
   LIGHT_CANVAS,
 } from '../../../web/src/core/render/colors.ts'
+import { IMAGE_LIMITS, type ImageSource, loadSceneImages } from './images.ts'
 import { nodeMeasure } from './measure.ts'
 import {
   fitScale,
@@ -20,6 +22,7 @@ import {
   selectForRender,
   type Selection,
 } from './render.ts'
+import { solidPng } from './solidPng.ts'
 
 const measure = nodeMeasure()
 
@@ -200,6 +203,81 @@ describe('renderSvg', () => {
     )
     expect(renderSvg([a], frame, { theme: 'light' })).toContain(
       `fill="${LIGHT_CANVAS}"`,
+    )
+  })
+})
+
+describe('real images (ADR 0070)', () => {
+  const view = { x: 0, y: 0, width: 1000, height: 1000 }
+  const picture = {
+    ...createImage('f1', { width: 40, height: 40 }, view),
+    id: 'img',
+    x: 0,
+    y: 0,
+  }
+  const frame = { x: 0, y: 0, width: 40, height: 40 }
+  const red: ImageSource = {
+    async read(_id, fileIds) {
+      return new Map(
+        fileIds.map((id) => [
+          id,
+          { bytes: solidPng(4, 4), mimeType: 'image/png' },
+        ]),
+      )
+    },
+  }
+
+  it('draws the picture in a PNG, and the placeholder without one', async () => {
+    const images = await loadSceneImages([picture], red, 'd', 'png')
+    const drawn = await pixels(
+      renderPng([picture], frame, { theme: 'light', scale: 1, images }),
+    )
+    expect(drawn.at(20, 20)).toEqual([255, 0, 0])
+
+    const grey = await pixels(
+      renderPng([picture], frame, { theme: 'light', scale: 1 }),
+    )
+    expect(grey.at(20, 20)).toEqual([0xe9, 0xec, 0xef])
+  })
+
+  it('embeds the picture in an SVG', async () => {
+    const images = await loadSceneImages([picture], red, 'd', 'svg')
+    const svg = renderSvg([picture], frame, { theme: 'light', images })
+    expect(svg).toContain('href="data:image/png;base64,')
+    expect(renderSvg([picture], frame, { theme: 'light' })).not.toContain(
+      'data:image/png',
+    )
+  })
+
+  it('keeps the embedded images of an SVG within the budget', async () => {
+    const copies = Array.from({ length: 5 }, (_, i) => ({
+      ...picture,
+      id: `img-${i}`,
+    }))
+    const bytes = solidPng(4, 4).byteLength
+    const budget = bytes * 3
+    const without = renderSvg(copies, frame, { theme: 'light' }).length
+    const images = await loadSceneImages(copies, red, 'd', 'svg', {
+      ...IMAGE_LIMITS,
+      svgBytes: budget,
+    })
+    const svg = renderSvg(copies, frame, { theme: 'light', images })
+    // Five uses don't fit in three copies' worth, so none is embedded.
+    expect(images.placeholders).toHaveLength(5)
+    expect(svg.length).toBe(without)
+
+    const fits = await loadSceneImages(copies.slice(0, 3), red, 'd', 'svg', {
+      ...IMAGE_LIMITS,
+      svgBytes: budget,
+    })
+    const three = renderSvg(copies.slice(0, 3), frame, {
+      theme: 'light',
+      images: fits,
+    })
+    const plain = renderSvg(copies.slice(0, 3), frame, { theme: 'light' })
+    // Base64 grows the bytes by 4/3; the rest is the data: prefix per use.
+    expect(three.length - plain.length).toBeLessThanOrEqual(
+      Math.ceil((budget * 4) / 3) + 3 * 64,
     )
   })
 })
