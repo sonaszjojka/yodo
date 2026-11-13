@@ -3,7 +3,8 @@ import { ExcalidrawImportError } from '../core/excalidraw/convert.ts'
 import images from '../core/excalidraw/fixtures/images.excalidraw?raw'
 import shapes from '../core/excalidraw/fixtures/shapes.excalidraw?raw'
 import { estimateMeasure } from '../core/text/layout.ts'
-import { importExcalidrawFile } from './importExcalidraw.ts'
+import { MAX_OPEN_LINK_BYTES } from '../core/document/openLink.ts'
+import { importExcalidrawFile, MAX_IMPORT_BYTES } from './importExcalidraw.ts'
 import { InMemoryDrawingRepository } from './memory.ts'
 import { InMemoryImageRepository } from './memoryImages.ts'
 
@@ -82,4 +83,8 @@ describe('importExcalidrawFile', () => {
     await importExcalidrawFile(images, deps)
     expect(order).toEqual(['image', 'drawing'])
   })
+})
+
+test('open links inflate up to the same limit as a file import (ADR 0069)', () => {
+  expect(MAX_OPEN_LINK_BYTES).toBe(MAX_IMPORT_BYTES)
 })
