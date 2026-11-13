@@ -1,11 +1,13 @@
 // Smoke test of the built bundle over real stdio (ADR 0061): spawns
 // `node dist/index.js` as an MCP client would, once against a stub Yodo API
 // that checks the bearer token, and once without YODO_URL over a folder of
-// `.yodo` files (ADR 0064). Run after `npm run build`; exits non-zero on failure.
+// `.yodo` files (ADR 0064). It also checks what `npm publish` would ship (5.9).
+// Run after `npm run build`; exits non-zero on failure.
 
 import { Client } from '@modelcontextprotocol/client'
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio'
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { copyFileSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
@@ -21,6 +23,27 @@ const licenses = readFileSync(
 for (const name of ['@modelcontextprotocol/server', 'zod']) {
   assert.ok(licenses.includes(name), `THIRD_PARTY_LICENSES.md lacks ${name}`)
 }
+
+// The tarball holds the bundle, its notices and the package page, nothing
+// else (no sources or maps). `npm pack` runs `prepack`, which copies LICENSE.
+const [pack] = JSON.parse(
+  execFileSync(
+    'npm',
+    ['pack', '--dry-run', '--json', '--ignore-scripts=false'],
+    {
+      cwd: new URL('..', import.meta.url),
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'inherit'],
+    },
+  ),
+) as { files: { path: string }[] }[]
+assert.deepEqual(pack!.files.map((f) => f.path).sort(), [
+  'LICENSE',
+  'README.md',
+  'dist/THIRD_PARTY_LICENSES.md',
+  'dist/index.js',
+  'package.json',
+])
 
 const TOKEN = 'smoke-test-token-0123456789abcdef'
 const SUMMARY = {

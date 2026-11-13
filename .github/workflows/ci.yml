@@ -63,6 +63,8 @@ jobs:
               - 'web/src/storage/**'
               - 'web/package.json'
               - 'web/package-lock.json'
+              # test:server starts the Go server through web's helper (5.9).
+              - 'web/test/go-server.ts'
               # render_drawing is compared with the export baselines (ADR 0065).
               - 'e2e/visual/scenes.ts'
               - 'e2e/visual/__screenshots__/**'
@@ -158,6 +160,33 @@ jobs:
         with:
           go-version-file: server/go.mod
           cache-dependency-path: server/go.sum
+      - run: npm ci
+      - run: npm run test:server
+
+  # Every MCP tool against the real Go server with an API token (5.9). The
+  # MCP side and the API are both under test, so either path triggers it.
+  mcp-server:
+    needs: changes
+    if: needs.changes.outputs.mcp == 'true' || needs.changes.outputs.server == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mcp
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: mcp/.nvmrc
+          cache: npm
+          cache-dependency-path: |
+            web/package-lock.json
+            mcp/package-lock.json
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - run: npm ci
+        working-directory: web
       - run: npm ci
       - run: npm run test:server
 
@@ -323,7 +352,7 @@ jobs:
         run: cosign sign --yes "${IMAGE}@${DIGEST}"
 
   ci:
-    needs: [changes, web, web-server, server, mcp, e2e, visual, docker, pages-build]
+    needs: [changes, web, web-server, server, mcp, mcp-server, e2e, visual, docker, release-tag, pages-build, npm-publish]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -332,10 +361,25 @@ jobs:
         run: exit 1
       - run: echo "All required jobs passed or were skipped."
 
+  # Release jobs publish only a tag whose commit is on `main` and that is the
+  # highest release, so a stray or re-run older tag can't publish (ADR 0049).
+  # A job that moves a `latest` (docker, npm-publish) runs the check again
+  # inside its own serialized release group instead.
+  release-tag:
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Check the release tag
+        run: .github/scripts/check-release-tag.sh
+
   # The hosted app deploys from a release tag only, never from a merge to main
   # (ADR 0057). The tagged commit passed CI when it merged, so only the web
-  # build is repeated here, with the same tag guard as the image.
+  # build is repeated here.
   pages-build:
+    needs: release-tag
     if: ${{ startsWith(github.ref, 'refs/tags/v') }}
     runs-on: ubuntu-latest
     defaults:
@@ -343,21 +387,6 @@ jobs:
         working-directory: web
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-      - name: Check the release tag
-        working-directory: .
-        run: |
-          git fetch --no-tags origin main
-          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
-            echo "::error::$GITHUB_REF_NAME is not on main"
-            exit 1
-          fi
-          highest=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)
-          if [ "$highest" != "$GITHUB_REF_NAME" ]; then
-            echo "::error::$GITHUB_REF_NAME is not the highest release tag ($highest)"
-            exit 1
-          fi
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: web/.nvmrc
@@ -386,3 +415,49 @@ jobs:
     steps:
       - uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
         id: deployment
+
+  # Publishes `yodo-mcp` to npm from a release tag with trusted publishing:
+  # npm trusts this workflow's OIDC identity, so there is no token secret, and
+  # it adds a provenance statement (ADR 0061). The package must already exist
+  # on npm with this workflow set as its trusted publisher.
+  npm-publish:
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    # `npm publish` moves `latest` to the version it uploads, so releases
+    # publish one at a time and the tag check runs inside the queue: an older
+    # tag that was still running can't publish after a newer one (as docker).
+    concurrency:
+      group: release-npm
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: mcp
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The tag check needs the history and every tag.
+          fetch-depth: 0
+      - name: Check the release tag
+        working-directory: .
+        run: .github/scripts/check-release-tag.sh
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: mcp/.nvmrc
+          registry-url: https://registry.npmjs.org
+      - name: Check the package version matches the tag
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::mcp/package.json is $version, the tag is $GITHUB_REF_NAME"
+            exit 1
+          fi
+      - run: npm ci
+        working-directory: web
+      - run: npm ci
+      - run: npm run build
+      - run: npm run smoke
+      - run: npm publish
