@@ -363,7 +363,8 @@ jobs:
 
   # Release jobs publish only a tag whose commit is on `main` and that is the
   # highest release, so a stray or re-run older tag can't publish (ADR 0049).
-  # The docker job keeps its own copy, inside its serialized release group.
+  # A job that moves a `latest` (docker, npm-publish) runs the check again
+  # inside its own serialized release group instead.
   release-tag:
     if: ${{ startsWith(github.ref, 'refs/tags/v') }}
     runs-on: ubuntu-latest
@@ -372,17 +373,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Check the release tag
-        run: |
-          git fetch --no-tags origin main
-          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
-            echo "::error::$GITHUB_REF_NAME is not on main"
-            exit 1
-          fi
-          highest=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)
-          if [ "$highest" != "$GITHUB_REF_NAME" ]; then
-            echo "::error::$GITHUB_REF_NAME is not the highest release tag ($highest)"
-            exit 1
-          fi
+        run: .github/scripts/check-release-tag.sh
 
   # The hosted app deploys from a release tag only, never from a merge to main
   # (ADR 0057). The tagged commit passed CI when it merged, so only the web
@@ -430,8 +421,13 @@ jobs:
   # it adds a provenance statement (ADR 0061). The package must already exist
   # on npm with this workflow set as its trusted publisher.
   npm-publish:
-    needs: release-tag
     if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    # `npm publish` moves `latest` to the version it uploads, so releases
+    # publish one at a time and the tag check runs inside the queue: an older
+    # tag that was still running can't publish after a newer one (as docker).
+    concurrency:
+      group: release-npm
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     environment: npm
     permissions:
@@ -442,6 +438,12 @@ jobs:
         working-directory: mcp
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The tag check needs the history and every tag.
+          fetch-depth: 0
+      - name: Check the release tag
+        working-directory: .
+        run: .github/scripts/check-release-tag.sh
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: mcp/.nvmrc
