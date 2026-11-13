@@ -38,10 +38,11 @@ Node 26 (`web/.nvmrc`, `nvm use`), Go 1.27. golangci-lint 2.15 is a separate bin
 | Task | Command |
 |---|---|
 | Tests | `npm test` (Vitest) · one file: `npx vitest run src/path/file.test.ts` |
+| Server integration tests | `npm run test:server` (needs Go: every tool against the real server with an API token, through `web/test/go-server.ts`) |
 | Lint | `npm run lint` (oxlint, with the import-boundary rule) |
 | Format | `npm run format` · check: `npm run format:check` |
 | Type-check | `npm run typecheck` |
-| Bundle | `npm run build` (one file, `dist/index.js`) · then `npm run smoke` (spawns it over stdio against a stub API) |
+| Bundle | `npm run build` (one file, `dist/index.js`) · then `npm run smoke` (spawns it over stdio against a stub API, and checks the `npm pack` file list) |
 | Run | `YODO_URL=http://127.0.0.1:8080 YODO_API_TOKEN=… node dist/index.js` (stdio; try it with `npx @modelcontextprotocol/inspector`) |
 
 **Docker image** (run from the repo root): `docker build -t yodo .`, then `docker run -p 127.0.0.1:8080:8080 -v yodo-data:/data yodo`. The build copies `web/dist` into `server/internal/webui/dist/` for `go:embed` (ADR 0019).
