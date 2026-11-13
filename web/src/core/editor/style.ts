@@ -5,6 +5,7 @@
 import type { ElementStyle } from '../document/create.ts'
 import type { YodoDocument, YodoElement } from '../document/types.ts'
 import type { Measure } from '../text/layout.ts'
+import { followBindings } from './binding.ts'
 import { withText } from './text.ts'
 
 export type StyleKey = keyof ElementStyle
@@ -120,7 +121,9 @@ function styled(
 
 /**
  * Applies `patch` to the elements in `ids`, each only where a style fits.
- * Returns the same document when nothing changes, so it is no undo step.
+ * Arrows attached to a shape whose corners changed re-snap to its new outline
+ * (#202). Returns the same document when nothing changes, so it is no undo
+ * step.
  */
 export function applyStyle(
   document: YodoDocument,
@@ -130,13 +133,26 @@ export function applyStyle(
 ): YodoDocument {
   const targets = new Set(ids)
   let changed = false
+  // Rounded corners change the outline attached ends sit on (bindOutline).
+  const reshaped = new Set<string>()
   const elements = document.elements.map((element) => {
     if (!targets.has(element.id)) return element
     const next = styled(element, patch, measure)
-    if (next !== element) changed = true
+    if (next === element) return element
+    changed = true
+    if (valueOf(next, 'roundness') !== valueOf(element, 'roundness')) {
+      reshaped.add(element.id)
+    }
     return next
   })
-  return changed ? { ...document, elements } : document
+  if (!changed) return document
+  return {
+    ...document,
+    elements:
+      reshaped.size > 0
+        ? followBindings(elements, new Set(), undefined, reshaped)
+        : elements,
+  }
 }
 
 /** `defaults` with `patch` applied, or itself if nothing changes (ADR 0036). */

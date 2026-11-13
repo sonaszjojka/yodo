@@ -8,6 +8,7 @@ import {
 import { lineFromDrag } from '../geometry/line.ts'
 import { MAX_ZOOM, MIN_ZOOM } from '../geometry/viewport.ts'
 import type { ArrowElement, LineElement } from '../document/types.ts'
+import { snapToOutline } from './binding.ts'
 import { createEditor, type Tool } from './editor.ts'
 import { sceneOf } from './scene.ts'
 
@@ -1825,6 +1826,62 @@ describe('attached arrows', () => {
       ],
       startBinding: { elementId: a.id, ratio: [1, 0.5] },
       endBinding: { elementId: b.id, ratio: [0, 0.5] },
+    })
+  })
+
+  describe('a corner change re-snaps the attached end (#202)', () => {
+    /** An arrow from a's bottom-right corner out to empty space. */
+    function setupCorner() {
+      const { editor, a, b } = setupSelection()
+      editor.setTool('arrow')
+      editor.drawTool.pointerDown(1, [98, 98], false)
+      editor.drawTool.pointerMove(1, [150, 150], false)
+      editor.drawTool.pointerUp(1)
+      editor.setTool('select')
+      const state = () => editor.store.getState().document.elements
+      const shape = () => state().find((e) => e.id === a.id) as typeof a
+      const start = (): [number, number] => {
+        const arrow = state().find((e) => e.type === 'arrow') as ArrowElement
+        return [arrow.x + arrow.points[0]![0], arrow.y + arrow.points[0]![1]]
+      }
+      const expectOnOutline = () => {
+        const [x, y] = snapToOutline(shape(), start()).point
+        expect(x).toBeCloseTo(start()[0], 6)
+        expect(y).toBeCloseTo(start()[1], 6)
+      }
+      return { editor, a, b, shape, start, expectOnOutline }
+    }
+
+    test('through the style bar, in one undo step', () => {
+      const { editor, shape, start, expectOnOutline } = setupCorner()
+      const before = start()
+      expect(before).not.toEqual([98, 98])
+      click(editor, [50, 50])
+
+      editor.setStyle({ roundness: 'round' })
+
+      expect(shape().roundness).toBe('round')
+      expect(start()).not.toEqual(before)
+      expectOnOutline()
+
+      editor.undo()
+      expect(shape().roundness).toBe('sharp')
+      expect(start()).toEqual(before)
+    })
+
+    test('through paste style', () => {
+      const { editor, shape, start, expectOnOutline } = setupCorner()
+      const before = start()
+      click(editor, [250, 50])
+      editor.setStyle({ roundness: 'round' })
+      editor.copyStyle()
+      click(editor, [50, 50])
+
+      editor.pasteStyle()
+
+      expect(shape().roundness).toBe('round')
+      expect(start()).not.toEqual(before)
+      expectOnOutline()
     })
   })
 
