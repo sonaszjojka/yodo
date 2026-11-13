@@ -60,6 +60,8 @@ Replace `X.Y.Z` with a release that came after this was added; `1.0.0` and `edge
 
 `yodo-mcp` is an [MCP](https://modelcontextprotocol.io) server that lets an agent (Claude Code, Claude Desktop, Cursor or any MCP client) list, read, draw, connect and render Yodo drawings. The agent starts it on your machine with `npx`, so it needs [Node.js](https://nodejs.org) 22 or newer; nothing is added to the Docker image ([ADR 0061](docs/adr/0061-mcp-server-as-a-typescript-package-in-mcp.md)). It has two setups:
 
+> **Not on npm yet.** Until `yodo-mcp` is published, build it from a clone (`npm ci` in `web/` and `mcp/`, then `npm run build` in `mcp/`) and use `node /path/to/yodo/mcp/dist/index.js` wherever this section says `npx -y yodo-mcp` (in JSON: `"command": "node", "args": ["/path/to/yodo/mcp/dist/index.js"]`).
+
 - **Standalone** (no settings): drawings are `.yodo` files in `~/Yodo`. Every write answers with the file's path and a link that opens the drawing in the hosted app, where you confirm and it's imported into your browser.
 - **Self-hosted**: with `YODO_URL` and `YODO_API_TOKEN` it works on your self-hosted Yodo, and what the agent draws shows on Home right away.
 
