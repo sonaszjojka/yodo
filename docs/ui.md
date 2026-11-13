@@ -38,7 +38,7 @@
   - opened with "All styles" or the toolbar button; closed with ✕;
   - draggable by its header, resizable from the left edge and bottom-left corner (width 240–520 px);
   - "snap back" button once moved.
-  - Sections: stroke, background, fill style, stroke width, stroke style, look, corners, opacity, layers, copy/paste style, use as default, delete. Text: font with live previews, size steps + exact px, alignment.
+  - Sections: stroke, background, fill style (only while the background isn't "None", since it has nothing to fill; a mixed background keeps it), stroke width, stroke style, look, corners, opacity, layers, copy/paste style, use as default, delete. Text: font with live previews, size steps + exact px, alignment.
   - With nothing selected the panel edits the **defaults for new shapes** and says so.
 - Bar and panel edit the same state and always agree.
 

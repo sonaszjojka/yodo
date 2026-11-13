@@ -251,6 +251,15 @@ const ORDER: StyleKey[] = [
   'opacity',
 ]
 
+/**
+ * Whether a section that `style` has is worth showing: a fill style only
+ * draws over a background, so it's hidden while the background is "None"
+ * (as in Excalidraw). A mixed background keeps it, for the filled ones.
+ */
+function fits(key: StyleKey, style: CommonStyle) {
+  return key !== 'fillStyle' || style.backgroundColor !== 'transparent'
+}
+
 /** The header line of a section: its name and the current value. */
 function SectionTitle({
   id,
@@ -729,7 +738,7 @@ export function StylePanel({ editor, panel }: StylePanelProps) {
             Nothing is selected: these apply to what you draw next.
           </p>
         )}
-        {ORDER.filter((key) => key in style).map((key) => {
+        {ORDER.filter((key) => key in style && fits(key, style)).map((key) => {
           const value = style[key]!
           if (key === 'opacity') {
             return (
