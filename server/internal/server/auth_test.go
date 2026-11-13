@@ -156,6 +156,16 @@ func TestLogoutEndsTheSession(t *testing.T) {
 	wantStatus(t, a.do(http.MethodGet, "/api/drawings", "", "", c), http.StatusUnauthorized)
 }
 
+func TestLogoutOverHTTPSClearsASecureCookie(t *testing.T) {
+	a := newAuthAPI(t, "secret")
+	c := a.login("secret", false)
+	rec := a.do(http.MethodDelete, "/api/session", "", "https://secure.example", c)
+	wantStatus(t, rec, http.StatusNoContent)
+	if got := rec.Result().Cookies(); len(got) != 1 || !got[0].Secure {
+		t.Errorf("logout cookies = %v, want a Secure clearing cookie over https", got)
+	}
+}
+
 func TestTooManyWrongPasswordsLockLogins(t *testing.T) {
 	a := newAuthAPI(t, "secret")
 	for range maxFailures {
