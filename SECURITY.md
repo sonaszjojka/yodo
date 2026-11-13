@@ -4,7 +4,7 @@
 Only the latest minor release (the `latest` Docker image and the hosted app) receives security fixes. Older lines are not maintained unless a `release/X.Y` branch is announced.
 
 ## Reporting a vulnerability
-**Please do not open a public issue.** Report it privately through GitHub: [Report a vulnerability](../../security/advisories/new) (Security tab → "Report a vulnerability").
+**Please do not open a public issue.** Report it privately through GitHub: [Report a vulnerability](https://github.com/sonaszjojka/yodo/security/advisories/new) (Security tab → "Report a vulnerability").
 
 Include what you found, how to reproduce it, the version or image tag, and whether you use the hosted or self-hosted mode. You will get an acknowledgement within about 7 days. We will keep you updated, fix confirmed issues in a new release, and credit you in the advisory unless you prefer otherwise. Please give us reasonable time to fix before you disclose publicly.
 

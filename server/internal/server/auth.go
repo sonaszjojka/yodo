@@ -193,6 +193,8 @@ func (a *Auth) logout(w http.ResponseWriter, r *http.Request) {
 			MaxAge:   -1,
 			HttpOnly: true,
 			SameSite: http.SameSiteStrictMode,
+			// Same attributes as the login cookie, so the browser replaces it.
+			Secure: strings.HasPrefix(r.Header.Get("Origin"), "https://"),
 		})
 	}
 	w.WriteHeader(http.StatusNoContent)
