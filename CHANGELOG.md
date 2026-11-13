@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.7.0](https://github.com/sonaszjojka/yodo/compare/v1.6.0...v1.7.0) (2026-11-13)
+
+
+### Features
+
+* **mcp:** draw real images in render_drawing ([#210](https://github.com/sonaszjojka/yodo/issues/210)) ([1866d22](https://github.com/sonaszjojka/yodo/commit/1866d22beee3e96de7414d7f5d6280c3df09b9d7))
+
+
+### Bug Fixes
+
+* **web:** re-snap attached arrows when a shape's corners change ([#208](https://github.com/sonaszjojka/yodo/issues/208)) ([736dfe0](https://github.com/sonaszjojka/yodo/commit/736dfe04d22c5362e9939c78cb0002f1de95d91b))
+
 ## [1.6.0](https://github.com/sonaszjojka/yodo/compare/v1.5.0...v1.6.0) (2026-11-13)
 
 
